@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>PartnerScout AI - Discovery Sessions</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "apple-bg": "#fbfbfd",
+                        "apple-card": "#ffffff",
+                        "apple-gray": "#f5f5f7",
+                        "apple-border": "rgba(0, 0, 0, 0.06)",
+                        "apple-blue": "#0071e3",
+                        "apple-blue-hover": "#0077ed",
+                        "apple-green": "#34c759",
+                        "apple-orange": "#ff9500",
+                        "apple-red": "#ff3b30",
+                        "apple-purple": "#af52de",
+                        "apple-text": "#1d1d1f",
+                        "apple-text-secondary": "#86868b",
+                        "apple-text-tertiary": "#aeaeb2",
+                    },
+                    fontFamily: {
+                        "sf": ["Inter", "-apple-system", "BlinkMacSystemFont", "sans-serif"]
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'slide-up': 'slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        'slide-down': 'slideDown 0.3s ease-out forwards',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        slideDown: {
+                            '0%': { opacity: '0', transform: 'translateY(-10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+        
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .session-card {
+            background: #ffffff;
+            border-radius: 16px;
+            border: 1px solid rgba(0, 0, 0, 0.04);
+            transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+        
+        .session-card:hover {
+            border-color: rgba(0, 113, 227, 0.2);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+            transform: translateY(-2px);
+        }
+        
+        .apple-button {
+            background: #0071e3;
+            color: white;
+            border-radius: 980px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .apple-button:hover {
+            background: #0077ed;
+        }
+        
+        .status-badge {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            padding: 4px 10px;
+            border-radius: 980px;
+        }
+        
+        .status-pending { background: #f5f5f7; color: #86868b; }
+        .status-analyzing { background: rgba(175, 82, 222, 0.1); color: #af52de; }
+        .status-discovering { background: rgba(0, 113, 227, 0.1); color: #0071e3; }
+        .status-scoring { background: rgba(255, 149, 0, 0.1); color: #ff9500; }
+        .status-completed { background: rgba(52, 199, 89, 0.1); color: #34c759; }
+        .status-failed { background: rgba(255, 59, 48, 0.1); color: #ff3b30; }
+        
+        .nav-link {
+            position: relative;
+            color: #86868b;
+            transition: color 0.2s ease;
+        }
+        
+        .nav-link:hover, .nav-link.active {
+            color: #1d1d1f;
+        }
+        
+        .nav-link.active::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            background: #0071e3;
+            border-radius: 50%;
+        }
+        
+        .animate-delay-100 { animation-delay: 0.05s; }
+        .animate-delay-200 { animation-delay: 0.1s; }
+        .animate-delay-300 { animation-delay: 0.15s; }
+        .animate-delay-400 { animation-delay: 0.2s; }
+        
+        /* Skeleton Loader Animation */
+        .skeleton {
+            background: linear-gradient(90deg, #f5f5f7 25%, #ebebeb 50%, #f5f5f7 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+    </style>
+</head>
+<body class="bg-apple-bg text-apple-text min-h-screen">
+    <!-- Toast Notification Container -->
+    <div class="fixed top-6 right-6 z-[100] space-y-3" id="toast-container">
+        <!-- Success Toast Example -->
+        <div class="hidden bg-white rounded-2xl shadow-xl border-l-4 border-apple-green p-4 flex items-start gap-3 min-w-[320px] max-w-[420px] animate-slide-up" id="toast-success">
+            <span class="material-symbols-outlined text-apple-green text-xl flex-shrink-0" style="font-variation-settings: 'FILL' 1">check_circle</span>
+            <div class="flex-1">
+                <p class="font-semibold text-sm">Session created!</p>
+                <p class="text-apple-text-secondary text-sm">Your discovery session is ready.</p>
+            </div>
+            <button class="text-apple-text-tertiary hover:text-apple-text-secondary" onclick="this.closest('[id^=toast]').classList.add('hidden')">
+                <span class="material-symbols-outlined text-lg">close</span>
+            </button>
+        </div>
+        <!-- Error Toast Example -->
+        <div class="hidden bg-white rounded-2xl shadow-xl border-l-4 border-apple-red p-4 flex items-start gap-3 min-w-[320px] max-w-[420px] animate-slide-up" id="toast-error">
+            <span class="material-symbols-outlined text-apple-red text-xl flex-shrink-0">error</span>
+            <div class="flex-1">
+                <p class="font-semibold text-sm">Session failed</p>
+                <p class="text-apple-text-secondary text-sm">Unable to start discovery.</p>
+            </div>
+            <button class="text-apple-text-tertiary hover:text-apple-text-secondary" onclick="this.closest('[id^=toast]').classList.add('hidden')">
+                <span class="material-symbols-outlined text-lg">close</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="flex flex-col min-h-screen">
+        <!-- Header -->
+        <header class="sticky top-0 z-50 bg-apple-bg/80 backdrop-blur-xl border-b border-apple-border">
+            <div class="max-w-6xl mx-auto px-6">
+                <div class="flex items-center justify-between h-14">
+                    <!-- Logo -->
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-apple-blue to-blue-600 flex items-center justify-center">
+                            <svg class="w-4.5 h-4.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                        </div>
+                        <span class="font-semibold text-lg tracking-tight">PartnerScout</span>
+                    </div>
+
+                    <!-- Navigation -->
+                    <nav class="hidden md:flex items-center gap-8">
+                        <a href="main-discovery-dashboard.html" class="nav-link text-sm font-medium">Dashboard</a>
+                        <a href="session-list.html" class="nav-link active text-sm font-medium">Sessions</a>
+                        <a href="#" class="nav-link text-sm font-medium">Analytics</a>
+                    </nav>
+
+                    <!-- Actions -->
+                    <div class="flex items-center gap-4">
+                        <button class="p-2 rounded-full hover:bg-apple-gray transition-colors">
+                            <span class="material-symbols-outlined text-apple-text-secondary text-xl">search</span>
+                        </button>
+                        <button class="relative p-2 rounded-full hover:bg-apple-gray transition-colors">
+                            <span class="material-symbols-outlined text-apple-text-secondary text-xl">notifications</span>
+                        </button>
+                        <!-- User Menu with Dropdown -->
+                        <div class="relative" id="user-menu">
+                            <button class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-apple-blue/30 transition-all">
+                                <span class="text-white text-sm font-semibold">R</span>
+                            </button>
+                            <!-- Dropdown (hidden by default) -->
+                            <div class="hidden absolute right-0 top-12 bg-white rounded-2xl shadow-xl border border-apple-border min-w-[220px] py-2 z-50" id="user-dropdown">
+                                <div class="px-4 py-3 border-b border-apple-border">
+                                    <p class="font-semibold text-sm">Ravi Kumar</p>
+                                    <p class="text-apple-text-secondary text-xs">ravi@company.com</p>
+                                </div>
+                                <div class="py-1">
+                                    <a href="#" class="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-apple-gray transition-colors">
+                                        <span class="material-symbols-outlined text-apple-text-secondary text-lg">person</span>
+                                        Profile Settings
+                                    </a>
+                                    <a href="#" class="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-apple-gray transition-colors">
+                                        <span class="material-symbols-outlined text-apple-text-secondary text-lg">settings</span>
+                                        Preferences
+                                    </a>
+                                </div>
+                                <div class="border-t border-apple-border pt-1 mt-1">
+                                    <a href="login.html" class="flex items-center gap-3 px-4 py-2.5 text-sm text-apple-red hover:bg-apple-red/5 transition-colors">
+                                        <span class="material-symbols-outlined text-lg">logout</span>
+                                        Sign Out
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 max-w-6xl w-full mx-auto px-6 py-10">
+            <!-- Page Header -->
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 opacity-0 animate-fade-in">
+                <div>
+                    <h1 class="text-4xl font-semibold tracking-tight mb-2">Discovery Sessions</h1>
+                    <p class="text-apple-text-secondary text-lg">View and manage all your discovery campaigns</p>
+                </div>
+                <button class="apple-button inline-flex items-center gap-2 px-6 py-3 text-sm">
+                    <span class="material-symbols-outlined text-lg">add</span>
+                    New Session
+                </button>
+            </div>
+
+            <!-- Stats Summary -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10 opacity-0 animate-slide-up animate-delay-100">
+                <div class="bg-white rounded-2xl p-5 border border-apple-border">
+                    <p class="text-apple-text-secondary text-sm font-medium mb-1">Total Sessions</p>
+                    <p class="text-3xl font-semibold tracking-tight">12</p>
+                </div>
+                <div class="bg-white rounded-2xl p-5 border border-apple-border">
+                    <p class="text-apple-text-secondary text-sm font-medium mb-1">Active</p>
+                    <p class="text-3xl font-semibold tracking-tight text-apple-blue">2</p>
+                </div>
+                <div class="bg-white rounded-2xl p-5 border border-apple-border">
+                    <p class="text-apple-text-secondary text-sm font-medium mb-1">Completed</p>
+                    <p class="text-3xl font-semibold tracking-tight text-apple-green">9</p>
+                </div>
+                <div class="bg-white rounded-2xl p-5 border border-apple-border">
+                    <p class="text-apple-text-secondary text-sm font-medium mb-1">Total Profiles</p>
+                    <p class="text-3xl font-semibold tracking-tight">847</p>
+                </div>
+            </div>
+
+            <!-- Filter Tabs -->
+            <div class="mb-6 opacity-0 animate-fade-in animate-delay-200">
+                <div class="inline-flex gap-1 p-1 bg-apple-gray rounded-xl">
+                    <button class="px-5 py-2 rounded-lg bg-white shadow-sm text-sm font-medium text-apple-text transition-all">
+                        All <span class="ml-1 text-apple-text-tertiary">12</span>
+                    </button>
+                    <button class="px-5 py-2 rounded-lg text-sm font-medium text-apple-text-secondary hover:text-apple-text transition-all">
+                        Active <span class="ml-1 text-apple-text-tertiary">2</span>
+                    </button>
+                    <button class="px-5 py-2 rounded-lg text-sm font-medium text-apple-text-secondary hover:text-apple-text transition-all">
+                        Completed <span class="ml-1 text-apple-text-tertiary">9</span>
+                    </button>
+                    <button class="px-5 py-2 rounded-lg text-sm font-medium text-apple-text-secondary hover:text-apple-text transition-all">
+                        Failed <span class="ml-1 text-apple-text-tertiary">1</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Sessions List -->
+            <div class="space-y-4">
+                <!-- Session Card 1 - Active/Scoring -->
+                <div class="session-card p-6 opacity-0 animate-slide-up animate-delay-200">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div class="flex items-start gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-apple-orange/10 flex items-center justify-center flex-shrink-0">
+                                <span class="material-symbols-outlined text-apple-orange text-2xl">campaign</span>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-3 mb-1">
+                                    <h3 class="font-semibold text-lg">Summer Wellness Campaign</h3>
+                                    <span class="status-badge status-scoring">SCORING</span>
+                                </div>
+                                <p class="text-apple-text-secondary text-sm mb-2">Created Jan 28, 2026 • Last updated 2 min ago</p>
+                                <div class="flex flex-wrap gap-4 text-sm">
+                                    <span class="text-apple-text-secondary">
+                                        <span class="font-medium text-apple-text">47</span> profiles discovered
+                                    </span>
+                                    <span class="text-apple-text-secondary">
+                                        <span class="font-medium text-apple-text">38</span> scored
+                                    </span>
+                                    <span class="text-apple-text-secondary">
+                                        <span class="font-medium text-apple-green">12</span> high matches
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button class="px-4 py-2 bg-apple-gray hover:bg-gray-200 rounded-xl text-sm font-medium transition-colors">
+                                View Details
+                            </button>
+                            <button class="p-2 bg-apple-gray hover:bg-gray-200 rounded-xl transition-colors">
+                                <span class="material-symbols-outlined text-apple-text-secondary text-lg">more_horiz</span>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Progress bar for active sessions -->
+                    <div class="mt-4 pt-4 border-t border-apple-border">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm text-apple-text-secondary">Progress</span>
+                            <span class="text-sm font-medium">81%</span>
+                        </div>
+                        <div class="h-1.5 bg-apple-gray rounded-full overflow-hidden">
+                            <div class="h-full bg-gradient-to-r from-apple-blue to-cyan-400 rounded-full" style="width: 81%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Session Card 2 - Discovering -->
+                <div class="session-card p-6 opacity-0 animate-slide-up animate-delay-300">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div class="flex items-start gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-apple-blue/10 flex items-center justify-center flex-shrink-0">
+                                <span class="material-symbols-outlined text-apple-blue text-2xl">explore</span>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-3 mb-1">
+                                    <h3 class="font-semibold text-lg">Fitness Influencer Outreach</h3>
+                                    <span class="status-badge status-discovering">DISCOVERING</span>
+                                </div>
+                                <p class="text-apple-text-secondary text-sm mb-2">Created Jan 30, 2026 • Last updated just now</p>
+                                <div class="flex flex-wrap gap-4 text-sm">
+                                    <span class="text-apple-text-secondary">
+                                        <span class="font-medium text-apple-text">23</span> profiles discovered
+                                    </span>
+                                    <span class="text-apple-text-secondary">
+                                        Target: <span class="font-medium text-apple-text">50</span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button class="px-4 py-2 bg-apple-gray hover:bg-gray-200 rounded-xl text-sm font-medium transition-colors">
+                                View Progress
+                            </button>
+                            <button class="p-2 bg-apple-gray hover:bg-gray-200 rounded-xl transition-colors">
+                                <span class="material-symbols-outlined text-apple-text-secondary text-lg">more_horiz</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Session Card 3 - Completed -->
+                <div class="session-card p-6 opacity-0 animate-slide-up animate-delay-400">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div class="flex items-start gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-apple-green/10 flex items-center justify-center flex-shrink-0">
+                                <span class="material-symbols-outlined text-apple-green text-2xl" style="font-variation-settings: 'FILL' 1">check_circle</span>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-3 mb-1">
+                                    <h3 class="font-semibold text-lg">Q4 Beauty Partners</h3>
+                                    <span class="status-badge status-completed">COMPLETED</span>
+                                </div>
+                                <p class="text-apple-text-secondary text-sm mb-2">Created Dec 15, 2025 • Completed Jan 20, 2026</p>
+                                <div class="flex flex-wrap gap-4 text-sm">
+                                    <span class="text-apple-text-secondary">
+                                        <span class="font-medium text-apple-text">150</span> profiles
+                                    </span>
+                                    <span class="text-apple-text-secondary">
+                                        <span class="font-medium text-apple-green">42</span> high matches
+                                    </span>
+                                    <span class="text-apple-text-secondary">
+                                        <span class="font-medium text-apple-text">78%</span> avg score
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button class="px-4 py-2 bg-apple-blue text-white hover:bg-apple-blue-hover rounded-xl text-sm font-medium transition-colors">
+                                View Results
+                            </button>
+                            <button class="p-2 bg-apple-gray hover:bg-gray-200 rounded-xl transition-colors">
+                                <span class="material-symbols-outlined text-apple-text-secondary text-lg">more_horiz</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Session Card 4 - Failed -->
+                <div class="session-card p-6 opacity-0 animate-slide-up" style="animation-delay: 0.25s">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div class="flex items-start gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-apple-red/10 flex items-center justify-center flex-shrink-0">
+                                <span class="material-symbols-outlined text-apple-red text-2xl">error</span>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-3 mb-1">
+                                    <h3 class="font-semibold text-lg">Tech Reviewers Campaign</h3>
+                                    <span class="status-badge status-failed">FAILED</span>
+                                </div>
+                                <p class="text-apple-text-secondary text-sm mb-2">Created Jan 25, 2026 • Failed Jan 25, 2026</p>
+                                <p class="text-apple-red text-sm">
+                                    <span class="material-symbols-outlined text-sm align-middle mr-1">warning</span>
+                                    Error: Rate limit exceeded. Please try again later.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button class="px-4 py-2 bg-apple-orange/10 text-apple-orange hover:bg-apple-orange/20 rounded-xl text-sm font-medium transition-colors">
+                                <span class="material-symbols-outlined text-sm align-middle mr-1">refresh</span>
+                                Retry
+                            </button>
+                            <button class="px-4 py-2 bg-apple-gray hover:bg-gray-200 rounded-xl text-sm font-medium transition-colors text-apple-red">
+                                <span class="material-symbols-outlined text-sm align-middle mr-1">delete</span>
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Session Card 5 - Pending -->
+                <div class="session-card p-6 opacity-0 animate-slide-up" style="animation-delay: 0.3s">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div class="flex items-start gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-apple-gray flex items-center justify-center flex-shrink-0">
+                                <span class="material-symbols-outlined text-apple-text-tertiary text-2xl">schedule</span>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-3 mb-1">
+                                    <h3 class="font-semibold text-lg">Spring Fashion Collab</h3>
+                                    <span class="status-badge status-pending">PENDING</span>
+                                </div>
+                                <p class="text-apple-text-secondary text-sm mb-2">Created Jan 31, 2026 • Not started</p>
+                                <p class="text-apple-text-tertiary text-sm">Ready to launch when you're ready</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button class="px-4 py-2 bg-apple-blue text-white hover:bg-apple-blue-hover rounded-xl text-sm font-medium transition-colors">
+                                <span class="material-symbols-outlined text-sm align-middle mr-1">rocket_launch</span>
+                                Start
+                            </button>
+                            <button class="p-2 bg-apple-gray hover:bg-gray-200 rounded-xl transition-colors">
+                                <span class="material-symbols-outlined text-apple-text-secondary text-lg">more_horiz</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================ -->
+            <!-- ERROR STATE: Service Unavailable (hidden by default) -->
+            <!-- ============================================ -->
+            <div class="hidden bg-white rounded-2xl border border-apple-border p-12 text-center" id="error-state">
+                <div class="max-w-md mx-auto">
+                    <div class="w-16 h-16 rounded-full bg-apple-gray flex items-center justify-center mx-auto mb-6">
+                        <span class="material-symbols-outlined text-apple-text-tertiary text-3xl">cloud_off</span>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">Unable to Load Sessions</h3>
+                    <p class="text-apple-text-secondary mb-8 leading-relaxed">
+                        We're having trouble connecting to our servers. Your sessions are safe — please try again in a moment.
+                    </p>
+                    <button class="apple-button inline-flex items-center gap-2 px-8 py-3.5 text-sm" onclick="location.reload()">
+                        <span class="material-symbols-outlined text-lg">refresh</span>
+                        Try Again
+                    </button>
+                </div>
+            </div>
+
+            <!-- ============================================ -->
+            <!-- LOADING STATE: Skeleton Loaders (hidden by default) -->
+            <!-- ============================================ -->
+            <div class="hidden space-y-4" id="loading-state">
+                <!-- Skeleton Session Card 1 -->
+                <div class="session-card p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="skeleton w-12 h-12 rounded-xl flex-shrink-0"></div>
+                        <div class="flex-1 space-y-3">
+                            <div class="flex items-center gap-3">
+                                <div class="skeleton h-5 w-48 rounded"></div>
+                                <div class="skeleton h-5 w-20 rounded-full"></div>
+                            </div>
+                            <div class="skeleton h-3 w-40 rounded"></div>
+                            <div class="flex gap-4 mt-2">
+                                <div class="skeleton h-3 w-24 rounded"></div>
+                                <div class="skeleton h-3 w-20 rounded"></div>
+                            </div>
+                        </div>
+                        <div class="skeleton h-10 w-28 rounded-xl"></div>
+                    </div>
+                </div>
+                <!-- Skeleton Session Card 2 -->
+                <div class="session-card p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="skeleton w-12 h-12 rounded-xl flex-shrink-0"></div>
+                        <div class="flex-1 space-y-3">
+                            <div class="flex items-center gap-3">
+                                <div class="skeleton h-5 w-40 rounded"></div>
+                                <div class="skeleton h-5 w-24 rounded-full"></div>
+                            </div>
+                            <div class="skeleton h-3 w-36 rounded"></div>
+                            <div class="flex gap-4 mt-2">
+                                <div class="skeleton h-3 w-20 rounded"></div>
+                                <div class="skeleton h-3 w-24 rounded"></div>
+                            </div>
+                        </div>
+                        <div class="skeleton h-10 w-28 rounded-xl"></div>
+                    </div>
+                </div>
+                <!-- Skeleton Session Card 3 -->
+                <div class="session-card p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="skeleton w-12 h-12 rounded-xl flex-shrink-0"></div>
+                        <div class="flex-1 space-y-3">
+                            <div class="flex items-center gap-3">
+                                <div class="skeleton h-5 w-52 rounded"></div>
+                                <div class="skeleton h-5 w-20 rounded-full"></div>
+                            </div>
+                            <div class="skeleton h-3 w-44 rounded"></div>
+                            <div class="flex gap-4 mt-2">
+                                <div class="skeleton h-3 w-24 rounded"></div>
+                                <div class="skeleton h-3 w-20 rounded"></div>
+                            </div>
+                        </div>
+                        <div class="skeleton h-10 w-28 rounded-xl"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="py-8 mt-auto border-t border-apple-border">
+            <div class="max-w-6xl mx-auto px-6">
+                <p class="text-center text-apple-text-tertiary text-sm">
+                    © 2026 PartnerScout AI
+                </p>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>
+

@@ -109,34 +109,81 @@ POST /api/agent/discover
       "id": "aaaa1111-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
       "instagram_url": "https://instagram.com/the_sustainable_closet",
       "username": "the_sustainable_closet",
-      "followers": 45200
+      "full_name": "The Sustainable Closet",
+      "profile_picture_url": "https://instagram.com/...",
+      "bio": "Curating ethical fashion | Slow fashion advocate",
+      "followers": 45200,
+      "following": 1250,
+      "posts_count": 847,
+      "engagement_rate": 3.2,
+      "is_verified": false,
+      "is_business": true,
+      "external_url": "https://sustainablecloset.com",
+      "business_email": "hello@sustainablecloset.com",
+      "business_category": "Clothing Store",
+      "following_ratio": 0.03
     },
     {
       "id": "bbbb2222-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
       "instagram_url": "https://instagram.com/eco.boutique",
       "username": "eco.boutique",
-      "followers": 28500
+      "full_name": "Eco Boutique",
+      "profile_picture_url": "https://instagram.com/...",
+      "bio": "Sustainable living | Eco-friendly products",
+      "followers": 28500,
+      "following": 890,
+      "posts_count": 432,
+      "engagement_rate": 4.1,
+      "is_verified": false,
+      "is_business": true,
+      "external_url": "https://ecoboutique.co",
+      "business_email": "contact@ecoboutique.co",
+      "business_category": "Home Goods Store",
+      "following_ratio": 0.03
     },
     {
       "id": "cccc3333-cccc-cccc-cccc-cccccccccccc",
       "instagram_url": "https://instagram.com/mindful_threads",
       "username": "mindful_threads",
-      "followers": 67800
+      "full_name": "Mindful Threads",
+      "profile_picture_url": "https://instagram.com/...",
+      "bio": "Conscious fashion choices | Ethical style",
+      "followers": 67800,
+      "following": 2100,
+      "posts_count": 1203,
+      "engagement_rate": 2.8,
+      "is_verified": true,
+      "is_business": true,
+      "external_url": "https://mindfulthreads.com",
+      "business_email": "hello@mindfulthreads.com",
+      "business_category": "Fashion Designer",
+      "following_ratio": 0.03
     }
-  ]
+  ],
+  "total_discovered": 3,
+  "deduplicated": 0
 }
 ```
 
-**Note:** The response includes `id` because profiles are inserted into the `discovered_profiles` table during discovery, and the generated UUIDs are returned for use in the scoring phase.
+**Note:** The response includes `id` because profiles are inserted into the `discovered_profiles` table during discovery, and the generated UUIDs are returned for use in the scoring phase. All profile data is stored at discovery time for consistent frontend display.
 
 ### What It Does
 
 1. Searches hashtags via Apify Instagram scraper
 2. Explores "similar accounts" from reference profiles
 3. Filters for relevant follower ranges (e.g., 10K-500K)
-4. Deduplicates results
-5. Inserts discovered profiles into `discovered_profiles` table with status `new`
-6. Returns profile data with generated database IDs
+4. Deduplicates results by username
+5. Fetches full profile data from Apify (username, bio, followers, engagement_rate, business indicators, etc.)
+6. Calculates `following_ratio` from `following / followers`
+7. Inserts discovered profiles into `discovered_profiles` table with all metadata and status `new`
+8. Returns profile data with generated database IDs
+
+**Data Stored at Discovery:**
+- `username`, `full_name`, `profile_picture_url`, `bio`
+- `followers`, `following`, `posts_count`, `engagement_rate`
+- `is_verified`, `is_business`
+- `external_url`, `business_email`, `business_category` (business indicators)
+- `following_ratio` (calculated for fake detection)
 
 ---
 
@@ -161,17 +208,27 @@ POST /api/agent/score
   "profile_id": "aaaa1111-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
   "profile_data": {
     "username": "the_sustainable_closet",
+    "full_name": "The Sustainable Closet",
     "instagram_url": "https://instagram.com/the_sustainable_closet",
+    "profile_picture_url": "https://instagram.com/...",
     "bio": "Curating ethical fashion | Slow fashion advocate | hello@sustainablecloset.com",
     "followers": 45200,
+    "following": 1250,
     "posts_count": 847,
     "engagement_rate": 3.2,
+    "is_verified": false,
+    "is_business": true,
+    "external_url": "https://sustainablecloset.com",
+    "business_email": "hello@sustainablecloset.com",
+    "business_category": "Clothing Store",
+    "following_ratio": 0.03,
     "recent_posts": [
       {
         "caption": "Capsule wardrobe essentials...",
         "hashtags": ["#capsulewardrobe", "#slowfashion"],
         "likes": 1250,
-        "comments": 45
+        "comments": 45,
+        "timestamp": "2026-01-28T14:30:00Z"
       }
     ]
   },
@@ -185,7 +242,7 @@ POST /api/agent/score
 
 **Option B: Simplified Request (used by N8N and Python orchestrators)**
 
-The orchestrators use a simplified request with just IDs. The backend fetches `brand_dna` from the database and `profile_data` from Apify at runtime. See `docs/Orchestration.md` Section 3.3 (Node 12) for details.
+The orchestrators use a simplified request with just IDs. The backend fetches `brand_dna` from the database and `profile_data` from the `discovered_profiles` table (stored at discovery time). Only `recent_posts` is fetched from Apify at runtime for engagement analysis. See `docs/Orchestration.md` Section 3.3 (Node 12) for details.
 
 ```json
 {
@@ -200,44 +257,142 @@ The orchestrators use a simplified request with just IDs. The backend fetches `b
 {
   "score": 92,
   "reasoning": {
-    "aesthetic_match": 95,
-    "engagement_quality": 88,
-    "content_alignment": 93,
-    "audience_fit": 91,
-    "summary": "Excellent match. Strong alignment with sustainable fashion values, consistent minimalist aesthetic, and engaged audience.",
+    "visual_aesthetic_match": 95,
+    "content_theme_alignment": 90,
+    "engagement_rate_score": 88,
+    "follower_quality": 95,
+    "business_indicators": 100,
+    "activity_recency": 90,
+    "summary": "Excellent match. Strong alignment with sustainable fashion values, consistent minimalist aesthetic. Genuine profile with healthy following ratio (0.03), strong engagement (3.2%), and complete business presence.",
     "recommendation": "Highly recommended for partnership outreach."
   },
   "contact": {
     "email": "hello@sustainablecloset.com",
-    "source": "bio"
+    "source": "business_email"
   }
 }
 ```
 
 ### What It Does
 
-1. Fetches detailed profile data via Apify
+1. Fetches detailed profile data via Apify (including business indicators)
 2. Calculates embedding similarity with brand DNA
 3. Analyzes aesthetic consistency using vision models
-4. Evaluates engagement quality and audience authenticity
-5. Extracts email from bio, website, or linked content
-6. Stores score in `profile_scores` table
-7. Stores contact in `profile_contacts` table
-8. Updates profile status to `done`
+4. Evaluates engagement quality and follower authenticity
+5. Detects fake/bot accounts using following ratio and post count heuristics
+6. Scores business presence (account type, email, website)
+7. Evaluates activity recency from post timestamps
+8. Extracts email from bio, business info, or linked content
+9. Stores score in `profile_scores` table
+10. Stores contact in `profile_contacts` table
+11. Updates profile status to `done`
 
 ### Apify Data Mapping
 
-The Scorer Agent fetches fresh profile data from Apify at scoring time. Field mapping:
+The Discovery Agent stores profile data at discovery time. The Scorer Agent uses stored data plus fetches `recent_posts` for engagement analysis:
 
-| Apify Field | Agent Field | Notes |
-|-------------|-------------|-------|
-| `biography` | `bio` | Profile description text |
-| `postsCount` | `posts_count` | Total number of posts |
-| `followersCount` | `followers` | Current follower count |
-| `latestPosts` | `recent_posts` | Array with likes, comments, captions |
-| Calculated | `engagement_rate` | `(avg_likes + avg_comments) / followers * 100` |
+| Apify Field | DB Column | Stored At | Notes |
+|-------------|-----------|-----------|-------|
+| `username` | `username` | Discovery | Profile handle |
+| `fullName` | `full_name` | Discovery | Display name |
+| `profilePicUrl` | `profile_picture_url` | Discovery | Avatar URL |
+| `biography` | `bio` | Discovery | Profile description text |
+| `followersCount` | `followers` | Discovery | Current follower count |
+| `followsCount` | `following` | Discovery | Following count |
+| `postsCount` | `posts_count` | Discovery | Total number of posts |
+| `isVerified` | `is_verified` | Discovery | Blue checkmark |
+| `isBusinessAccount` | `is_business` | Discovery | Business account flag |
+| `externalUrl` | `external_url` | Discovery | Website link from bio |
+| `businessEmail` | `business_email` | Discovery | Email for business accounts |
+| `businessCategoryName` | `business_category` | Discovery | Business category |
+| Calculated | `engagement_rate` | Discovery | `(avg_likes + avg_comments) / followers * 100` |
+| Calculated | `following_ratio` | Discovery | `following / followers` |
+| `latestPosts` | — | Not stored | Fetched fresh at scoring time (includes timestamps) |
 
-**Note:** These fields are fetched at runtime, not stored in `discovered_profiles`, ensuring scoring uses current data.
+**Note:** All profile metadata is stored at discovery time for consistent frontend display. Only `recent_posts` is fetched fresh at scoring time for accurate engagement analysis and activity recency calculation.
+
+### Fake vs Genuine Profile Detection
+
+The Scorer Agent includes heuristics to detect fake/bot accounts as part of the `follower_quality` dimension.
+
+#### Detection Signals
+
+| Signal | Genuine | Suspicious | Likely Fake |
+|--------|---------|------------|-------------|
+| Following/Follower Ratio | < 1.0 | 1.0 - 2.0 | > 2.0 |
+| Posts vs Followers | 50+ posts for 5K | 20-50 posts | < 20 posts for 5K+ |
+| Business Account | Yes | - | No |
+| Email Available | Yes | - | No |
+| Website Linked | Yes | - | No |
+| Engagement Rate | > 2% | 1-2% | < 1% |
+| Bio Quality | Detailed, professional | Generic | Empty/spam |
+| Post Consistency | Regular (2-5/week) | Irregular | Burst then silent |
+
+#### Scoring Algorithm
+
+```python
+def calculate_follower_quality(profile: dict) -> int:
+    """
+    Calculate follower quality score (0-100).
+    Higher = more genuine, Lower = more likely fake.
+    """
+    score = 100
+    
+    # Check 1: Following/Follower ratio
+    ratio = profile.get("following_ratio", 0)
+    if ratio > 2.0:
+        score -= 30  # High ratio - likely fake
+    elif ratio > 1.5:
+        score -= 15  # Elevated ratio - suspicious
+    
+    # Check 2: Posts vs Followers
+    followers = profile.get("followers", 0)
+    posts = profile.get("posts_count", 0)
+    if followers > 5000 and posts < 20:
+        score -= 25  # Too few posts for follower count
+    elif posts > 50:
+        score += 0   # Good post history (no penalty)
+    
+    # Check 3: Business indicators
+    if profile.get("is_business"):
+        score += 5
+    if profile.get("business_email"):
+        score += 5
+    if profile.get("external_url"):
+        score += 5
+    
+    # Check 4: Engagement rate
+    engagement = profile.get("engagement_rate", 0)
+    if engagement < 1.0:
+        score -= 20  # Very low engagement
+    elif engagement < 2.0:
+        score -= 10  # Low engagement
+    
+    # Cap score between 0-100
+    return max(0, min(100, score))
+```
+
+#### Sample Verdicts
+
+**Genuine Profile (Score: 100/100)**
+```
+@daboraparis
+Followers: 28,500 | Following: 1,200 | Posts: 456
+Following Ratio: 0.04 ✅
+Business Account: Yes ✅
+Email: Yes ✅ | Website: Yes ✅
+Engagement: 3.2% ✅
+```
+
+**Fake Profile (Score: 25/100)**
+```
+@random_bot_12345
+Followers: 15,000 | Following: 45,000 | Posts: 12
+Following Ratio: 3.0 ❌ (High following/follower ratio)
+Business Account: No ❌
+Email: No ❌ | Website: No ❌
+Engagement: 0.4% ❌ (Too few posts for follower count)
+```
 
 ---
 
@@ -562,18 +717,26 @@ Return as a JSON array of hashtag strings (include # prefix).
 
 **`prompts/scorer/system.txt`**
 ```
-You are an influencer partnership analyst.
+You are an influencer partnership analyst and authenticity expert.
 
 Your task is to score candidate Instagram profiles against a brand's DNA 
-to determine partnership fit.
+to determine partnership fit, while also detecting fake/bot accounts.
 
 Scoring criteria (0-100 each):
-- aesthetic_match: Visual style and content alignment
-- engagement_quality: Signs of authentic engagement vs fake followers
-- content_alignment: Topic, values, and messaging alignment  
-- audience_fit: Target audience overlap potential
+- visual_aesthetic_match: Visual style and content alignment with brand (25%)
+- content_theme_alignment: Topic, values, and messaging alignment (20%)
+- engagement_rate_score: Engagement metrics relative to follower count (15%)
+- follower_quality: Authenticity signals - detect fake/bot accounts (15%)
+- business_indicators: Business account, email, website presence (15%)
+- activity_recency: Posting frequency and recency (10%)
 
-Also extract any contact email found in the profile.
+Fake account detection rules:
+- Following/Follower ratio > 2.0 = likely fake
+- < 20 posts for 5K+ followers = suspicious
+- Engagement rate < 1% = likely fake
+- No business account, email, or website = less trustworthy
+
+Also extract any contact email found in the profile bio or business info.
 
 Always provide a summary and actionable recommendation.
 ```
@@ -588,17 +751,26 @@ Keywords: {brand_keywords}
 Username: {username}
 Bio: {bio}
 Followers: {followers}
+Following: {following}
+Posts Count: {posts_count}
 Engagement Rate: {engagement_rate}%
+Following/Follower Ratio: {following_ratio}
+Is Business Account: {is_business}
+Has Email: {has_email}
+Has Website: {has_website}
+Last Post Date: {last_post_date}
 Recent Captions: 
 {captions}
 
 === TASK ===
 Score this profile and return JSON with:
-- aesthetic_match (0-100)
-- engagement_quality (0-100)
-- content_alignment (0-100)
-- audience_fit (0-100)
-- summary (2-3 sentences)
+- visual_aesthetic_match (0-100): Visual style alignment with brand
+- content_theme_alignment (0-100): Topic and messaging match
+- engagement_rate_score (0-100): Quality of engagement metrics
+- follower_quality (0-100): Authenticity score (100=genuine, 0=fake)
+- business_indicators (0-100): Business presence score
+- activity_recency (0-100): Recent posting activity score
+- summary (2-3 sentences including authenticity assessment)
 - recommendation (action to take)
 - email (extracted email or null)
 ```
@@ -923,20 +1095,22 @@ class ScorerAgent(BaseAgent):
         return {
             "score": final_score,
             "reasoning": {
-                "aesthetic_match": result["aesthetic_match"],
-                "engagement_quality": result["engagement_quality"],
-                "content_alignment": result["content_alignment"],
-                "audience_fit": result["audience_fit"],
+                "visual_aesthetic_match": result["visual_aesthetic_match"],
+                "content_theme_alignment": result["content_theme_alignment"],
+                "engagement_rate_score": result["engagement_rate_score"],
+                "follower_quality": result["follower_quality"],
+                "business_indicators": result["business_indicators"],
+                "activity_recency": result["activity_recency"],
                 "summary": result["summary"],
                 "recommendation": result["recommendation"]
             },
             "contact": {
                 "email": email,
-                "source": "bio" if email else None
+                "source": "business_email" if email else None
             }
         }
     
-    def _calculate_final_score(self, llm_result: dict, similarity: float) -> int:
+    def _calculate_final_score(self, llm_result: dict) -> int:
         """
         Weighted score calculation using config values.
         Weights defined in config/scoring.yaml (see Section 8.8)
@@ -944,11 +1118,12 @@ class ScorerAgent(BaseAgent):
         weights = self.scoring_config["weights"]
         
         score = (
-            llm_result["aesthetic_match"] * weights["aesthetic_match"] +
-            llm_result["engagement_quality"] * weights["engagement_quality"] +
-            llm_result["content_alignment"] * weights["content_alignment"] +
-            llm_result["audience_fit"] * weights["audience_fit"] +
-            similarity * 100 * weights["embedding_similarity"]
+            llm_result["visual_aesthetic_match"] * weights["visual_aesthetic_match"] +
+            llm_result["content_theme_alignment"] * weights["content_theme_alignment"] +
+            llm_result["engagement_rate_score"] * weights["engagement_rate_score"] +
+            llm_result["follower_quality"] * weights["follower_quality"] +
+            llm_result["business_indicators"] * weights["business_indicators"] +
+            llm_result["activity_recency"] * weights["activity_recency"]
         )
         
         return int(min(100, max(0, score)))
@@ -1121,11 +1296,12 @@ scorer:
 
 # Score component weights (must sum to 1.0)
 weights:
-  aesthetic_match: 0.25
-  engagement_quality: 0.25
-  content_alignment: 0.25
-  audience_fit: 0.15
-  embedding_similarity: 0.10
+  visual_aesthetic_match: 0.25   # Visual style and content alignment
+  content_theme_alignment: 0.20  # Topic, values, messaging alignment
+  engagement_rate_score: 0.15    # Engagement metrics relative to followers
+  follower_quality: 0.15         # Authenticity (fake detection)
+  business_indicators: 0.15      # Business account, email, website
+  activity_recency: 0.10         # Posting frequency and recency
 
 # Score thresholds for recommendations
 thresholds:
@@ -1133,6 +1309,18 @@ thresholds:
   good: 70         # "Recommended"
   moderate: 50     # "Consider with caution"
   poor: 0          # "Not recommended"
+
+# Fake profile detection thresholds
+fake_detection:
+  following_ratio:
+    genuine: 1.0       # < 1.0 = genuine
+    suspicious: 2.0    # 1.0-2.0 = suspicious, > 2.0 = likely fake
+  min_posts:
+    threshold_followers: 5000
+    min_posts_required: 20
+  engagement_rate:
+    fake: 1.0          # < 1% = likely fake
+    suspicious: 2.0    # 1-2% = suspicious
 
 # Engagement rate benchmarks (by follower tier)
 engagement_benchmarks:
@@ -1260,16 +1448,17 @@ class ScorerAgent(BaseAgent):
         super().__init__(llm)
         self.scoring_config = get_scoring_config()
     
-    def _calculate_final_score(self, llm_result: dict, similarity: float) -> int:
+    def _calculate_final_score(self, llm_result: dict) -> int:
         """Calculate score using configured weights."""
         weights = self.scoring_config["weights"]
         
         score = (
-            llm_result["aesthetic_match"] * weights["aesthetic_match"] +
-            llm_result["engagement_quality"] * weights["engagement_quality"] +
-            llm_result["content_alignment"] * weights["content_alignment"] +
-            llm_result["audience_fit"] * weights["audience_fit"] +
-            similarity * 100 * weights["embedding_similarity"]
+            llm_result["visual_aesthetic_match"] * weights["visual_aesthetic_match"] +
+            llm_result["content_theme_alignment"] * weights["content_theme_alignment"] +
+            llm_result["engagement_rate_score"] * weights["engagement_rate_score"] +
+            llm_result["follower_quality"] * weights["follower_quality"] +
+            llm_result["business_indicators"] * weights["business_indicators"] +
+            llm_result["activity_recency"] * weights["activity_recency"]
         )
         
         return int(min(100, max(0, score)))
@@ -1429,10 +1618,12 @@ class ScoreRequest(BaseModel):
     brand_dna: BrandDNA
 
 class ScoreReasoning(BaseModel):
-    aesthetic_match: int
-    engagement_quality: int
-    content_alignment: int
-    audience_fit: int
+    visual_aesthetic_match: int
+    content_theme_alignment: int
+    engagement_rate_score: int
+    follower_quality: int
+    business_indicators: int
+    activity_recency: int
     summary: str
     recommendation: str
 

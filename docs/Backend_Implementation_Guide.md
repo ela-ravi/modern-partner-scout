@@ -228,6 +228,7 @@ backend/
 │   │       ├── health.py               # GET /api/health
 │   │       ├── jobs.py                 # /api/jobs/* endpoints
 │   │       ├── agents.py               # /api/agent/* endpoints
+│   │       ├── email.py                # /api/email/* endpoints
 │   │       └── status.py               # Status update endpoints
 │   │
 │   ├── models/                         # Pydantic models
@@ -236,6 +237,7 @@ backend/
 │   │   ├── profile.py                  # Profile, ProfileScore, ProfileContact
 │   │   ├── brand.py                    # BrandDNA
 │   │   ├── agent.py                    # Agent request/response models
+│   │   ├── email.py                    # Email generation models
 │   │   └── status.py                   # Status update models
 │   │
 │   ├── services/                       # Business logic layer
@@ -243,6 +245,7 @@ backend/
 │   │   ├── job_service.py              # Job business logic
 │   │   ├── profile_service.py          # Profile business logic
 │   │   ├── scoring_service.py          # Scoring calculations
+│   │   ├── email_service.py            # Email generation service
 │   │   ├── llm_service.py              # LLM provider abstraction
 │   │   └── apify_service.py            # Instagram scraping service
 │   │
@@ -259,7 +262,8 @@ backend/
 │   │   ├── base.py                     # BaseAgent abstract class
 │   │   ├── brand_analyzer.py           # Brand DNA extraction agent
 │   │   ├── discovery.py                # Profile discovery agent
-│   │   └── scorer.py                   # Profile scoring agent
+│   │   ├── scorer.py                   # Profile scoring agent
+│   │   └── email_composer.py           # Email draft generation agent
 │   │
 │   ├── prompts/                        # LLM prompt templates
 │   │   ├── __init__.py
@@ -270,7 +274,10 @@ backend/
 │   │   ├── discovery/
 │   │   │   ├── system.txt
 │   │   │   └── user.txt
-│   │   └── scorer/
+│   │   ├── scorer/
+│   │   │   ├── system.txt
+│   │   │   └── user.txt
+│   │   └── email_composer/
 │   │       ├── system.txt
 │   │       └── user.txt
 │   │
@@ -577,6 +584,73 @@ async def delete_job(
 ):
     """Delete job and all related data."""
     return await job_service.delete_job(job)
+
+
+@router.post("/{job_id}/retry")
+async def retry_job(
+    job = Depends(JobOwnerGuard()),  # Guard: must own the job
+    job_service: JobService = Depends()
+):
+    """Retry a failed job by resetting and restarting."""
+    return await job_service.retry_job(job)
+
+
+@router.patch("/{job_id}")
+async def update_job(
+    request: UpdateJobRequest,
+    job = Depends(JobOwnerGuard()),  # Guard: must own the job
+    job_service: JobService = Depends()
+):
+    """Update job metadata (name)."""
+    return await job_service.update_job(job, request)
+
+
+@router.get("/{job_id}/analytics")
+async def get_job_analytics(
+    job = Depends(JobOwnerGuard()),  # Guard: must own the job
+    job_service: JobService = Depends()
+):
+    """Get analytics summary for a job."""
+    return await job_service.get_analytics(job)
+```
+
+```python
+# routes/email.py
+from fastapi import APIRouter, Depends
+from app.guards.auth import require_user
+from app.guards.ownership import JobOwnerGuard, ProfileOwnerGuard
+from app.services.email_service import EmailService
+
+router = APIRouter(prefix="/api/email", tags=["email"])
+
+@router.post("/generate")
+async def generate_email(
+    request: GenerateEmailRequest,
+    user: dict = Depends(require_user),  # Guard: must be authenticated
+    email_service: EmailService = Depends()
+):
+    """Generate AI-drafted outreach email for a profile."""
+    return await email_service.generate_email(
+        profile_id=request.profile_id,
+        job_id=request.job_id,
+        tone=request.tone,
+        user_id=user["id"]
+    )
+
+
+@router.post("/send")
+async def send_email(
+    request: SendEmailRequest,
+    user: dict = Depends(require_user),  # Guard: must be authenticated
+    email_service: EmailService = Depends()
+):
+    """Send email (mock - for demo purposes)."""
+    return await email_service.send_email_mock(
+        profile_id=request.profile_id,
+        subject=request.subject,
+        body=request.body,
+        to_email=request.to_email
+    )
 ```
 
 ```python
@@ -849,6 +923,7 @@ class Routes:
     HEALTH = "/api/health"
     JOBS = "/api/jobs"
     AGENTS = "/api/agent"
+    EMAIL = "/api/email"
     STATUS = "/api"
 
 
@@ -871,11 +946,12 @@ class Defaults:
 # =============================================================================
 class ScoringCategories:
     """Scoring category names."""
-    AESTHETIC_MATCH = "aesthetic_match"
-    ENGAGEMENT_QUALITY = "engagement_quality"
-    CONTENT_ALIGNMENT = "content_alignment"
-    AUDIENCE_FIT = "audience_fit"
-    EMBEDDING_SIMILARITY = "embedding_similarity"
+    VISUAL_AESTHETIC_MATCH = "visual_aesthetic_match"
+    CONTENT_THEME_ALIGNMENT = "content_theme_alignment"
+    ENGAGEMENT_RATE_SCORE = "engagement_rate_score"
+    FOLLOWER_QUALITY = "follower_quality"
+    BUSINESS_INDICATORS = "business_indicators"
+    ACTIVITY_RECENCY = "activity_recency"
 
 
 # =============================================================================
@@ -887,6 +963,16 @@ class ContactSources:
     WEBSITE = "website"
     LINKTREE = "linktree"
     POST = "post"
+
+
+# =============================================================================
+# Email Tones
+# =============================================================================
+class EmailTone(str, Enum):
+    """Email draft tone options."""
+    PROFESSIONAL = "professional"
+    FRIENDLY = "friendly"
+    CASUAL = "casual"
 
 
 # =============================================================================
@@ -949,6 +1035,16 @@ scorer:
     - bio
     - website
     - linktree
+
+email_composer:
+  # Default email tone
+  default_tone: "professional"
+  
+  # Max email length
+  max_words: 150
+  
+  # Include profile stats in email
+  include_stats: false
 ```
 
 #### settings/scoring.yaml
@@ -958,11 +1054,12 @@ scorer:
 # Weights must sum to 1.0
 
 weights:
-  aesthetic_match: 0.25
-  engagement_quality: 0.25
-  content_alignment: 0.25
-  audience_fit: 0.15
-  embedding_similarity: 0.10
+  visual_aesthetic_match: 0.25   # Visual style and content alignment with brand
+  content_theme_alignment: 0.20  # Topic, values, and messaging alignment
+  engagement_rate_score: 0.15    # Engagement metrics relative to follower count
+  follower_quality: 0.15         # Authenticity signals (fake detection)
+  business_indicators: 0.15      # Business account, email, website presence
+  activity_recency: 0.10         # Posting frequency and recency
 
 # Score thresholds for recommendations
 thresholds:
@@ -970,6 +1067,36 @@ thresholds:
   good: 70         # "Recommended"
   moderate: 50     # "Consider with caution"
   poor: 0          # "Not recommended"
+
+# Fake profile detection thresholds
+fake_detection:
+  # Following/Follower ratio thresholds
+  following_ratio:
+    genuine: 1.0       # < 1.0 = genuine
+    suspicious: 2.0    # 1.0 - 2.0 = suspicious, > 2.0 = likely fake
+  
+  # Minimum posts for follower counts
+  min_posts:
+    threshold_followers: 5000
+    min_posts_required: 20      # < 20 posts for 5K+ followers = suspicious
+    good_posts_ratio: 50        # 50+ posts for 5K followers = good
+  
+  # Engagement rate thresholds
+  engagement_rate:
+    fake: 1.0          # < 1% = likely fake
+    suspicious: 2.0    # 1-2% = suspicious
+    genuine: 2.0       # > 2% = genuine
+
+  # Score adjustments
+  penalties:
+    high_following_ratio: -30    # Ratio > 2.0
+    elevated_following_ratio: -15 # Ratio 1.5 - 2.0
+    too_few_posts: -25           # < 20 posts for 5K+ followers
+  
+  bonuses:
+    business_account: 5
+    email_available: 5
+    website_linked: 5
 
 # Engagement rate benchmarks by follower tier
 engagement_benchmarks:
@@ -985,6 +1112,13 @@ engagement_benchmarks:
     min: 1.5
     good: 2.5
     excellent: 4.0
+
+# Activity recency thresholds
+activity_recency:
+  excellent: 7     # Posted within 7 days
+  good: 14         # Posted within 14 days
+  moderate: 30     # Posted within 30 days
+  poor: 60         # Posted within 60 days (or never)
 ```
 
 #### settings/limits.yaml
@@ -1219,6 +1353,70 @@ class JobService:
         """Delete job and all related data (cascades in database)."""
         await self.job_repo.delete(job.id)
         return {"deleted": True, "job_id": str(job.id)}
+    
+    async def retry_job(self, job: Job) -> dict:
+        """
+        Retry a failed job.
+        
+        Business Rules:
+        - Can only retry jobs in FAILED status
+        - Resets status to PENDING and triggers discovery
+        """
+        if job.status != JobStatus.FAILED:
+            raise BusinessError(
+                code=ErrorCodes.INVALID_TRANSITION,
+                message="Can only retry jobs with 'failed' status"
+            )
+        
+        # Reset job status to pending
+        await self.job_repo.update_status(job.id, JobStatus.PENDING)
+        
+        # Clear previous profiles (optional - or keep them)
+        # await self.profile_repo.delete_by_job(job.id)
+        
+        # Trigger n8n workflow
+        job.status = JobStatus.PENDING
+        return await self.trigger_discovery(job)
+    
+    async def update_job(self, job: Job, data: UpdateJobRequest) -> Job:
+        """Update job metadata."""
+        return await self.job_repo.update(
+            job_id=job.id,
+            name=data.name
+        )
+    
+    async def get_analytics(self, job: Job) -> dict:
+        """Get analytics summary for a job."""
+        profiles = await self.profile_repo.list_by_job_with_scores(job.id)
+        
+        scores = [p.score.score for p in profiles if p.score]
+        emails = [p for p in profiles if p.contact and p.contact.email]
+        
+        # Calculate score distribution
+        excellent = len([s for s in scores if s >= 85])
+        good = len([s for s in scores if 70 <= s < 85])
+        moderate = len([s for s in scores if 50 <= s < 70])
+        poor = len([s for s in scores if s < 50])
+        
+        return {
+            "job_id": str(job.id),
+            "profiles_discovered": job.profiles_discovered,
+            "profiles_scored": job.profiles_scored,
+            "profiles_with_email": len(emails),
+            "average_score": sum(scores) / len(scores) if scores else 0,
+            "score_distribution": {
+                "excellent": excellent,
+                "good": good,
+                "moderate": moderate,
+                "poor": poor
+            },
+            "status_distribution": {
+                "new": len([p for p in profiles if p.status == "new"]),
+                "processing": len([p for p in profiles if p.status == "processing"]),
+                "done": len([p for p in profiles if p.status == "done"]),
+                "skipped": len([p for p in profiles if p.status == "skipped"])
+            }
+        }
 ```
 
 ### 6.2 Scoring Service Example
@@ -1238,23 +1436,28 @@ class ScoringService:
     
     def calculate_final_score(
         self,
-        aesthetic_match: int,
-        engagement_quality: int,
-        content_alignment: int,
-        audience_fit: int,
-        embedding_similarity: float
+        visual_aesthetic_match: int,
+        content_theme_alignment: int,
+        engagement_rate_score: int,
+        follower_quality: int,
+        business_indicators: int,
+        activity_recency: int
     ) -> int:
         """
         Calculate weighted final score.
         
         Uses weights from scoring.yaml configuration.
+        Weights: visual_aesthetic_match (25%), content_theme_alignment (20%),
+        engagement_rate_score (15%), follower_quality (15%), 
+        business_indicators (15%), activity_recency (10%)
         """
         score = (
-            aesthetic_match * self.weights[ScoringCategories.AESTHETIC_MATCH] +
-            engagement_quality * self.weights[ScoringCategories.ENGAGEMENT_QUALITY] +
-            content_alignment * self.weights[ScoringCategories.CONTENT_ALIGNMENT] +
-            audience_fit * self.weights[ScoringCategories.AUDIENCE_FIT] +
-            (embedding_similarity * 100) * self.weights[ScoringCategories.EMBEDDING_SIMILARITY]
+            visual_aesthetic_match * self.weights[ScoringCategories.VISUAL_AESTHETIC_MATCH] +
+            content_theme_alignment * self.weights[ScoringCategories.CONTENT_THEME_ALIGNMENT] +
+            engagement_rate_score * self.weights[ScoringCategories.ENGAGEMENT_RATE_SCORE] +
+            follower_quality * self.weights[ScoringCategories.FOLLOWER_QUALITY] +
+            business_indicators * self.weights[ScoringCategories.BUSINESS_INDICATORS] +
+            activity_recency * self.weights[ScoringCategories.ACTIVITY_RECENCY]
         )
         
         return int(min(100, max(0, score)))
@@ -1300,6 +1503,97 @@ class ScoringService:
             return 60
         else:
             return 30
+```
+
+### 6.3 Email Service Example
+
+```python
+# services/email_service.py
+from fastapi import Depends
+from app.repositories.profile_repo import ProfileRepository
+from app.repositories.job_repo import JobRepository
+from app.repositories.brand_repo import BrandRepository
+from app.agents.email_composer import EmailComposerAgent
+from app.core.constants import EmailTone
+from app.core.settings import get_agent_config
+from datetime import datetime
+import uuid
+
+class EmailService:
+    """Business logic for email generation."""
+    
+    def __init__(
+        self,
+        profile_repo: ProfileRepository = Depends(),
+        job_repo: JobRepository = Depends(),
+        brand_repo: BrandRepository = Depends(),
+        email_agent: EmailComposerAgent = Depends()
+    ):
+        self.profile_repo = profile_repo
+        self.job_repo = job_repo
+        self.brand_repo = brand_repo
+        self.email_agent = email_agent
+        self.config = get_agent_config("email_composer")
+    
+    async def generate_email(
+        self,
+        profile_id: str,
+        job_id: str,
+        tone: str,
+        user_id: str
+    ) -> dict:
+        """
+        Generate AI-drafted outreach email.
+        
+        Uses profile data and brand DNA to create personalized email.
+        """
+        # Fetch profile and brand data
+        profile = await self.profile_repo.get_by_id_with_score(profile_id)
+        brand_dna = await self.brand_repo.get_by_job(job_id)
+        job = await self.job_repo.get_by_id(job_id)
+        
+        # Generate email using AI agent
+        email = await self.email_agent.compose(
+            profile=profile,
+            brand_dna=brand_dna,
+            brand_description=job.brand_description,
+            tone=tone or self.config.get("default_tone", "professional")
+        )
+        
+        return {
+            "subject": email.subject,
+            "body": email.body,
+            "profile": {
+                "username": profile.username,
+                "email": profile.contact.email if profile.contact else None,
+                "followers": profile.followers,
+                "score": profile.score.score if profile.score else None
+            },
+            "metadata": {
+                "generated_at": datetime.utcnow().isoformat() + "Z",
+                "tone": tone,
+                "word_count": len(email.body.split())
+            }
+        }
+    
+    async def send_email_mock(
+        self,
+        profile_id: str,
+        subject: str,
+        body: str,
+        to_email: str
+    ) -> dict:
+        """
+        Mock email sending for demo purposes.
+        
+        In production, integrate with SendGrid, Mailgun, etc.
+        """
+        return {
+            "status": "sent",
+            "message": "Email sent successfully (demo mode)",
+            "email_id": f"email-mock-{uuid.uuid4().hex[:8]}",
+            "sent_at": datetime.utcnow().isoformat() + "Z"
+        }
 ```
 
 ---
@@ -1438,6 +1732,7 @@ class JobRepository(BaseRepository[Job]):
 | `/api/jobs/*` | User JWT | `Authorization: Bearer <token>` |
 | `/api/agent/*` | Service Key | `X-Service-Key: <key>` |
 | `/api/profiles/*/status` | Service Key | `X-Service-Key: <key>` |
+| `/api/email/*` | User JWT | `Authorization: Bearer <token>` |
 
 ### 8.2 Job Endpoints
 
@@ -1503,6 +1798,17 @@ class JobRepository(BaseRepository[Job]):
 
 #### GET /api/jobs/{job_id} - Get Session Details
 
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `min_score` | integer | - | Filter profiles with score >= value |
+| `sort` | string | `score` | Sort by: `score`, `followers`, `created_at` |
+| `order` | string | `desc` | Sort order: `asc`, `desc` |
+| `status` | string | - | Filter by profile status: `new`, `processing`, `done`, `skipped` |
+
+**Example:** `GET /api/jobs/{id}?min_score=50&sort=score&order=desc`
+
 **Response (200 OK):**
 ```json
 {
@@ -1516,19 +1822,33 @@ class JobRepository(BaseRepository[Job]):
   "profiles_scored": 47,
   "created_at": "2026-01-31T10:00:00Z",
   "updated_at": "2026-01-31T10:15:00Z",
+  "brand_dna": {
+    "hashtags": ["#sustainablefashion", "#slowfashion"],
+    "keywords": ["sustainable", "minimalist", "ethical"]
+  },
   "profiles": [
     {
       "id": "aaaa1111-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
       "instagram_url": "https://instagram.com/the_sustainable_closet",
       "username": "the_sustainable_closet",
+      "full_name": "The Sustainable Closet",
+      "profile_picture_url": "https://instagram.com/...",
+      "bio": "Curating ethical fashion | Slow fashion advocate",
       "followers": 45200,
+      "following": 1250,
+      "posts_count": 847,
+      "engagement_rate": 3.2,
+      "is_verified": false,
+      "is_business": true,
       "status": "done",
       "score": {
         "score": 92,
-        "aesthetic_match": 95,
-        "engagement_quality": 88,
-        "content_alignment": 93,
-        "audience_fit": 91,
+        "visual_aesthetic_match": 95,
+        "content_theme_alignment": 90,
+        "engagement_rate_score": 88,
+        "follower_quality": 95,
+        "business_indicators": 100,
+        "activity_recency": 90,
         "reasoning": {
           "summary": "Excellent match...",
           "recommendation": "Highly recommended..."
@@ -1560,6 +1880,76 @@ class JobRepository(BaseRepository[Job]):
 {
   "deleted": true,
   "job_id": "11111111-1111-1111-1111-111111111111"
+}
+```
+
+#### POST /api/jobs/{job_id}/retry - Retry Failed Session
+
+Retries a failed job by resetting status to pending and triggering discovery.
+
+**Response (202 Accepted):**
+```json
+{
+  "status": "accepted",
+  "job_id": "11111111-1111-1111-1111-111111111111",
+  "message": "Job has been reset and restarted"
+}
+```
+
+**Error Response (400 Bad Request):**
+```json
+{
+  "error": {
+    "code": "INVALID_TRANSITION",
+    "message": "Can only retry jobs with 'failed' status"
+  }
+}
+```
+
+#### PATCH /api/jobs/{job_id} - Update Session
+
+Update session metadata (name).
+
+**Request:**
+```json
+{
+  "name": "Updated Session Name"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "id": "11111111-1111-1111-1111-111111111111",
+  "name": "Updated Session Name",
+  "updated_at": "2026-01-31T10:05:00Z"
+}
+```
+
+#### GET /api/jobs/{job_id}/analytics - Get Session Analytics
+
+Get pre-calculated analytics for a session.
+
+**Response (200 OK):**
+```json
+{
+  "job_id": "11111111-1111-1111-1111-111111111111",
+  "profiles_discovered": 47,
+  "profiles_scored": 47,
+  "profiles_with_email": 38,
+  "average_score": 68.5,
+  "score_distribution": {
+    "excellent": 12,
+    "good": 18,
+    "moderate": 10,
+    "poor": 7
+  },
+  "status_distribution": {
+    "new": 0,
+    "processing": 0,
+    "done": 45,
+    "skipped": 2
+  }
 }
 ```
 
@@ -1625,15 +2015,33 @@ class JobRepository(BaseRepository[Job]):
       "id": "aaaa1111-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
       "instagram_url": "https://instagram.com/the_sustainable_closet",
       "username": "the_sustainable_closet",
-      "followers": 45200
+      "full_name": "The Sustainable Closet",
+      "profile_picture_url": "https://instagram.com/...",
+      "bio": "Curating ethical fashion | Slow fashion advocate",
+      "followers": 45200,
+      "following": 1250,
+      "posts_count": 847,
+      "engagement_rate": 3.2,
+      "is_verified": false,
+      "is_business": true
     },
     {
       "id": "bbbb2222-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
       "instagram_url": "https://instagram.com/eco.boutique",
       "username": "eco.boutique",
-      "followers": 28500
+      "full_name": "Eco Boutique",
+      "profile_picture_url": "https://instagram.com/...",
+      "bio": "Sustainable living | Eco-friendly products",
+      "followers": 28500,
+      "following": 890,
+      "posts_count": 432,
+      "engagement_rate": 4.1,
+      "is_verified": false,
+      "is_business": true
     }
-  ]
+  ],
+  "total_discovered": 2,
+  "deduplicated": 0
 }
 ```
 
@@ -1652,11 +2060,13 @@ class JobRepository(BaseRepository[Job]):
 {
   "score": 92,
   "reasoning": {
-    "aesthetic_match": 95,
-    "engagement_quality": 88,
-    "content_alignment": 93,
-    "audience_fit": 91,
-    "summary": "Excellent match. Strong alignment with sustainable fashion values, consistent minimalist aesthetic, and engaged audience.",
+    "visual_aesthetic_match": 95,
+    "content_theme_alignment": 90,
+    "engagement_rate_score": 88,
+    "follower_quality": 95,
+    "business_indicators": 100,
+    "activity_recency": 90,
+    "summary": "Excellent match. Strong alignment with sustainable fashion values, consistent minimalist aesthetic, and engaged audience. Genuine profile with healthy engagement.",
     "recommendation": "Highly recommended for partnership outreach."
   },
   "contact": {
@@ -1666,7 +2076,75 @@ class JobRepository(BaseRepository[Job]):
 }
 ```
 
-### 8.4 Status Update Endpoints
+### 8.4 Email Endpoints
+
+#### POST /api/email/generate - Generate Outreach Email
+
+Generate an AI-drafted partnership outreach email for a discovered profile.
+
+**Request:**
+```json
+{
+  "profile_id": "aaaa1111-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "job_id": "11111111-1111-1111-1111-111111111111",
+  "tone": "friendly"
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `profile_id` | string | Yes | - | Profile UUID |
+| `job_id` | string | Yes | - | Job UUID (for brand context) |
+| `tone` | string | No | `professional` | Email tone: `professional`, `friendly`, `casual` |
+
+**Response (200 OK):**
+```json
+{
+  "subject": "Partnership Opportunity - Sustainable Fashion Collaboration",
+  "body": "Hi @the_sustainable_closet,\n\nI came across your profile and was impressed by your commitment to ethical fashion and minimalist aesthetics. Your content around capsule wardrobes really resonates with our brand values.\n\nWe're a sustainable fashion brand focused on timeless wardrobe essentials, and I think there could be a great opportunity for us to collaborate.\n\nWould you be open to a quick chat about potential partnership opportunities?\n\nBest regards,\n[Your Name]",
+  "profile": {
+    "username": "the_sustainable_closet",
+    "email": "hello@sustainablecloset.com",
+    "followers": 45200,
+    "score": 92
+  },
+  "metadata": {
+    "generated_at": "2026-01-31T10:20:00Z",
+    "tone": "friendly",
+    "word_count": 87
+  }
+}
+```
+
+#### POST /api/email/send - Send Email (Mock)
+
+Mock endpoint for demo purposes. Does not actually send email.
+
+**Request:**
+```json
+{
+  "profile_id": "aaaa1111-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "subject": "Partnership Opportunity",
+  "body": "Hi @the_sustainable_closet...",
+  "to_email": "hello@sustainablecloset.com"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "status": "sent",
+  "message": "Email sent successfully (demo mode)",
+  "email_id": "email-mock-12345",
+  "sent_at": "2026-01-31T10:22:00Z"
+}
+```
+
+> **Note:** This is a mock endpoint for demonstration. In production, integrate with email providers like SendGrid, Mailgun, or SMTP.
+
+---
+
+### 8.5 Status Update Endpoints
 
 #### PATCH /api/jobs/{job_id}/status
 
@@ -1779,7 +2257,19 @@ class JobRepository(BaseRepository[Job]):
 | `job_id` | UUID | FK → discovery_jobs, ON DELETE CASCADE | - |
 | `instagram_url` | TEXT | NOT NULL | - |
 | `username` | TEXT | NOT NULL | - |
+| `full_name` | TEXT | nullable | `NULL` |
+| `profile_picture_url` | TEXT | nullable | `NULL` |
+| `bio` | TEXT | nullable | `NULL` |
 | `followers` | INTEGER | NOT NULL | `0` |
+| `following` | INTEGER | nullable | `NULL` |
+| `posts_count` | INTEGER | nullable | `NULL` |
+| `engagement_rate` | DECIMAL(5,2) | nullable | `NULL` |
+| `is_verified` | BOOLEAN | NOT NULL | `false` |
+| `is_business` | BOOLEAN | nullable | `NULL` |
+| `external_url` | TEXT | nullable | `NULL` |
+| `business_email` | TEXT | nullable | `NULL` |
+| `business_category` | TEXT | nullable | `NULL` |
+| `following_ratio` | DECIMAL(5,2) | nullable | `NULL` |
 | `status` | profile_status | NOT NULL | `'new'` |
 | `created_at` | TIMESTAMPTZ | NOT NULL | `NOW()` |
 
@@ -1789,6 +2279,7 @@ class JobRepository(BaseRepository[Job]):
 **Indexes:**
 - `idx_discovered_profiles_job_id` on `job_id`
 - `idx_discovered_profiles_status` on `status`
+- `idx_discovered_profiles_followers` on `followers`
 
 ### 9.4 profile_scores
 
@@ -1797,10 +2288,12 @@ class JobRepository(BaseRepository[Job]):
 | `id` | UUID | PRIMARY KEY | `uuid_generate_v4()` |
 | `profile_id` | UUID | FK → discovered_profiles, ON DELETE CASCADE, UNIQUE | - |
 | `score` | INTEGER | NOT NULL, CHECK (0-100) | - |
-| `aesthetic_match` | INTEGER | CHECK (0-100) | `NULL` |
-| `engagement_quality` | INTEGER | CHECK (0-100) | `NULL` |
-| `content_alignment` | INTEGER | CHECK (0-100) | `NULL` |
-| `audience_fit` | INTEGER | CHECK (0-100) | `NULL` |
+| `visual_aesthetic_match` | INTEGER | CHECK (0-100) | `NULL` |
+| `content_theme_alignment` | INTEGER | CHECK (0-100) | `NULL` |
+| `engagement_rate_score` | INTEGER | CHECK (0-100) | `NULL` |
+| `follower_quality` | INTEGER | CHECK (0-100) | `NULL` |
+| `business_indicators` | INTEGER | CHECK (0-100) | `NULL` |
+| `activity_recency` | INTEGER | CHECK (0-100) | `NULL` |
 | `reasoning` | JSONB | NOT NULL | `'{}'` |
 | `created_at` | TIMESTAMPTZ | NOT NULL | `NOW()` |
 
@@ -2066,11 +2559,20 @@ class AgentError(BusinessError):
 
 ```json
 {
+  "id": "aaaa1111-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "job_id": "11111111-1111-1111-1111-111111111111",
+  "instagram_url": "https://instagram.com/the_sustainable_closet",
   "username": "the_sustainable_closet",
+  "full_name": "The Sustainable Closet",
+  "profile_picture_url": "https://instagram.com/p/abc123/media",
   "bio": "Curating ethical fashion | Slow fashion advocate | hello@sustainablecloset.com",
   "followers": 45200,
+  "following": 1250,
+  "posts_count": 847,
   "engagement_rate": 3.2,
-  "posts_count": 847
+  "is_verified": false,
+  "is_business": true,
+  "status": "done"
 }
 ```
 
@@ -2079,14 +2581,27 @@ class AgentError(BusinessError):
 ```json
 {
   "score": 92,
-  "aesthetic_match": 95,
-  "engagement_quality": 88,
-  "content_alignment": 93,
-  "audience_fit": 91,
+  "visual_aesthetic_match": 95,
+  "content_theme_alignment": 90,
+  "engagement_rate_score": 88,
+  "follower_quality": 95,
+  "business_indicators": 100,
+  "activity_recency": 90,
   "reasoning": {
-    "summary": "Excellent match. Strong alignment with sustainable fashion values, consistent minimalist aesthetic, and engaged audience.",
+    "summary": "Excellent match. Strong alignment with sustainable fashion values, consistent minimalist aesthetic, and engaged genuine audience with healthy engagement metrics.",
     "recommendation": "Highly recommended for partnership outreach."
   }
+}
+```
+
+### 12.6 Sample Generated Email
+
+```json
+{
+  "subject": "Partnership Opportunity - Sustainable Fashion Collaboration",
+  "body": "Hi @the_sustainable_closet,\n\nI came across your profile and was impressed by your commitment to ethical fashion and minimalist aesthetics. Your content around capsule wardrobes really resonates with our brand values.\n\nWe're a sustainable fashion brand focused on timeless wardrobe essentials, and I think there could be a great opportunity for us to collaborate.\n\nWould you be open to a quick chat about potential partnership opportunities?\n\nBest regards,\n[Your Name]",
+  "tone": "friendly",
+  "word_count": 87
 }
 ```
 
@@ -2109,8 +2624,9 @@ class AgentError(BusinessError):
 | 11 | Discovery Agent | `agents/discovery.py`, `services/apify_service.py` | Phase 10 |
 | 12 | Scorer Agent | `agents/scorer.py`, `services/scoring_service.py` | Phase 10 |
 | 13 | Agent Routes | `routes/agents.py` | Phase 10, 11, 12 |
-| 14 | Fallback | `scripts/run_discovery.py` | All phases |
-| 15 | Main App | `main.py` | All phases |
+| 14 | Email Composer | `agents/email_composer.py`, `services/email_service.py`, `routes/email.py` | Phase 9, 4 |
+| 15 | Fallback | `scripts/run_discovery.py` | All phases |
+| 16 | Main App | `main.py` | All phases |
 
 ---
 

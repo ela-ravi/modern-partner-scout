@@ -150,8 +150,8 @@
 
                     <!-- Navigation -->
                     <nav class="hidden md:flex items-center gap-8">
-                        <a href="#" class="nav-link active text-sm font-medium">Dashboard</a>
-                        <a href="#" class="nav-link text-sm font-medium">Discovery</a>
+                        <a href="main-discovery-dashboard.html" class="nav-link active text-sm font-medium">Dashboard</a>
+                        <a href="session-list.html" class="nav-link text-sm font-medium">Sessions</a>
                         <a href="#" class="nav-link text-sm font-medium">Analytics</a>
                     </nav>
 
@@ -164,8 +164,34 @@
                             <span class="material-symbols-outlined text-apple-text-secondary text-xl">notifications</span>
                             <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-apple-red rounded-full"></span>
                         </button>
-                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center cursor-pointer">
-                            <span class="text-white text-sm font-semibold">R</span>
+                        <!-- User Menu with Dropdown -->
+                        <div class="relative" id="user-menu">
+                            <button class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-apple-blue/30 transition-all">
+                                <span class="text-white text-sm font-semibold">R</span>
+                            </button>
+                            <!-- Dropdown (hidden by default) -->
+                            <div class="hidden absolute right-0 top-12 bg-white rounded-2xl shadow-xl border border-apple-border min-w-[220px] py-2 z-50" id="user-dropdown">
+                                <div class="px-4 py-3 border-b border-apple-border">
+                                    <p class="font-semibold text-sm">Ravi Kumar</p>
+                                    <p class="text-apple-text-secondary text-xs">ravi@company.com</p>
+                                </div>
+                                <div class="py-1">
+                                    <a href="#" class="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-apple-gray transition-colors">
+                                        <span class="material-symbols-outlined text-apple-text-secondary text-lg">person</span>
+                                        Profile Settings
+                                    </a>
+                                    <a href="#" class="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-apple-gray transition-colors">
+                                        <span class="material-symbols-outlined text-apple-text-secondary text-lg">settings</span>
+                                        Preferences
+                                    </a>
+                                </div>
+                                <div class="border-t border-apple-border pt-1 mt-1">
+                                    <a href="login.html" class="flex items-center gap-3 px-4 py-2.5 text-sm text-apple-red hover:bg-apple-red/5 transition-colors">
+                                        <span class="material-symbols-outlined text-lg">logout</span>
+                                        Sign Out
+                                    </a>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -216,7 +242,7 @@
                         Processing
                     </button>
                     <button class="px-5 py-2 rounded-lg text-sm font-medium text-apple-text-secondary hover:text-apple-text transition-all">
-                        Completed
+                        Done
                     </button>
                 </div>
             </div>

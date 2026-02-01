@@ -10,7 +10,7 @@ Team PartnerScout AI
 
 ## Last Updated
 
-January 2026
+February 2026
 
 ---
 
@@ -97,7 +97,7 @@ PartnerScout AI automates partner discovery by:
 3. User creates new discovery:
 
    * Brand description
-   * 5–10 reference Instagram profiles
+   * 2–10 reference Instagram profiles
 4. User clicks **Start Discovery**
 5. System:
 
@@ -154,18 +154,63 @@ PartnerScout AI automates partner discovery by:
 
 ### 5.3 Scorer Agent
 
-**Purpose:** Rank candidates
+**Purpose:** Rank candidates and detect fake/bot accounts
 
 **Inputs:**
 
-* Candidate profile
+* Candidate profile (with business indicators)
 * Brand DNA
 
 **Outputs:**
 
-* Score (0–100)
-* Reasoning (JSON)
+* Score (0–100) with 6 scoring dimensions
+* Follower authenticity assessment (fake detection)
+* Reasoning breakdown (JSON)
 * Contact email (if found)
+
+**Scoring Dimensions:**
+
+| Dimension | Weight | Description |
+|-----------|--------|-------------|
+| Visual Aesthetic Match | 25% | Visual style alignment with brand |
+| Content Theme Alignment | 20% | Topic, values, messaging match |
+| Engagement Rate | 15% | Engagement metrics vs followers |
+| Follower Quality | 15% | Authenticity (fake detection) |
+| Business Indicators | 15% | Business account, email, website |
+| Activity Recency | 10% | Posting frequency and recency |
+
+---
+
+### 5.3.1 Fake Profile Detection
+
+**Purpose:** Filter out bot accounts and fake profiles to ensure quality partner recommendations
+
+**Why It Matters:**
+
+* Fake accounts waste outreach efforts
+* Low-quality followers don't convert to sales
+* Bot accounts damage brand reputation
+
+**Detection Signals:**
+
+| Signal | Genuine | Suspicious | Likely Fake |
+|--------|---------|------------|-------------|
+| Following/Follower Ratio | < 1.0 | 1.0 – 2.0 | > 2.0 |
+| Posts vs Followers | 50+ posts for 5K | 20–50 posts | < 20 posts for 5K+ |
+| Business Account | Yes | – | No |
+| Email Available | Yes | – | No |
+| Website Linked | Yes | – | No |
+| Engagement Rate | > 2% | 1–2% | < 1% |
+
+**Scoring Impact:**
+
+* High following ratio (> 2.0): -30 points
+* Too few posts for followers: -25 points
+* Business account verified: +5 points
+* Email available: +5 points
+* Website linked: +5 points
+
+Profiles scoring below 50 on follower quality are flagged as potentially fake.
 
 ---
 
@@ -368,8 +413,18 @@ The service key is validated server-side and grants access to process any job. T
 GET    /api/jobs              # List all sessions for current user
 POST   /api/jobs              # Create new discovery session
 GET    /api/jobs/{id}         # Get session details with results
+GET    /api/jobs/{id}/analytics  # Get session analytics
 POST   /api/jobs/{id}/start   # Start/resume discovery
+POST   /api/jobs/{id}/retry   # Retry a failed session
+PATCH  /api/jobs/{id}         # Update session metadata (name)
 DELETE /api/jobs/{id}         # Delete session and all related data
+```
+
+### 8.1.1 Email Endpoints
+
+```
+POST   /api/email/generate    # Generate AI-drafted outreach email
+POST   /api/email/send        # Send email (mock for demo)
 ```
 
 **Note:** All session endpoints automatically filter by `user_id` from the JWT token. Users cannot access other users' sessions.
@@ -439,8 +494,27 @@ POST /api/agent/discover
 ```json
 {
   "profiles": [
-    { "id": "uuid", "instagram_url": "", "username": "", "followers": 0 }
-  ]
+    {
+      "id": "uuid",
+      "instagram_url": "https://instagram.com/example",
+      "username": "example",
+      "full_name": "Example Account",
+      "profile_picture_url": "https://...",
+      "bio": "Account bio text",
+      "followers": 45000,
+      "following": 1200,
+      "posts_count": 500,
+      "engagement_rate": 3.5,
+      "is_verified": false,
+      "is_business": true,
+      "external_url": "https://example.com",
+      "business_email": "hello@example.com",
+      "business_category": "Clothing Store",
+      "following_ratio": 0.03
+    }
+  ],
+  "total_discovered": 1,
+  "deduplicated": 0
 }
 ```
 
@@ -458,16 +532,18 @@ POST /api/agent/score
 {
   "score": 78,
   "reasoning": {
-    "aesthetic_match": 85,
-    "engagement_quality": 72,
-    "content_alignment": 80,
-    "audience_fit": 75,
-    "summary": "Good match with strong visual alignment.",
+    "visual_aesthetic_match": 85,
+    "content_theme_alignment": 80,
+    "engagement_rate_score": 72,
+    "follower_quality": 90,
+    "business_indicators": 75,
+    "activity_recency": 80,
+    "summary": "Good match with strong visual alignment. Genuine profile with healthy engagement.",
     "recommendation": "Recommended for partnership."
   },
   "contact": {
     "email": "hello@example.com",
-    "source": "bio"
+    "source": "business_email"
   }
 }
 ```
@@ -654,7 +730,19 @@ Stores candidate profiles found during discovery.
 | `job_id` | uuid (FK) | Reference to discovery_jobs |
 | `instagram_url` | text | Profile URL |
 | `username` | text | Instagram handle |
+| `full_name` | text | Display name |
+| `profile_picture_url` | text | Avatar URL |
+| `bio` | text | Profile bio/description |
 | `followers` | integer | Follower count |
+| `following` | integer | Following count |
+| `posts_count` | integer | Total posts |
+| `engagement_rate` | decimal(5,2) | Calculated engagement rate |
+| `is_verified` | boolean | Blue checkmark status |
+| `is_business` | boolean | Business account flag |
+| `external_url` | text | Website link from bio |
+| `business_email` | text | Email for business accounts |
+| `business_category` | text | Business category name |
+| `following_ratio` | decimal(5,2) | Calculated: following / followers |
 | `status` | enum | `new`, `processing`, `done`, `skipped` |
 | `created_at` | timestamptz | Discovery time |
 
@@ -669,9 +757,13 @@ Stores AI scoring results for each profile.
 | `id` | uuid (PK) | Unique ID |
 | `profile_id` | uuid (FK) | Reference to discovered_profiles |
 | `score` | integer | Match score (0-100) |
-| `aesthetic_match` | integer | Aesthetic sub-score |
-| `engagement_quality` | integer | Engagement sub-score |
-| `reasoning` | jsonb | Full reasoning breakdown |
+| `visual_aesthetic_match` | integer | Visual style alignment (0-100, 25% weight) |
+| `content_theme_alignment` | integer | Topic/messaging alignment (0-100, 20% weight) |
+| `engagement_rate_score` | integer | Engagement metrics (0-100, 15% weight) |
+| `follower_quality` | integer | Authenticity/fake detection (0-100, 15% weight) |
+| `business_indicators` | integer | Business presence (0-100, 15% weight) |
+| `activity_recency` | integer | Posting frequency (0-100, 10% weight) |
+| `reasoning` | jsonb | Full reasoning breakdown (summary, recommendation) |
 | `created_at` | timestamptz | Scoring time |
 
 ---

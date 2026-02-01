@@ -46,7 +46,7 @@
 | 11 | Session status tracking (pending → analyzing → discovering → scoring → completed/failed) |
 | 12 | Switch between multiple sessions without losing data |
 | 13 | View session progress (profiles discovered / profiles scored) |
-| 14 | Retry failed sessions |
+| 14 | Retry failed sessions via `POST /api/jobs/{id}/retry` |
 
 ---
 
@@ -71,7 +71,11 @@
 | 22 | Filter profiles by follower count range (10K-500K) |
 | 23 | Deduplicate discovered profiles by username |
 | 24 | Set discovery limit (default: 50 profiles) |
-| 25 | Display discovered profiles with username, followers, and URL |
+| 25 | Display discovered profiles with username, full_name, profile_picture, bio, followers, following, posts_count, engagement_rate, and URL |
+| 25a | Display external_url (website link from bio) |
+| 25b | Display business_email (for business accounts) |
+| 25c | Display business_category (business type) |
+| 25d | Display following_ratio (following/followers for fake detection) |
 
 ---
 
@@ -80,14 +84,17 @@
 | # | Functionality |
 |---|---------------|
 | 26 | Score profiles against brand DNA (0-100 scale) |
-| 27 | Calculate aesthetic match sub-score (0-100) |
-| 28 | Calculate engagement quality sub-score (0-100) |
-| 29 | Calculate content alignment sub-score (0-100) |
-| 30 | Calculate audience fit sub-score (0-100) |
-| 31 | Display overall weighted score |
-| 32 | Show AI-generated reasoning/summary for each score |
-| 33 | Show AI-generated partnership recommendation |
-| 34 | Filter profiles by minimum score threshold (default: ≥50) |
+| 27 | Calculate visual aesthetic match sub-score (0-100, 25% weight) |
+| 28 | Calculate content theme alignment sub-score (0-100, 20% weight) |
+| 29 | Calculate engagement rate sub-score (0-100, 15% weight) |
+| 30 | Calculate follower quality sub-score (0-100, 15% weight) - fake detection |
+| 31 | Calculate business indicators sub-score (0-100, 15% weight) |
+| 32 | Calculate activity recency sub-score (0-100, 10% weight) |
+| 33 | Display overall weighted score |
+| 34 | Show AI-generated reasoning/summary for each score |
+| 35 | Show AI-generated partnership recommendation |
+| 36 | Display authenticity verdict (genuine/suspicious/fake) based on follower_quality |
+| 37 | Filter profiles by minimum score threshold (default: ≥50) via `?min_score=50` |
 
 ---
 
@@ -95,10 +102,11 @@
 
 | # | Functionality |
 |---|---------------|
-| 35 | Extract email from profile bio |
-| 36 | Extract email from linked website |
-| 37 | Display extracted email with source indicator |
-| 38 | Show email availability icon on profile cards |
+| 38 | Extract email from profile bio |
+| 39 | Extract email from business_email field (Apify) |
+| 40 | Extract email from linked website |
+| 41 | Display extracted email with source indicator (bio/business_email/website) |
+| 42 | Show email availability icon on profile cards |
 
 ---
 
@@ -106,17 +114,17 @@
 
 | # | Functionality |
 |---|---------------|
-| 39 | **NEW tab** - Display freshly discovered profiles (not yet scored) |
-| 40 | **PROCESSING tab** - Display profiles currently being scored |
-| 41 | **DONE tab** - Display final ranked profiles with scores |
-| 42 | Profile cards with avatar, username, follower count |
-| 43 | Score badge/indicator on profile cards |
-| 44 | Email availability indicator on profile cards |
-| 45 | Sort profiles by score (highest first) |
-| 46 | Real-time updates as profiles are discovered and scored |
-| 47 | Progress bar/indicator showing discovery status |
-| 48 | Session selector dropdown to switch sessions |
-| 49 | Session history list view |
+| 43 | **NEW tab** - Display freshly discovered profiles (not yet scored) |
+| 44 | **PROCESSING tab** - Display profiles currently being scored |
+| 45 | **DONE tab** - Display final ranked profiles with scores |
+| 46 | Profile cards with profile_picture_url, username, full_name, follower count |
+| 47 | Score badge/indicator on profile cards |
+| 48 | Authenticity indicator on profile cards (Genuine/Suspicious/Fake) |
+| 49 | Email availability indicator on profile cards |
+| 50 | Sort profiles by score (highest first) via `?sort=score&order=desc` |
+| 51 | Real-time updates as profiles are discovered and scored |
+| 52 | Progress bar/indicator showing discovery status |
+| 53 | Session selector dropdown to switch sessions |
 
 ---
 
@@ -124,12 +132,23 @@
 
 | # | Functionality |
 |---|---------------|
-| 50 | Full profile information display |
-| 51 | Score breakdown visualization (all 4 dimensions) |
-| 52 | AI reasoning/summary display |
-| 53 | Partnership recommendation display |
-| 54 | Contact information display |
-| 55 | Link to Instagram profile |
+| 54 | Full profile information display (username, full_name, bio, profile_picture_url) |
+| 55 | Score breakdown visualization (all 6 dimensions with weights) |
+| 56 | Visual aesthetic match (25%) bar/chart |
+| 57 | Content theme alignment (20%) bar/chart |
+| 58 | Engagement rate score (15%) bar/chart |
+| 59 | Follower quality (15%) bar/chart with authenticity verdict |
+| 60 | Business indicators (15%) bar/chart |
+| 61 | Activity recency (10%) bar/chart |
+| 62 | AI reasoning/summary display |
+| 63 | Partnership recommendation display |
+| 64 | Contact information display |
+| 65 | Link to Instagram profile |
+| 65a | Display follower/following counts, posts_count, and following_ratio |
+| 65b | Display engagement rate |
+| 65c | Display verification and business account badges |
+| 65d | Display external_url (website) and business_category |
+| 65e | Display authenticity badge (Genuine/Suspicious/Fake based on follower_quality)
 
 ---
 
@@ -170,13 +189,15 @@
 
 ## 12. Analytics Summary
 
+> **API:** `GET /api/jobs/{id}/analytics` returns pre-calculated analytics
+
 | # | Functionality |
 |---|---------------|
-| 70 | Total profiles discovered count |
-| 71 | Total profiles scored count |
-| 72 | Average score across all profiles |
-| 73 | Count of profiles with email |
-| 74 | Count of high-scoring profiles (≥50, ≥70, ≥85) |
+| 70 | Total profiles discovered count (`profiles_discovered`) |
+| 71 | Total profiles scored count (`profiles_scored`) |
+| 72 | Average score across all profiles (`average_score`) |
+| 73 | Count of profiles with email (`profiles_with_email`) |
+| 74 | Count of high-scoring profiles by tier (`score_distribution.excellent/good/moderate/poor`) |
 
 ---
 
@@ -197,15 +218,16 @@
 | Page/Component | Functionalities |
 |----------------|-----------------|
 | **Login/Signup Page** | 1, 2 |
-| **Session List Page** | 7, 10, 12, 49, 75 |
+| **Session List Page** | 7, 10, 12, 14, 49, 75 |
 | **New Session Form** | 6, 15, 16 |
 | **Main Dashboard** | 39-49, 59-64, 70-74, 76-79 |
-| **Profile Card Component** | 25, 42-44 |
-| **Profile Detail Modal** | 50-55 |
-| **Email Composer Modal** | 56-58 |
+| **Profile Card Component** | 25, 42-44, 55a-55c |
+| **Profile Detail Modal** | 50-55, 55a-55c |
+| **Email Composer Modal** | 56-58 (uses `POST /api/email/generate` and `POST /api/email/send`) |
 | **Progress Indicator** | 11, 13, 47, 63 |
 | **Error Display** | 65-69, 79 |
 | **Brand DNA Display** | 17, 18 |
+| **Analytics Panel** | 70-74 (uses `GET /api/jobs/{id}/analytics`) |
 
 ---
 
@@ -216,8 +238,13 @@
 | Create session | `POST /api/jobs` |
 | List sessions | `GET /api/jobs` |
 | Get session details | `GET /api/jobs/{id}` |
+| Get session analytics | `GET /api/jobs/{id}/analytics` |
 | Start discovery | `POST /api/jobs/{id}/start` |
+| Retry failed session | `POST /api/jobs/{id}/retry` |
+| Update session name | `PATCH /api/jobs/{id}` |
 | Delete session | `DELETE /api/jobs/{id}` |
+| Generate outreach email | `POST /api/email/generate` |
+| Send email (mock) | `POST /api/email/send` |
 | Real-time updates | Supabase Realtime WebSocket |
 
 ---

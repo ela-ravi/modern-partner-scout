@@ -964,7 +964,7 @@ flowchart TB
 
 **Expected Response:**
 
-**Note:** The response includes `id` for each profile because the Discovery Agent inserts profiles into the `discovered_profiles` database table and returns the generated UUIDs. This differs slightly from the basic response shown in `docs/Agents_Documentation.md` Section 3.
+**Note:** The response includes `id` for each profile because the Discovery Agent inserts profiles into the `discovered_profiles` database table and returns the generated UUIDs. All profile metadata is stored at discovery time.
 
 ```json
 {
@@ -973,15 +973,41 @@ flowchart TB
       "id": "aaaa1111-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
       "instagram_url": "https://instagram.com/the_sustainable_closet",
       "username": "the_sustainable_closet",
-      "followers": 45200
+      "full_name": "The Sustainable Closet",
+      "profile_picture_url": "https://instagram.com/...",
+      "bio": "Curating ethical fashion | Slow fashion advocate",
+      "followers": 45200,
+      "following": 1250,
+      "posts_count": 847,
+      "engagement_rate": 3.2,
+      "is_verified": false,
+      "is_business": true,
+      "external_url": "https://sustainablecloset.com",
+      "business_email": "hello@sustainablecloset.com",
+      "business_category": "Clothing Store",
+      "following_ratio": 0.03
     },
     {
       "id": "bbbb2222-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
       "instagram_url": "https://instagram.com/eco.boutique",
       "username": "eco.boutique",
-      "followers": 28500
+      "full_name": "Eco Boutique",
+      "profile_picture_url": "https://instagram.com/...",
+      "bio": "Sustainable living | Eco-friendly products",
+      "followers": 28500,
+      "following": 890,
+      "posts_count": 432,
+      "engagement_rate": 4.1,
+      "is_verified": false,
+      "is_business": true,
+      "external_url": "https://ecoboutique.co",
+      "business_email": "contact@ecoboutique.co",
+      "business_category": "Home Goods Store",
+      "following_ratio": 0.03
     }
-  ]
+  ],
+  "total_discovered": 2,
+  "deduplicated": 0
 }
 ```
 
@@ -1181,7 +1207,7 @@ flowchart TB
 
 **Request Body:**
 
-The Scorer Agent accepts a simplified request with IDs. The backend fetches `brand_dna` from the job and `profile_data` from Apify at runtime. See `docs/Agents_Documentation.md` Section 4 for the full data structure.
+The Scorer Agent accepts a simplified request with IDs. The backend fetches `brand_dna` from the database and uses stored `profile_data` from `discovered_profiles` table. It fetches only `recent_posts` from Apify at runtime for engagement analysis. See `docs/Agents_Documentation.md` Section 4 for details.
 
 ```json
 {
@@ -1190,7 +1216,7 @@ The Scorer Agent accepts a simplified request with IDs. The backend fetches `bra
 }
 ```
 
-**Note:** The backend internally expands this to the full format documented in `Agents_Documentation.md` Section 4, which includes `profile_data` (fetched from Apify) and `brand_dna` (fetched from database).
+**Note:** The backend internally uses stored profile data from `discovered_profiles` table plus fetches `recent_posts` from Apify for engagement analysis. See `Agents_Documentation.md` Section 4 for field mapping.
 
 **Expected Response:**
 
@@ -1198,16 +1224,18 @@ The Scorer Agent accepts a simplified request with IDs. The backend fetches `bra
 {
   "score": 92,
   "reasoning": {
-    "aesthetic_match": 95,
-    "engagement_quality": 88,
-    "content_alignment": 93,
-    "audience_fit": 91,
-    "summary": "Excellent match. Strong alignment with sustainable fashion values, consistent minimalist aesthetic, and engaged audience.",
+    "visual_aesthetic_match": 95,
+    "content_theme_alignment": 90,
+    "engagement_rate_score": 88,
+    "follower_quality": 95,
+    "business_indicators": 100,
+    "activity_recency": 90,
+    "summary": "Excellent match. Strong alignment with sustainable fashion values, consistent minimalist aesthetic. Genuine profile with healthy engagement and complete business presence.",
     "recommendation": "Highly recommended for partnership outreach."
   },
   "contact": {
     "email": "hello@sustainablecloset.com",
-    "source": "bio"
+    "source": "business_email"
   }
 }
 ```
@@ -1859,7 +1887,11 @@ async def call_discovery_agent(
     See docs/Agents_Documentation.md Section 3 for details.
     
     Returns:
-        {"profiles": [{"id": "...", "instagram_url": "...", "username": "...", "followers": ...}]}
+        {"profiles": [{"id": "...", "instagram_url": "...", "username": "...", "full_name": "...", 
+         "profile_picture_url": "...", "bio": "...", "followers": ..., "following": ..., 
+         "posts_count": ..., "engagement_rate": ..., "is_verified": ..., "is_business": ...,
+         "external_url": "...", "business_email": "...", "business_category": "...", "following_ratio": ...}],
+         "total_discovered": ..., "deduplicated": ...}
     """
     async with httpx.AsyncClient() as client:
         response = await client.post(
@@ -1890,7 +1922,8 @@ async def call_scorer_agent(profile_id: str, job_id: str) -> dict:
     
     Note: We send simplified request (just IDs). The backend fetches:
     - brand_dna from the job's brand_dna table entry
-    - profile_data from Apify at runtime
+    - profile_data from discovered_profiles table (stored at discovery time)
+    - recent_posts from Apify at runtime for engagement analysis
     
     Returns:
         {"score": 92, "reasoning": {...}, "contact": {"email": "...", "source": "..."}}

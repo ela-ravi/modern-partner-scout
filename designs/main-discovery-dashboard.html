@@ -114,6 +114,14 @@
             transform: scale(1.05);
         }
         
+        .profile-name {
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+        }
+        
+        .profile-username {
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.6);
+        }
+        
         .badge {
             font-size: 11px;
             font-weight: 600;
@@ -126,9 +134,47 @@
         .animate-delay-400 { animation-delay: 0.2s; }
         .animate-delay-500 { animation-delay: 0.25s; }
         .animate-delay-600 { animation-delay: 0.3s; }
+        
+        /* Skeleton Loader Animation */
+        .skeleton {
+            background: linear-gradient(90deg, #f5f5f7 25%, #ebebeb 50%, #f5f5f7 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
     </style>
 </head>
 <body class="bg-apple-bg text-apple-text min-h-screen">
+    <!-- Toast Notification Container (fixed position) -->
+    <div class="fixed top-6 right-6 z-[100] space-y-3" id="toast-container">
+        <!-- Example Success Toast (remove 'hidden' to show) -->
+        <div class="hidden bg-white rounded-2xl shadow-xl border-l-4 border-apple-green p-4 flex items-start gap-3 min-w-[320px] max-w-[420px] animate-slide-up" id="toast-success">
+            <span class="material-symbols-outlined text-apple-green text-xl flex-shrink-0" style="font-variation-settings: 'FILL' 1">check_circle</span>
+            <div class="flex-1">
+                <p class="font-semibold text-sm">Profile saved!</p>
+                <p class="text-apple-text-secondary text-sm">Added to your shortlist.</p>
+            </div>
+            <button class="text-apple-text-tertiary hover:text-apple-text-secondary" onclick="this.closest('[id^=toast]').classList.add('hidden')">
+                <span class="material-symbols-outlined text-lg">close</span>
+            </button>
+        </div>
+        <!-- Example Error Toast -->
+        <div class="hidden bg-white rounded-2xl shadow-xl border-l-4 border-apple-red p-4 flex items-start gap-3 min-w-[320px] max-w-[420px] animate-slide-up" id="toast-error">
+            <span class="material-symbols-outlined text-apple-red text-xl flex-shrink-0">error</span>
+            <div class="flex-1">
+                <p class="font-semibold text-sm">Action failed</p>
+                <p class="text-apple-text-secondary text-sm">Please try again later.</p>
+            </div>
+            <button class="text-apple-text-tertiary hover:text-apple-text-secondary" onclick="this.closest('[id^=toast]').classList.add('hidden')">
+                <span class="material-symbols-outlined text-lg">close</span>
+            </button>
+        </div>
+    </div>
+
     <div class="flex flex-col min-h-screen">
         <!-- Header -->
         <header class="sticky top-0 z-50 bg-apple-bg/80 backdrop-blur-xl border-b border-apple-border">
@@ -144,8 +190,14 @@
                         <span class="font-semibold text-lg tracking-tight">PartnerScout</span>
                     </div>
 
+                    <!-- Navigation -->
+                    <nav class="hidden md:flex items-center gap-6">
+                        <a href="main-discovery-dashboard.html" class="text-sm font-medium text-apple-text">Dashboard</a>
+                        <a href="session-list.html" class="text-sm font-medium text-apple-text-secondary hover:text-apple-text transition-colors">Sessions</a>
+                    </nav>
+
                     <!-- Session Selector -->
-                    <button class="hidden md:flex items-center gap-2 px-4 py-2 bg-apple-gray hover:bg-gray-200 rounded-full transition-colors">
+                    <button class="hidden lg:flex items-center gap-2 px-4 py-2 bg-apple-gray hover:bg-gray-200 rounded-full transition-colors">
                         <span class="w-2 h-2 bg-apple-green rounded-full"></span>
                         <span class="text-sm font-medium">Summer Wellness Campaign</span>
                         <span class="material-symbols-outlined text-apple-text-secondary text-lg">expand_more</span>
@@ -160,8 +212,34 @@
                             <span class="material-symbols-outlined text-apple-text-secondary text-xl">notifications</span>
                             <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-apple-red rounded-full"></span>
                         </button>
-                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center cursor-pointer">
-                            <span class="text-white text-sm font-semibold">R</span>
+                        <!-- User Menu with Dropdown -->
+                        <div class="relative" id="user-menu">
+                            <button class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-apple-blue/30 transition-all">
+                                <span class="text-white text-sm font-semibold">R</span>
+                            </button>
+                            <!-- Dropdown (hidden by default, toggle with JS) -->
+                            <div class="hidden absolute right-0 top-12 bg-white rounded-2xl shadow-xl border border-apple-border min-w-[220px] py-2 z-50" id="user-dropdown">
+                                <div class="px-4 py-3 border-b border-apple-border">
+                                    <p class="font-semibold text-sm">Ravi Kumar</p>
+                                    <p class="text-apple-text-secondary text-xs">ravi@company.com</p>
+                                </div>
+                                <div class="py-1">
+                                    <a href="#" class="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-apple-gray transition-colors">
+                                        <span class="material-symbols-outlined text-apple-text-secondary text-lg">person</span>
+                                        Profile Settings
+                                    </a>
+                                    <a href="#" class="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-apple-gray transition-colors">
+                                        <span class="material-symbols-outlined text-apple-text-secondary text-lg">settings</span>
+                                        Preferences
+                                    </a>
+                                </div>
+                                <div class="border-t border-apple-border pt-1 mt-1">
+                                    <a href="login.html" class="flex items-center gap-3 px-4 py-2.5 text-sm text-apple-red hover:bg-apple-red/5 transition-colors">
+                                        <span class="material-symbols-outlined text-lg">logout</span>
+                                        Sign Out
+                                    </a>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -224,8 +302,8 @@
                 </div>
             </div>
 
-            <!-- Tab Navigation -->
-            <div class="mb-8 opacity-0 animate-fade-in animate-delay-200">
+            <!-- Tab Navigation & Sort -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 opacity-0 animate-fade-in animate-delay-200">
                 <div class="inline-flex gap-1 p-1 bg-apple-gray rounded-xl">
                     <button class="px-5 py-2 rounded-lg text-sm font-medium text-apple-text-secondary hover:text-apple-text transition-all">
                         All <span class="ml-1 text-apple-text-tertiary">47</span>
@@ -234,10 +312,18 @@
                         New <span class="ml-1 text-apple-blue">8</span>
                     </button>
                     <button class="px-5 py-2 rounded-lg text-sm font-medium text-apple-text-secondary hover:text-apple-text transition-all">
-                        Contacted <span class="ml-1 text-apple-text-tertiary">15</span>
+                        Processing <span class="ml-1 text-apple-text-tertiary">15</span>
                     </button>
                     <button class="px-5 py-2 rounded-lg text-sm font-medium text-apple-text-secondary hover:text-apple-text transition-all">
-                        Shortlisted <span class="ml-1 text-apple-text-tertiary">24</span>
+                        Done <span class="ml-1 text-apple-text-tertiary">24</span>
+                    </button>
+                </div>
+                <!-- Sort Dropdown -->
+                <div class="flex items-center gap-3">
+                    <span class="text-sm text-apple-text-secondary">Sort by:</span>
+                    <button class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-apple-border rounded-xl text-sm font-medium hover:bg-apple-gray transition-colors">
+                        Score (High to Low)
+                        <span class="material-symbols-outlined text-apple-text-tertiary text-lg">expand_more</span>
                     </button>
                 </div>
             </div>
@@ -246,22 +332,25 @@
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 <!-- Profile Card 1 -->
                 <div class="apple-card overflow-hidden opacity-0 animate-scale-in animate-delay-200">
-                    <div class="relative h-28 bg-gradient-to-br from-rose-100 to-orange-100 overflow-hidden">
+                    <div class="relative h-32 bg-gradient-to-br from-rose-100 to-orange-100 overflow-hidden">
                         <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80" alt="Cover" class="w-full h-full object-cover opacity-80"/>
                         <div class="absolute top-3 right-3">
                             <span class="badge inline-flex items-center gap-1 px-2 py-1 bg-apple-green/90 text-white rounded-full">
                                 NEW
                             </span>
                         </div>
-                    </div>
-                    <div class="relative px-5 pb-5">
-                        <div class="flex items-end gap-4 -mt-8 mb-4">
-                            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&q=80" alt="Avatar" class="profile-image w-16 h-16 rounded-2xl border-4 border-white object-cover shadow-lg"/>
-                            <div class="flex-1 pb-1">
-                                <h3 class="font-semibold text-base">Wellness by Sarah</h3>
-                                <p class="text-apple-text-secondary text-sm">@wellnessbysarah</p>
+                        <!-- Profile overlay section -->
+                        <div class="absolute bottom-0 left-0 right-0 px-5 pb-3 pt-8 bg-gradient-to-t from-white via-white/95 to-transparent">
+                            <div class="flex items-end gap-3">
+                                <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&q=80" alt="Avatar" class="profile-image w-14 h-14 rounded-xl border-3 border-white object-cover shadow-lg -mb-6"/>
+                                <div class="flex-1 min-w-0">
+                                    <h3 class="font-semibold text-base text-apple-text profile-name truncate">Wellness by Sarah</h3>
+                                    <p class="text-apple-text-secondary text-sm profile-username">@wellnessbysarah</p>
+                                </div>
                             </div>
                         </div>
+                    </div>
+                    <div class="relative px-5 pt-8 pb-5 bg-white">
                         <p class="text-apple-text-secondary text-sm mb-4 line-clamp-2">Holistic wellness coach • Plant-based nutrition • Mindfulness practices ✨</p>
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center gap-4">
@@ -296,22 +385,25 @@
 
                 <!-- Profile Card 2 -->
                 <div class="apple-card overflow-hidden opacity-0 animate-scale-in animate-delay-300">
-                    <div class="relative h-28 bg-gradient-to-br from-purple-100 to-blue-100 overflow-hidden">
+                    <div class="relative h-32 bg-gradient-to-br from-purple-100 to-blue-100 overflow-hidden">
                         <img src="https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&q=80" alt="Cover" class="w-full h-full object-cover opacity-80"/>
                         <div class="absolute top-3 right-3">
                             <span class="badge inline-flex items-center gap-1 px-2 py-1 bg-apple-blue/90 text-white rounded-full">
                                 EMAIL
                             </span>
                         </div>
-                    </div>
-                    <div class="relative px-5 pb-5">
-                        <div class="flex items-end gap-4 -mt-8 mb-4">
-                            <img src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&q=80" alt="Avatar" class="profile-image w-16 h-16 rounded-2xl border-4 border-white object-cover shadow-lg"/>
-                            <div class="flex-1 pb-1">
-                                <h3 class="font-semibold text-base">Fitness with Mike</h3>
-                                <p class="text-apple-text-secondary text-sm">@fitnesswithmike</p>
+                        <!-- Profile overlay section -->
+                        <div class="absolute bottom-0 left-0 right-0 px-5 pb-3 pt-8 bg-gradient-to-t from-white via-white/95 to-transparent">
+                            <div class="flex items-end gap-3">
+                                <img src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&q=80" alt="Avatar" class="profile-image w-14 h-14 rounded-xl border-3 border-white object-cover shadow-lg -mb-6"/>
+                                <div class="flex-1 min-w-0">
+                                    <h3 class="font-semibold text-base text-apple-text profile-name truncate">Fitness with Mike</h3>
+                                    <p class="text-apple-text-secondary text-sm profile-username">@fitnesswithmike</p>
+                                </div>
                             </div>
                         </div>
+                    </div>
+                    <div class="relative px-5 pt-8 pb-5 bg-white">
                         <p class="text-apple-text-secondary text-sm mb-4 line-clamp-2">HIIT specialist • Nutrition coach • Helping you crush your fitness goals 💪</p>
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center gap-4">
@@ -346,22 +438,25 @@
 
                 <!-- Profile Card 3 - Top Match -->
                 <div class="apple-card overflow-hidden opacity-0 animate-scale-in animate-delay-400">
-                    <div class="relative h-28 bg-gradient-to-br from-emerald-100 to-teal-100 overflow-hidden">
+                    <div class="relative h-32 bg-gradient-to-br from-emerald-100 to-teal-100 overflow-hidden">
                         <img src="https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400&q=80" alt="Cover" class="w-full h-full object-cover opacity-80"/>
                         <div class="absolute top-3 right-3">
                             <span class="badge inline-flex items-center gap-1 px-2 py-1 bg-apple-orange/90 text-white rounded-full">
                                 ★ TOP
                             </span>
                         </div>
-                    </div>
-                    <div class="relative px-5 pb-5">
-                        <div class="flex items-end gap-4 -mt-8 mb-4">
-                            <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80" alt="Avatar" class="profile-image w-16 h-16 rounded-2xl border-4 border-white object-cover shadow-lg"/>
-                            <div class="flex-1 pb-1">
-                                <h3 class="font-semibold text-base">Clean Eating Amy</h3>
-                                <p class="text-apple-text-secondary text-sm">@cleaneatingamy</p>
+                        <!-- Profile overlay section -->
+                        <div class="absolute bottom-0 left-0 right-0 px-5 pb-3 pt-8 bg-gradient-to-t from-white via-white/95 to-transparent">
+                            <div class="flex items-end gap-3">
+                                <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80" alt="Avatar" class="profile-image w-14 h-14 rounded-xl border-3 border-white object-cover shadow-lg -mb-6"/>
+                                <div class="flex-1 min-w-0">
+                                    <h3 class="font-semibold text-base text-apple-text profile-name truncate">Clean Eating Amy</h3>
+                                    <p class="text-apple-text-secondary text-sm profile-username">@cleaneatingamy</p>
+                                </div>
                             </div>
                         </div>
+                    </div>
+                    <div class="relative px-5 pt-8 pb-5 bg-white">
                         <p class="text-apple-text-secondary text-sm mb-4 line-clamp-2">Recipe developer • Whole30 enthusiast • Making healthy food delicious 🥗</p>
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center gap-4">
@@ -396,17 +491,20 @@
 
                 <!-- Profile Card 4 -->
                 <div class="apple-card overflow-hidden opacity-0 animate-scale-in animate-delay-500">
-                    <div class="relative h-28 bg-gradient-to-br from-amber-100 to-red-100 overflow-hidden">
+                    <div class="relative h-32 bg-gradient-to-br from-amber-100 to-red-100 overflow-hidden">
                         <img src="https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&q=80" alt="Cover" class="w-full h-full object-cover opacity-80"/>
-                    </div>
-                    <div class="relative px-5 pb-5">
-                        <div class="flex items-end gap-4 -mt-8 mb-4">
-                            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80" alt="Avatar" class="profile-image w-16 h-16 rounded-2xl border-4 border-white object-cover shadow-lg"/>
-                            <div class="flex-1 pb-1">
-                                <h3 class="font-semibold text-base">Yoga with James</h3>
-                                <p class="text-apple-text-secondary text-sm">@yogawithjames</p>
+                        <!-- Profile overlay section -->
+                        <div class="absolute bottom-0 left-0 right-0 px-5 pb-3 pt-8 bg-gradient-to-t from-white via-white/95 to-transparent">
+                            <div class="flex items-end gap-3">
+                                <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80" alt="Avatar" class="profile-image w-14 h-14 rounded-xl border-3 border-white object-cover shadow-lg -mb-6"/>
+                                <div class="flex-1 min-w-0">
+                                    <h3 class="font-semibold text-base text-apple-text profile-name truncate">Yoga with James</h3>
+                                    <p class="text-apple-text-secondary text-sm profile-username">@yogawithjames</p>
+                                </div>
                             </div>
                         </div>
+                    </div>
+                    <div class="relative px-5 pt-8 pb-5 bg-white">
                         <p class="text-apple-text-secondary text-sm mb-4 line-clamp-2">Vinyasa flow • Breathwork expert • Find your zen 🧘‍♂️</p>
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center gap-4">
@@ -441,17 +539,20 @@
 
                 <!-- Profile Card 5 -->
                 <div class="apple-card overflow-hidden opacity-0 animate-scale-in animate-delay-600">
-                    <div class="relative h-28 bg-gradient-to-br from-cyan-100 to-blue-100 overflow-hidden">
+                    <div class="relative h-32 bg-gradient-to-br from-cyan-100 to-blue-100 overflow-hidden">
                         <img src="https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=400&q=80" alt="Cover" class="w-full h-full object-cover opacity-80"/>
-                    </div>
-                    <div class="relative px-5 pb-5">
-                        <div class="flex items-end gap-4 -mt-8 mb-4">
-                            <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&q=80" alt="Avatar" class="profile-image w-16 h-16 rounded-2xl border-4 border-white object-cover shadow-lg"/>
-                            <div class="flex-1 pb-1">
-                                <h3 class="font-semibold text-base">RunnerDan</h3>
-                                <p class="text-apple-text-secondary text-sm">@runnerdan</p>
+                        <!-- Profile overlay section -->
+                        <div class="absolute bottom-0 left-0 right-0 px-5 pb-3 pt-8 bg-gradient-to-t from-white via-white/95 to-transparent">
+                            <div class="flex items-end gap-3">
+                                <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&q=80" alt="Avatar" class="profile-image w-14 h-14 rounded-xl border-3 border-white object-cover shadow-lg -mb-6"/>
+                                <div class="flex-1 min-w-0">
+                                    <h3 class="font-semibold text-base text-apple-text profile-name truncate">RunnerDan</h3>
+                                    <p class="text-apple-text-secondary text-sm profile-username">@runnerdan</p>
+                                </div>
                             </div>
                         </div>
+                    </div>
+                    <div class="relative px-5 pt-8 pb-5 bg-white">
                         <p class="text-apple-text-secondary text-sm mb-4 line-clamp-2">Marathon runner • Endurance coach • Chasing PRs 🏃</p>
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center gap-4">
@@ -486,17 +587,20 @@
 
                 <!-- Profile Card 6 -->
                 <div class="apple-card overflow-hidden opacity-0 animate-scale-in" style="animation-delay: 0.35s">
-                    <div class="relative h-28 bg-gradient-to-br from-pink-100 to-violet-100 overflow-hidden">
+                    <div class="relative h-32 bg-gradient-to-br from-pink-100 to-violet-100 overflow-hidden">
                         <img src="https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&q=80" alt="Cover" class="w-full h-full object-cover opacity-80"/>
-                    </div>
-                    <div class="relative px-5 pb-5">
-                        <div class="flex items-end gap-4 -mt-8 mb-4">
-                            <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&q=80" alt="Avatar" class="profile-image w-16 h-16 rounded-2xl border-4 border-white object-cover shadow-lg"/>
-                            <div class="flex-1 pb-1">
-                                <h3 class="font-semibold text-base">VeganVibes</h3>
-                                <p class="text-apple-text-secondary text-sm">@veganvibes</p>
+                        <!-- Profile overlay section -->
+                        <div class="absolute bottom-0 left-0 right-0 px-5 pb-3 pt-8 bg-gradient-to-t from-white via-white/95 to-transparent">
+                            <div class="flex items-end gap-3">
+                                <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&q=80" alt="Avatar" class="profile-image w-14 h-14 rounded-xl border-3 border-white object-cover shadow-lg -mb-6"/>
+                                <div class="flex-1 min-w-0">
+                                    <h3 class="font-semibold text-base text-apple-text profile-name truncate">VeganVibes</h3>
+                                    <p class="text-apple-text-secondary text-sm profile-username">@veganvibes</p>
+                                </div>
                             </div>
                         </div>
+                    </div>
+                    <div class="relative px-5 pt-8 pb-5 bg-white">
                         <p class="text-apple-text-secondary text-sm mb-4 line-clamp-2">Plant-based recipes • Sustainable living 🌱</p>
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center gap-4">
@@ -536,6 +640,111 @@
                     Load More Partners
                     <span class="material-symbols-outlined text-lg">expand_more</span>
                 </button>
+            </div>
+
+            <!-- ============================================ -->
+            <!-- ERROR STATE: Service Unavailable (hidden by default) -->
+            <!-- Show this when API/service is unavailable -->
+            <!-- ============================================ -->
+            <div class="hidden apple-card p-12 text-center" id="error-state">
+                <div class="max-w-md mx-auto">
+                    <div class="w-16 h-16 rounded-full bg-apple-gray flex items-center justify-center mx-auto mb-6">
+                        <span class="material-symbols-outlined text-apple-text-tertiary text-3xl">cloud_off</span>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">Unable to Load Profiles</h3>
+                    <p class="text-apple-text-secondary mb-8 leading-relaxed">
+                        We're having trouble connecting to our servers. This is usually temporary. Please try again in a few moments.
+                    </p>
+                    <button class="apple-button inline-flex items-center gap-2 px-8 py-3.5 text-sm" onclick="location.reload()">
+                        <span class="material-symbols-outlined text-lg">refresh</span>
+                        Try Again
+                    </button>
+                    <p class="text-apple-text-tertiary text-sm mt-6">
+                        If the problem persists, <a href="#" class="text-apple-blue hover:underline">contact support</a>.
+                    </p>
+                </div>
+            </div>
+
+            <!-- ============================================ -->
+            <!-- LOADING STATE: Skeleton Loaders (hidden by default) -->
+            <!-- Show this while data is loading -->
+            <!-- ============================================ -->
+            <div class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" id="loading-state">
+                <!-- Skeleton Profile Card 1 -->
+                <div class="bg-white rounded-2xl border border-apple-border overflow-hidden">
+                    <div class="skeleton h-32"></div>
+                    <div class="p-5 pt-8">
+                        <div class="flex items-end gap-3 -mt-14 mb-4">
+                            <div class="skeleton w-14 h-14 rounded-xl border-4 border-white"></div>
+                            <div class="flex-1 space-y-2 pb-2">
+                                <div class="skeleton h-4 w-3/4 rounded"></div>
+                                <div class="skeleton h-3 w-1/2 rounded"></div>
+                            </div>
+                        </div>
+                        <div class="space-y-2 mb-4">
+                            <div class="skeleton h-3 w-full rounded"></div>
+                            <div class="skeleton h-3 w-2/3 rounded"></div>
+                        </div>
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex gap-4">
+                                <div class="skeleton w-12 h-8 rounded-lg"></div>
+                                <div class="skeleton w-12 h-8 rounded-lg"></div>
+                            </div>
+                            <div class="skeleton w-12 h-12 rounded-full"></div>
+                        </div>
+                        <div class="skeleton h-10 rounded-xl"></div>
+                    </div>
+                </div>
+                <!-- Skeleton Profile Card 2 -->
+                <div class="bg-white rounded-2xl border border-apple-border overflow-hidden">
+                    <div class="skeleton h-32"></div>
+                    <div class="p-5 pt-8">
+                        <div class="flex items-end gap-3 -mt-14 mb-4">
+                            <div class="skeleton w-14 h-14 rounded-xl border-4 border-white"></div>
+                            <div class="flex-1 space-y-2 pb-2">
+                                <div class="skeleton h-4 w-3/4 rounded"></div>
+                                <div class="skeleton h-3 w-1/2 rounded"></div>
+                            </div>
+                        </div>
+                        <div class="space-y-2 mb-4">
+                            <div class="skeleton h-3 w-full rounded"></div>
+                            <div class="skeleton h-3 w-2/3 rounded"></div>
+                        </div>
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex gap-4">
+                                <div class="skeleton w-12 h-8 rounded-lg"></div>
+                                <div class="skeleton w-12 h-8 rounded-lg"></div>
+                            </div>
+                            <div class="skeleton w-12 h-12 rounded-full"></div>
+                        </div>
+                        <div class="skeleton h-10 rounded-xl"></div>
+                    </div>
+                </div>
+                <!-- Skeleton Profile Card 3 -->
+                <div class="bg-white rounded-2xl border border-apple-border overflow-hidden">
+                    <div class="skeleton h-32"></div>
+                    <div class="p-5 pt-8">
+                        <div class="flex items-end gap-3 -mt-14 mb-4">
+                            <div class="skeleton w-14 h-14 rounded-xl border-4 border-white"></div>
+                            <div class="flex-1 space-y-2 pb-2">
+                                <div class="skeleton h-4 w-3/4 rounded"></div>
+                                <div class="skeleton h-3 w-1/2 rounded"></div>
+                            </div>
+                        </div>
+                        <div class="space-y-2 mb-4">
+                            <div class="skeleton h-3 w-full rounded"></div>
+                            <div class="skeleton h-3 w-2/3 rounded"></div>
+                        </div>
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex gap-4">
+                                <div class="skeleton w-12 h-8 rounded-lg"></div>
+                                <div class="skeleton w-12 h-8 rounded-lg"></div>
+                            </div>
+                            <div class="skeleton w-12 h-12 rounded-full"></div>
+                        </div>
+                        <div class="skeleton h-10 rounded-xl"></div>
+                    </div>
+                </div>
             </div>
         </main>
 
