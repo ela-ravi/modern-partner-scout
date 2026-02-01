@@ -1,0 +1,27 @@
+# N8N Workflow Exports
+
+This directory will contain exported N8N workflow JSON files.
+
+## Files to Create
+
+After implementing the workflow in N8N UI using the specifications in `docs/Orchestration.md`:
+
+1. **partner-discovery.json** - Export the main workflow from N8N
+   - Contains all 21 nodes as specified in Section 3.3
+   - Includes node connections as specified in Section 3.4
+
+## How to Export
+
+1. Open the workflow in N8N
+2. Click the three-dot menu (...)
+3. Select "Download"
+4. Save as `partner-discovery.json` in this directory
+
+## Implementation Reference
+
+See `docs/Orchestration.md` Section 3 for:
+- Complete node specifications (21 nodes)
+- Node configuration JSON examples
+- Connection mapping
+- Environment variable setup
+
