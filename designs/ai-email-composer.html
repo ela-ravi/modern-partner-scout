@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>PartnerScout AI - Compose Email</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "apple-bg": "#fbfbfd",
+                        "apple-card": "#ffffff",
+                        "apple-gray": "#f5f5f7",
+                        "apple-border": "rgba(0, 0, 0, 0.06)",
+                        "apple-blue": "#0071e3",
+                        "apple-blue-hover": "#0077ed",
+                        "apple-green": "#34c759",
+                        "apple-orange": "#ff9500",
+                        "apple-red": "#ff3b30",
+                        "apple-purple": "#af52de",
+                        "apple-text": "#1d1d1f",
+                        "apple-text-secondary": "#86868b",
+                        "apple-text-tertiary": "#aeaeb2",
+                    },
+                    fontFamily: {
+                        "sf": ["Inter", "-apple-system", "BlinkMacSystemFont", "sans-serif"]
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.4s ease-out forwards',
+                        'scale-in': 'scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        scaleIn: {
+                            '0%': { opacity: '0', transform: 'scale(0.95)' },
+                            '100%': { opacity: '1', transform: 'scale(1)' },
+                        }
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+        
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .modal-backdrop {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(8px);
+        }
+        
+        .modal-content {
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        
+        .apple-input {
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            transition: all 0.2s ease;
+            color: #1d1d1f;
+        }
+        
+        .apple-input:focus {
+            border-color: #0071e3;
+            box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.1);
+            outline: none;
+        }
+        
+        .apple-input::placeholder {
+            color: #aeaeb2;
+        }
+        
+        .apple-button {
+            background: #0071e3;
+            color: white;
+            border-radius: 980px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .apple-button:hover {
+            background: #0077ed;
+        }
+        
+        .template-chip {
+            padding: 10px 18px;
+            background: #f5f5f7;
+            border: 1px solid transparent;
+            border-radius: 980px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #86868b;
+            transition: all 0.2s ease;
+        }
+        
+        .template-chip:hover {
+            background: #ebebed;
+            color: #1d1d1f;
+        }
+        
+        .template-chip.active {
+            background: rgba(0, 113, 227, 0.08);
+            border-color: #0071e3;
+            color: #0071e3;
+        }
+        
+        .email-body {
+            min-height: 280px;
+            resize: none;
+            line-height: 1.7;
+        }
+        
+        .insight-card {
+            background: #f5f5f7;
+            border-radius: 12px;
+            padding: 14px;
+            transition: all 0.2s ease;
+        }
+        
+        .insight-card:hover {
+            background: #ebebed;
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.1); border-radius: 3px; }
+        
+        .animate-delay-100 { animation-delay: 0.1s; }
+    </style>
+</head>
+<body class="bg-apple-bg text-apple-text min-h-screen">
+    <!-- Modal Backdrop -->
+    <div class="modal-backdrop fixed inset-0 flex items-center justify-center p-4 z-50 animate-fade-in">
+        <!-- Modal Content -->
+        <div class="modal-content w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col opacity-0 animate-scale-in animate-delay-100">
+            <!-- Header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-apple-border flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-apple-blue/10 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-apple-blue text-xl">mail</span>
+                    </div>
+                    <div>
+                        <h2 class="font-semibold text-lg">Compose Email</h2>
+                        <p class="text-apple-text-secondary text-sm">AI-powered outreach</p>
+                    </div>
+                </div>
+                <button class="w-9 h-9 rounded-full bg-apple-gray hover:bg-gray-200 flex items-center justify-center text-apple-text-secondary transition-colors">
+                    <span class="material-symbols-outlined text-xl">close</span>
+                </button>
+            </div>
+
+            <!-- Content -->
+            <div class="flex-1 overflow-y-auto p-6 scrollbar-thin">
+                <!-- Recipient -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-apple-text-secondary mb-2">To</label>
+                    <div class="flex items-center gap-3 p-3.5 bg-apple-gray rounded-xl">
+                        <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=50&q=80" alt="Avatar" class="w-9 h-9 rounded-lg object-cover"/>
+                        <div class="flex-1">
+                            <span class="font-medium">Clean Eating Amy</span>
+                            <span class="text-apple-text-secondary mx-2">•</span>
+                            <span class="text-apple-text-secondary text-sm">collabs@cleaneatingamy.com</span>
+                        </div>
+                        <span class="px-2.5 py-1 bg-apple-green/10 text-apple-green text-xs font-semibold rounded-full">96% match</span>
+                    </div>
+                </div>
+
+                <!-- Template Selection -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-apple-text-secondary mb-3">Template</label>
+                    <div class="flex flex-wrap gap-2">
+                        <button class="template-chip active">
+                            <span class="material-symbols-outlined text-sm align-middle mr-1.5">handshake</span>
+                            Collaboration
+                        </button>
+                        <button class="template-chip">
+                            <span class="material-symbols-outlined text-sm align-middle mr-1.5">card_giftcard</span>
+                            Product Gifting
+                        </button>
+                        <button class="template-chip">
+                            <span class="material-symbols-outlined text-sm align-middle mr-1.5">campaign</span>
+                            Campaign
+                        </button>
+                        <button class="template-chip">
+                            <span class="material-symbols-outlined text-sm align-middle mr-1.5">edit_note</span>
+                            Custom
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Subject Line -->
+                <div class="mb-6">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-sm font-medium text-apple-text-secondary">Subject</label>
+                        <button class="inline-flex items-center gap-1.5 px-3 py-1.5 text-apple-blue text-xs font-medium hover:bg-apple-blue/10 rounded-lg transition-colors">
+                            <span class="material-symbols-outlined text-sm">auto_awesome</span>
+                            Regenerate
+                        </button>
+                    </div>
+                    <input type="text" 
+                        value="Collaboration Opportunity with [Your Brand] 🌿" 
+                        class="apple-input w-full px-4 py-3.5"/>
+                </div>
+
+                <!-- Email Body -->
+                <div class="mb-6">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-sm font-medium text-apple-text-secondary">Message</label>
+                        <div class="flex items-center gap-2">
+                            <button class="inline-flex items-center gap-1.5 px-3 py-1.5 text-apple-blue text-xs font-medium hover:bg-apple-blue/10 rounded-lg transition-colors">
+                                <span class="material-symbols-outlined text-sm">auto_awesome</span>
+                                AI Rewrite
+                            </button>
+                            <button class="inline-flex items-center gap-1.5 px-3 py-1.5 text-apple-text-secondary text-xs font-medium hover:bg-apple-gray rounded-lg transition-colors">
+                                <span class="material-symbols-outlined text-sm">undo</span>
+                                Undo
+                            </button>
+                        </div>
+                    </div>
+                    <textarea class="apple-input email-body w-full px-4 py-4 scrollbar-thin">Hi Amy,
+
+I hope this message finds you well! I've been following your journey on Instagram and absolutely love your approach to clean eating and sustainable nutrition.
+
+I'm reaching out from [Your Brand], a wellness-focused company that specializes in organic, plant-based products. Your content around whole foods and healthy living aligns perfectly with our brand values, and we'd love to explore a potential collaboration.
+
+We think your audience would really resonate with our products, and we'd be excited to discuss various partnership options — whether that's a sponsored post, product review, or even a longer-term ambassador relationship.
+
+Would you be open to a quick call this week to discuss? I'd love to share more about what we have in mind.
+
+Looking forward to hearing from you!
+
+Best,
+[Your Name]
+[Your Brand]</textarea>
+                </div>
+
+                <!-- AI Personalization Insights -->
+                <div class="mb-6">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="material-symbols-outlined text-apple-purple text-lg">psychology</span>
+                        <h3 class="font-medium text-sm">AI Personalization Insights</h3>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="insight-card flex items-start gap-3">
+                            <span class="material-symbols-outlined text-apple-green text-lg flex-shrink-0 mt-0.5">lightbulb</span>
+                            <div class="flex-1">
+                                <p class="text-sm text-apple-text-secondary">
+                                    <span class="font-medium text-apple-text">Mention Whole30:</span> 
+                                    Amy frequently posts about Whole30 recipes.
+                                </p>
+                            </div>
+                            <button class="px-3 py-1 bg-white text-apple-blue text-xs font-medium rounded-lg hover:bg-apple-blue/5 transition-colors whitespace-nowrap shadow-sm">
+                                Add
+                            </button>
+                        </div>
+                        <div class="insight-card flex items-start gap-3">
+                            <span class="material-symbols-outlined text-apple-orange text-lg flex-shrink-0 mt-0.5">trending_up</span>
+                            <div class="flex-1">
+                                <p class="text-sm text-apple-text-secondary">
+                                    <span class="font-medium text-apple-text">Viral post:</span> 
+                                    Her "5-minute meal prep" reel got 2.3M views.
+                                </p>
+                            </div>
+                            <button class="px-3 py-1 bg-white text-apple-blue text-xs font-medium rounded-lg hover:bg-apple-blue/5 transition-colors whitespace-nowrap shadow-sm">
+                                Add
+                            </button>
+                        </div>
+                        <div class="insight-card flex items-start gap-3">
+                            <span class="material-symbols-outlined text-apple-blue text-lg flex-shrink-0 mt-0.5">location_on</span>
+                            <div class="flex-1">
+                                <p class="text-sm text-apple-text-secondary">
+                                    <span class="font-medium text-apple-text">Location:</span> 
+                                    Based in Los Angeles — mention local connection.
+                                </p>
+                            </div>
+                            <button class="px-3 py-1 bg-white text-apple-blue text-xs font-medium rounded-lg hover:bg-apple-blue/5 transition-colors whitespace-nowrap shadow-sm">
+                                Add
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Email Quality Score -->
+                <div class="flex items-center justify-between p-5 bg-apple-green/5 rounded-2xl border border-apple-green/20">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-apple-green/10 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-apple-green text-2xl">verified</span>
+                        </div>
+                        <div>
+                            <p class="font-semibold text-apple-green">Email Quality: Excellent</p>
+                            <p class="text-apple-text-secondary text-sm">Personalized, professional, and on-brand</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-3xl font-semibold text-apple-green">94</p>
+                        <p class="text-apple-text-tertiary text-xs">Score</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Actions -->
+            <div class="flex items-center justify-between px-6 py-4 border-t border-apple-border bg-apple-gray/30 flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <button class="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-apple-border hover:bg-apple-gray rounded-xl text-apple-text-secondary text-sm font-medium transition-colors shadow-sm">
+                        <span class="material-symbols-outlined text-lg">attach_file</span>
+                        Attach
+                    </button>
+                    <button class="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-apple-border hover:bg-apple-gray rounded-xl text-apple-text-secondary text-sm font-medium transition-colors shadow-sm">
+                        <span class="material-symbols-outlined text-lg">schedule_send</span>
+                        Schedule
+                    </button>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button class="px-4 py-2.5 text-apple-text-secondary text-sm font-medium hover:text-apple-text transition-colors">
+                        Save Draft
+                    </button>
+                    <button class="apple-button inline-flex items-center gap-2 px-6 py-3 text-sm shadow-lg shadow-apple-blue/20">
+                        <span class="material-symbols-outlined text-lg">send</span>
+                        Send Email
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

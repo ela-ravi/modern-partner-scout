@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>PartnerScout AI - Discovery Dashboard</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "apple-bg": "#fbfbfd",
+                        "apple-card": "#ffffff",
+                        "apple-gray": "#f5f5f7",
+                        "apple-border": "rgba(0, 0, 0, 0.06)",
+                        "apple-blue": "#0071e3",
+                        "apple-blue-hover": "#0077ed",
+                        "apple-green": "#34c759",
+                        "apple-orange": "#ff9500",
+                        "apple-red": "#ff3b30",
+                        "apple-purple": "#af52de",
+                        "apple-text": "#1d1d1f",
+                        "apple-text-secondary": "#86868b",
+                        "apple-text-tertiary": "#aeaeb2",
+                    },
+                    fontFamily: {
+                        "sf": ["Inter", "-apple-system", "BlinkMacSystemFont", "sans-serif"]
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.6s ease-out forwards',
+                        'slide-up': 'slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        'scale-in': 'scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        scaleIn: {
+                            '0%': { opacity: '0', transform: 'scale(0.96)' },
+                            '100%': { opacity: '1', transform: 'scale(1)' },
+                        }
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+        
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .apple-card {
+            background: #ffffff;
+            border-radius: 18px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04), 0 0 1px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+        
+        .apple-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .apple-button {
+            background: #0071e3;
+            color: white;
+            border-radius: 980px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .apple-button:hover {
+            background: #0077ed;
+        }
+        
+        .apple-button-secondary {
+            background: rgba(0, 113, 227, 0.1);
+            color: #0071e3;
+            border-radius: 980px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .apple-button-secondary:hover {
+            background: rgba(0, 113, 227, 0.15);
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f5f5f7 100%);
+            border-radius: 16px;
+            border: 1px solid rgba(0, 0, 0, 0.04);
+        }
+        
+        .score-ring {
+            background: conic-gradient(from 0deg, #0071e3 0%, #0071e3 var(--score), #f5f5f7 var(--score), #f5f5f7 100%);
+        }
+        
+        .profile-image {
+            transition: transform 0.3s ease;
+        }
+        
+        .apple-card:hover .profile-image {
+            transform: scale(1.05);
+        }
+        
+        .badge {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+        
+        .animate-delay-100 { animation-delay: 0.05s; }
+        .animate-delay-200 { animation-delay: 0.1s; }
+        .animate-delay-300 { animation-delay: 0.15s; }
+        .animate-delay-400 { animation-delay: 0.2s; }
+        .animate-delay-500 { animation-delay: 0.25s; }
+        .animate-delay-600 { animation-delay: 0.3s; }
+    </style>
+</head>
+<body class="bg-apple-bg text-apple-text min-h-screen">
+    <div class="flex flex-col min-h-screen">
+        <!-- Header -->
+        <header class="sticky top-0 z-50 bg-apple-bg/80 backdrop-blur-xl border-b border-apple-border">
+            <div class="max-w-6xl mx-auto px-6">
+                <div class="flex items-center justify-between h-14">
+                    <!-- Logo -->
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-apple-blue to-blue-600 flex items-center justify-center">
+                            <svg class="w-4.5 h-4.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                        </div>
+                        <span class="font-semibold text-lg tracking-tight">PartnerScout</span>
+                    </div>
+
+                    <!-- Session Selector -->
+                    <button class="hidden md:flex items-center gap-2 px-4 py-2 bg-apple-gray hover:bg-gray-200 rounded-full transition-colors">
+                        <span class="w-2 h-2 bg-apple-green rounded-full"></span>
+                        <span class="text-sm font-medium">Summer Wellness Campaign</span>
+                        <span class="material-symbols-outlined text-apple-text-secondary text-lg">expand_more</span>
+                    </button>
+
+                    <!-- Actions -->
+                    <div class="flex items-center gap-4">
+                        <button class="p-2 rounded-full hover:bg-apple-gray transition-colors">
+                            <span class="material-symbols-outlined text-apple-text-secondary text-xl">search</span>
+                        </button>
+                        <button class="relative p-2 rounded-full hover:bg-apple-gray transition-colors">
+                            <span class="material-symbols-outlined text-apple-text-secondary text-xl">notifications</span>
+                            <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-apple-red rounded-full"></span>
+                        </button>
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center cursor-pointer">
+                            <span class="text-white text-sm font-semibold">R</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 max-w-6xl w-full mx-auto px-6 py-10">
+            <!-- Page Header -->
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 opacity-0 animate-fade-in">
+                <div>
+                    <h1 class="text-4xl font-semibold tracking-tight mb-2">Discovery Dashboard</h1>
+                    <p class="text-apple-text-secondary text-lg">47 partners discovered • 12 high matches</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button class="apple-button-secondary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
+                        <span class="material-symbols-outlined text-lg">filter_list</span>
+                        Filters
+                    </button>
+                    <button class="apple-button inline-flex items-center gap-2 px-5 py-2.5 text-sm">
+                        <span class="material-symbols-outlined text-lg">add</span>
+                        New Discovery
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10 opacity-0 animate-slide-up animate-delay-100">
+                <div class="stat-card p-5">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-apple-text-secondary text-sm font-medium">Total Discovered</p>
+                        <span class="material-symbols-outlined text-apple-blue text-xl">group</span>
+                    </div>
+                    <p class="text-3xl font-semibold tracking-tight">47</p>
+                    <p class="text-apple-green text-xs font-medium mt-1">+12 today</p>
+                </div>
+                <div class="stat-card p-5">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-apple-text-secondary text-sm font-medium">High Match</p>
+                        <span class="material-symbols-outlined text-apple-green text-xl">verified</span>
+                    </div>
+                    <p class="text-3xl font-semibold tracking-tight">12</p>
+                    <p class="text-apple-text-tertiary text-xs font-medium mt-1">25% of total</p>
+                </div>
+                <div class="stat-card p-5">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-apple-text-secondary text-sm font-medium">Emails Found</p>
+                        <span class="material-symbols-outlined text-apple-orange text-xl">mail</span>
+                    </div>
+                    <p class="text-3xl font-semibold tracking-tight">38</p>
+                    <p class="text-apple-text-tertiary text-xs font-medium mt-1">81% extraction</p>
+                </div>
+                <div class="stat-card p-5">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-apple-text-secondary text-sm font-medium">Avg Score</p>
+                        <span class="material-symbols-outlined text-apple-purple text-xl">insights</span>
+                    </div>
+                    <p class="text-3xl font-semibold tracking-tight">78%</p>
+                    <p class="text-apple-green text-xs font-medium mt-1">↑ 5% from last</p>
+                </div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="mb-8 opacity-0 animate-fade-in animate-delay-200">
+                <div class="inline-flex gap-1 p-1 bg-apple-gray rounded-xl">
+                    <button class="px-5 py-2 rounded-lg text-sm font-medium text-apple-text-secondary hover:text-apple-text transition-all">
+                        All <span class="ml-1 text-apple-text-tertiary">47</span>
+                    </button>
+                    <button class="px-5 py-2 rounded-lg bg-white shadow-sm text-sm font-medium text-apple-text transition-all">
+                        New <span class="ml-1 text-apple-blue">8</span>
+                    </button>
+                    <button class="px-5 py-2 rounded-lg text-sm font-medium text-apple-text-secondary hover:text-apple-text transition-all">
+                        Contacted <span class="ml-1 text-apple-text-tertiary">15</span>
+                    </button>
+                    <button class="px-5 py-2 rounded-lg text-sm font-medium text-apple-text-secondary hover:text-apple-text transition-all">
+                        Shortlisted <span class="ml-1 text-apple-text-tertiary">24</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Partner Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <!-- Profile Card 1 -->
+                <div class="apple-card overflow-hidden opacity-0 animate-scale-in animate-delay-200">
+                    <div class="relative h-28 bg-gradient-to-br from-rose-100 to-orange-100 overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80" alt="Cover" class="w-full h-full object-cover opacity-80"/>
+                        <div class="absolute top-3 right-3">
+                            <span class="badge inline-flex items-center gap-1 px-2 py-1 bg-apple-green/90 text-white rounded-full">
+                                NEW
+                            </span>
+                        </div>
+                    </div>
+                    <div class="relative px-5 pb-5">
+                        <div class="flex items-end gap-4 -mt-8 mb-4">
+                            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&q=80" alt="Avatar" class="profile-image w-16 h-16 rounded-2xl border-4 border-white object-cover shadow-lg"/>
+                            <div class="flex-1 pb-1">
+                                <h3 class="font-semibold text-base">Wellness by Sarah</h3>
+                                <p class="text-apple-text-secondary text-sm">@wellnessbysarah</p>
+                            </div>
+                        </div>
+                        <p class="text-apple-text-secondary text-sm mb-4 line-clamp-2">Holistic wellness coach • Plant-based nutrition • Mindfulness practices ✨</p>
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-4">
+                                <div>
+                                    <p class="font-semibold text-sm">124K</p>
+                                    <p class="text-apple-text-tertiary text-xs">Followers</p>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-sm">4.2%</p>
+                                    <p class="text-apple-text-tertiary text-xs">Engage</p>
+                                </div>
+                            </div>
+                            <div class="score-ring w-12 h-12 rounded-full p-[3px]" style="--score: 92%">
+                                <div class="w-full h-full rounded-full bg-white flex items-center justify-center">
+                                    <span class="font-semibold text-sm text-apple-blue">92</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button class="flex-1 py-2.5 bg-apple-blue text-white font-medium rounded-xl text-sm hover:bg-apple-blue-hover transition-colors">
+                                View Profile
+                            </button>
+                            <button class="p-2.5 bg-apple-gray rounded-xl hover:bg-gray-200 transition-colors">
+                                <span class="material-symbols-outlined text-apple-text-secondary text-lg">mail</span>
+                            </button>
+                            <button class="p-2.5 bg-apple-gray rounded-xl hover:bg-gray-200 transition-colors">
+                                <span class="material-symbols-outlined text-apple-text-secondary text-lg">bookmark</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Profile Card 2 -->
+                <div class="apple-card overflow-hidden opacity-0 animate-scale-in animate-delay-300">
+                    <div class="relative h-28 bg-gradient-to-br from-purple-100 to-blue-100 overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&q=80" alt="Cover" class="w-full h-full object-cover opacity-80"/>
+                        <div class="absolute top-3 right-3">
+                            <span class="badge inline-flex items-center gap-1 px-2 py-1 bg-apple-blue/90 text-white rounded-full">
+                                EMAIL
+                            </span>
+                        </div>
+                    </div>
+                    <div class="relative px-5 pb-5">
+                        <div class="flex items-end gap-4 -mt-8 mb-4">
+                            <img src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&q=80" alt="Avatar" class="profile-image w-16 h-16 rounded-2xl border-4 border-white object-cover shadow-lg"/>
+                            <div class="flex-1 pb-1">
+                                <h3 class="font-semibold text-base">Fitness with Mike</h3>
+                                <p class="text-apple-text-secondary text-sm">@fitnesswithmike</p>
+                            </div>
+                        </div>
+                        <p class="text-apple-text-secondary text-sm mb-4 line-clamp-2">HIIT specialist • Nutrition coach • Helping you crush your fitness goals 💪</p>
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-4">
+                                <div>
+                                    <p class="font-semibold text-sm">89K</p>
+                                    <p class="text-apple-text-tertiary text-xs">Followers</p>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-sm">5.1%</p>
+                                    <p class="text-apple-text-tertiary text-xs">Engage</p>
+                                </div>
+                            </div>
+                            <div class="score-ring w-12 h-12 rounded-full p-[3px]" style="--score: 87%">
+                                <div class="w-full h-full rounded-full bg-white flex items-center justify-center">
+                                    <span class="font-semibold text-sm text-apple-blue">87</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button class="flex-1 py-2.5 bg-apple-blue text-white font-medium rounded-xl text-sm hover:bg-apple-blue-hover transition-colors">
+                                View Profile
+                            </button>
+                            <button class="p-2.5 bg-apple-gray rounded-xl hover:bg-gray-200 transition-colors">
+                                <span class="material-symbols-outlined text-apple-text-secondary text-lg">mail</span>
+                            </button>
+                            <button class="p-2.5 bg-apple-gray rounded-xl hover:bg-gray-200 transition-colors">
+                                <span class="material-symbols-outlined text-apple-text-secondary text-lg">bookmark</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Profile Card 3 - Top Match -->
+                <div class="apple-card overflow-hidden opacity-0 animate-scale-in animate-delay-400">
+                    <div class="relative h-28 bg-gradient-to-br from-emerald-100 to-teal-100 overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400&q=80" alt="Cover" class="w-full h-full object-cover opacity-80"/>
+                        <div class="absolute top-3 right-3">
+                            <span class="badge inline-flex items-center gap-1 px-2 py-1 bg-apple-orange/90 text-white rounded-full">
+                                ★ TOP
+                            </span>
+                        </div>
+                    </div>
+                    <div class="relative px-5 pb-5">
+                        <div class="flex items-end gap-4 -mt-8 mb-4">
+                            <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80" alt="Avatar" class="profile-image w-16 h-16 rounded-2xl border-4 border-white object-cover shadow-lg"/>
+                            <div class="flex-1 pb-1">
+                                <h3 class="font-semibold text-base">Clean Eating Amy</h3>
+                                <p class="text-apple-text-secondary text-sm">@cleaneatingamy</p>
+                            </div>
+                        </div>
+                        <p class="text-apple-text-secondary text-sm mb-4 line-clamp-2">Recipe developer • Whole30 enthusiast • Making healthy food delicious 🥗</p>
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-4">
+                                <div>
+                                    <p class="font-semibold text-sm">256K</p>
+                                    <p class="text-apple-text-tertiary text-xs">Followers</p>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-sm">6.8%</p>
+                                    <p class="text-apple-text-tertiary text-xs">Engage</p>
+                                </div>
+                            </div>
+                            <div class="score-ring w-12 h-12 rounded-full p-[3px]" style="--score: 96%">
+                                <div class="w-full h-full rounded-full bg-white flex items-center justify-center">
+                                    <span class="font-semibold text-sm text-apple-orange">96</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button class="flex-1 py-2.5 bg-apple-blue text-white font-medium rounded-xl text-sm hover:bg-apple-blue-hover transition-colors">
+                                View Profile
+                            </button>
+                            <button class="p-2.5 bg-apple-gray rounded-xl hover:bg-gray-200 transition-colors">
+                                <span class="material-symbols-outlined text-apple-text-secondary text-lg">mail</span>
+                            </button>
+                            <button class="p-2.5 bg-apple-orange/10 rounded-xl">
+                                <span class="material-symbols-outlined text-apple-orange text-lg" style="font-variation-settings: 'FILL' 1">bookmark</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Profile Card 4 -->
+                <div class="apple-card overflow-hidden opacity-0 animate-scale-in animate-delay-500">
+                    <div class="relative h-28 bg-gradient-to-br from-amber-100 to-red-100 overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&q=80" alt="Cover" class="w-full h-full object-cover opacity-80"/>
+                    </div>
+                    <div class="relative px-5 pb-5">
+                        <div class="flex items-end gap-4 -mt-8 mb-4">
+                            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80" alt="Avatar" class="profile-image w-16 h-16 rounded-2xl border-4 border-white object-cover shadow-lg"/>
+                            <div class="flex-1 pb-1">
+                                <h3 class="font-semibold text-base">Yoga with James</h3>
+                                <p class="text-apple-text-secondary text-sm">@yogawithjames</p>
+                            </div>
+                        </div>
+                        <p class="text-apple-text-secondary text-sm mb-4 line-clamp-2">Vinyasa flow • Breathwork expert • Find your zen 🧘‍♂️</p>
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-4">
+                                <div>
+                                    <p class="font-semibold text-sm">78K</p>
+                                    <p class="text-apple-text-tertiary text-xs">Followers</p>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-sm">3.9%</p>
+                                    <p class="text-apple-text-tertiary text-xs">Engage</p>
+                                </div>
+                            </div>
+                            <div class="score-ring w-12 h-12 rounded-full p-[3px]" style="--score: 74%">
+                                <div class="w-full h-full rounded-full bg-white flex items-center justify-center">
+                                    <span class="font-semibold text-sm text-apple-blue">74</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button class="flex-1 py-2.5 bg-apple-blue text-white font-medium rounded-xl text-sm hover:bg-apple-blue-hover transition-colors">
+                                View Profile
+                            </button>
+                            <button class="p-2.5 bg-apple-gray rounded-xl hover:bg-gray-200 transition-colors">
+                                <span class="material-symbols-outlined text-apple-text-secondary text-lg">mail</span>
+                            </button>
+                            <button class="p-2.5 bg-apple-gray rounded-xl hover:bg-gray-200 transition-colors">
+                                <span class="material-symbols-outlined text-apple-text-secondary text-lg">bookmark</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Profile Card 5 -->
+                <div class="apple-card overflow-hidden opacity-0 animate-scale-in animate-delay-600">
+                    <div class="relative h-28 bg-gradient-to-br from-cyan-100 to-blue-100 overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=400&q=80" alt="Cover" class="w-full h-full object-cover opacity-80"/>
+                    </div>
+                    <div class="relative px-5 pb-5">
+                        <div class="flex items-end gap-4 -mt-8 mb-4">
+                            <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&q=80" alt="Avatar" class="profile-image w-16 h-16 rounded-2xl border-4 border-white object-cover shadow-lg"/>
+                            <div class="flex-1 pb-1">
+                                <h3 class="font-semibold text-base">RunnerDan</h3>
+                                <p class="text-apple-text-secondary text-sm">@runnerdan</p>
+                            </div>
+                        </div>
+                        <p class="text-apple-text-secondary text-sm mb-4 line-clamp-2">Marathon runner • Endurance coach • Chasing PRs 🏃</p>
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-4">
+                                <div>
+                                    <p class="font-semibold text-sm">45K</p>
+                                    <p class="text-apple-text-tertiary text-xs">Followers</p>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-sm">7.2%</p>
+                                    <p class="text-apple-text-tertiary text-xs">Engage</p>
+                                </div>
+                            </div>
+                            <div class="score-ring w-12 h-12 rounded-full p-[3px]" style="--score: 81%">
+                                <div class="w-full h-full rounded-full bg-white flex items-center justify-center">
+                                    <span class="font-semibold text-sm text-apple-blue">81</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button class="flex-1 py-2.5 bg-apple-blue text-white font-medium rounded-xl text-sm hover:bg-apple-blue-hover transition-colors">
+                                View Profile
+                            </button>
+                            <button class="p-2.5 bg-apple-gray rounded-xl hover:bg-gray-200 transition-colors">
+                                <span class="material-symbols-outlined text-apple-text-secondary text-lg">mail</span>
+                            </button>
+                            <button class="p-2.5 bg-apple-gray rounded-xl hover:bg-gray-200 transition-colors">
+                                <span class="material-symbols-outlined text-apple-text-secondary text-lg">bookmark</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Profile Card 6 -->
+                <div class="apple-card overflow-hidden opacity-0 animate-scale-in" style="animation-delay: 0.35s">
+                    <div class="relative h-28 bg-gradient-to-br from-pink-100 to-violet-100 overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&q=80" alt="Cover" class="w-full h-full object-cover opacity-80"/>
+                    </div>
+                    <div class="relative px-5 pb-5">
+                        <div class="flex items-end gap-4 -mt-8 mb-4">
+                            <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&q=80" alt="Avatar" class="profile-image w-16 h-16 rounded-2xl border-4 border-white object-cover shadow-lg"/>
+                            <div class="flex-1 pb-1">
+                                <h3 class="font-semibold text-base">VeganVibes</h3>
+                                <p class="text-apple-text-secondary text-sm">@veganvibes</p>
+                            </div>
+                        </div>
+                        <p class="text-apple-text-secondary text-sm mb-4 line-clamp-2">Plant-based recipes • Sustainable living 🌱</p>
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-4">
+                                <div>
+                                    <p class="font-semibold text-sm">198K</p>
+                                    <p class="text-apple-text-tertiary text-xs">Followers</p>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-sm">5.5%</p>
+                                    <p class="text-apple-text-tertiary text-xs">Engage</p>
+                                </div>
+                            </div>
+                            <div class="score-ring w-12 h-12 rounded-full p-[3px]" style="--score: 89%">
+                                <div class="w-full h-full rounded-full bg-white flex items-center justify-center">
+                                    <span class="font-semibold text-sm text-apple-blue">89</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button class="flex-1 py-2.5 bg-apple-blue text-white font-medium rounded-xl text-sm hover:bg-apple-blue-hover transition-colors">
+                                View Profile
+                            </button>
+                            <button class="p-2.5 bg-apple-gray rounded-xl hover:bg-gray-200 transition-colors">
+                                <span class="material-symbols-outlined text-apple-text-secondary text-lg">mail</span>
+                            </button>
+                            <button class="p-2.5 bg-apple-gray rounded-xl hover:bg-gray-200 transition-colors">
+                                <span class="material-symbols-outlined text-apple-text-secondary text-lg">bookmark</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Load More -->
+            <div class="flex justify-center mt-12 opacity-0 animate-fade-in" style="animation-delay: 0.5s">
+                <button class="apple-button-secondary inline-flex items-center gap-2 px-8 py-3 text-sm">
+                    Load More Partners
+                    <span class="material-symbols-outlined text-lg">expand_more</span>
+                </button>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="py-8 mt-auto border-t border-apple-border">
+            <div class="max-w-6xl mx-auto px-6">
+                <p class="text-center text-apple-text-tertiary text-sm">
+                    © 2026 PartnerScout AI
+                </p>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>

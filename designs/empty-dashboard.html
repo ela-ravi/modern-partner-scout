@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>PartnerScout AI - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "apple-bg": "#fbfbfd",
+                        "apple-card": "#ffffff",
+                        "apple-gray": "#f5f5f7",
+                        "apple-border": "rgba(0, 0, 0, 0.06)",
+                        "apple-blue": "#0071e3",
+                        "apple-blue-hover": "#0077ed",
+                        "apple-green": "#34c759",
+                        "apple-orange": "#ff9500",
+                        "apple-red": "#ff3b30",
+                        "apple-text": "#1d1d1f",
+                        "apple-text-secondary": "#86868b",
+                        "apple-text-tertiary": "#aeaeb2",
+                    },
+                    fontFamily: {
+                        "sf": ["Inter", "-apple-system", "BlinkMacSystemFont", "sans-serif"]
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.8s ease-out forwards',
+                        'slide-up': 'slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        'float': 'float 6s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(30px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-15px)' },
+                        }
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+        
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .apple-card {
+            background: #ffffff;
+            border-radius: 18px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04), 0 0 1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .apple-card-hover {
+            transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+        
+        .apple-card-hover:hover {
+            transform: scale(1.01);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .apple-button {
+            background: #0071e3;
+            color: white;
+            border-radius: 980px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .apple-button:hover {
+            background: #0077ed;
+        }
+        
+        .apple-button-secondary {
+            background: transparent;
+            color: #0071e3;
+            border-radius: 980px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .apple-button-secondary:hover {
+            background: rgba(0, 113, 227, 0.1);
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f5f5f7 100%);
+            border-radius: 16px;
+            border: 1px solid rgba(0, 0, 0, 0.04);
+        }
+        
+        .nav-link {
+            position: relative;
+            color: #86868b;
+            transition: color 0.2s ease;
+        }
+        
+        .nav-link:hover, .nav-link.active {
+            color: #1d1d1f;
+        }
+        
+        .nav-link.active::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            background: #0071e3;
+            border-radius: 50%;
+        }
+        
+        .animate-delay-100 { animation-delay: 0.1s; }
+        .animate-delay-200 { animation-delay: 0.2s; }
+        .animate-delay-300 { animation-delay: 0.3s; }
+        .animate-delay-400 { animation-delay: 0.4s; }
+    </style>
+</head>
+<body class="bg-apple-bg text-apple-text min-h-screen">
+    <div class="flex flex-col min-h-screen">
+        <!-- Header -->
+        <header class="sticky top-0 z-50 bg-apple-bg/80 backdrop-blur-xl border-b border-apple-border">
+            <div class="max-w-6xl mx-auto px-6">
+                <div class="flex items-center justify-between h-14">
+                    <!-- Logo -->
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-apple-blue to-blue-600 flex items-center justify-center">
+                            <svg class="w-4.5 h-4.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                        </div>
+                        <span class="font-semibold text-lg tracking-tight">PartnerScout</span>
+                    </div>
+
+                    <!-- Navigation -->
+                    <nav class="hidden md:flex items-center gap-8">
+                        <a href="#" class="nav-link active text-sm font-medium">Dashboard</a>
+                        <a href="#" class="nav-link text-sm font-medium">Discovery</a>
+                        <a href="#" class="nav-link text-sm font-medium">Analytics</a>
+                    </nav>
+
+                    <!-- Actions -->
+                    <div class="flex items-center gap-4">
+                        <button class="p-2 rounded-full hover:bg-apple-gray transition-colors">
+                            <span class="material-symbols-outlined text-apple-text-secondary text-xl">search</span>
+                        </button>
+                        <button class="relative p-2 rounded-full hover:bg-apple-gray transition-colors">
+                            <span class="material-symbols-outlined text-apple-text-secondary text-xl">notifications</span>
+                            <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-apple-red rounded-full"></span>
+                        </button>
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center cursor-pointer">
+                            <span class="text-white text-sm font-semibold">R</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 max-w-6xl w-full mx-auto px-6 py-12">
+            <!-- Page Header -->
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 opacity-0 animate-fade-in">
+                <div>
+                    <h1 class="text-4xl font-semibold tracking-tight mb-2">Discovery Dashboard</h1>
+                    <p class="text-apple-text-secondary text-lg">Find and connect with your ideal brand partners.</p>
+                </div>
+                <button class="apple-button inline-flex items-center gap-2 px-6 py-3 text-sm">
+                    <span class="material-symbols-outlined text-lg">add</span>
+                    New Discovery
+                </button>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12 opacity-0 animate-slide-up animate-delay-100">
+                <div class="stat-card p-5 apple-card-hover">
+                    <p class="text-apple-text-secondary text-sm font-medium mb-1">Profiles Discovered</p>
+                    <p class="text-3xl font-semibold tracking-tight text-apple-text-tertiary">—</p>
+                </div>
+                <div class="stat-card p-5 apple-card-hover">
+                    <p class="text-apple-text-secondary text-sm font-medium mb-1">High Matches</p>
+                    <p class="text-3xl font-semibold tracking-tight text-apple-text-tertiary">—</p>
+                </div>
+                <div class="stat-card p-5 apple-card-hover">
+                    <p class="text-apple-text-secondary text-sm font-medium mb-1">Pending Outreach</p>
+                    <p class="text-3xl font-semibold tracking-tight text-apple-text-tertiary">—</p>
+                </div>
+                <div class="stat-card p-5 apple-card-hover">
+                    <p class="text-apple-text-secondary text-sm font-medium mb-1">Response Rate</p>
+                    <p class="text-3xl font-semibold tracking-tight text-apple-text-tertiary">—</p>
+                </div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="mb-8 opacity-0 animate-fade-in animate-delay-200">
+                <div class="inline-flex gap-1 p-1 bg-apple-gray rounded-xl">
+                    <button class="px-5 py-2 rounded-lg bg-white shadow-sm text-sm font-medium text-apple-text transition-all">
+                        New
+                    </button>
+                    <button class="px-5 py-2 rounded-lg text-sm font-medium text-apple-text-secondary hover:text-apple-text transition-all">
+                        Processing
+                    </button>
+                    <button class="px-5 py-2 rounded-lg text-sm font-medium text-apple-text-secondary hover:text-apple-text transition-all">
+                        Completed
+                    </button>
+                </div>
+            </div>
+
+            <!-- Empty State -->
+            <div class="apple-card p-16 opacity-0 animate-slide-up animate-delay-300">
+                <div class="flex flex-col items-center text-center max-w-md mx-auto">
+                    <!-- Animated Illustration -->
+                    <div class="relative mb-10">
+                        <div class="w-36 h-36 rounded-full bg-gradient-to-br from-apple-gray to-white flex items-center justify-center animate-float">
+                            <div class="w-24 h-24 rounded-full bg-gradient-to-br from-apple-blue/10 to-blue-100 flex items-center justify-center">
+                                <span class="material-symbols-outlined text-5xl text-apple-blue/70">explore</span>
+                            </div>
+                        </div>
+                        <!-- Orbiting dots -->
+                        <div class="absolute top-2 right-4 w-2.5 h-2.5 bg-apple-blue rounded-full opacity-60"></div>
+                        <div class="absolute bottom-6 left-0 w-2 h-2 bg-apple-green rounded-full opacity-60"></div>
+                        <div class="absolute top-1/2 -right-1 w-1.5 h-1.5 bg-apple-orange rounded-full opacity-60"></div>
+                    </div>
+
+                    <h2 class="text-2xl font-semibold tracking-tight mb-3">No Partners Discovered Yet</h2>
+                    <p class="text-apple-text-secondary text-lg mb-10 leading-relaxed">
+                        Configure your brand parameters and let our AI discover high-affinity partners tailored to your brand.
+                    </p>
+
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <button class="apple-button inline-flex items-center justify-center gap-2 px-7 py-3.5 text-sm">
+                            <span class="material-symbols-outlined text-lg">rocket_launch</span>
+                            Start Discovery
+                        </button>
+                        <button class="apple-button-secondary inline-flex items-center justify-center gap-2 px-7 py-3.5 text-sm">
+                            <span class="material-symbols-outlined text-lg">play_circle</span>
+                            Watch Demo
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="py-8 mt-auto border-t border-apple-border">
+            <div class="max-w-6xl mx-auto px-6">
+                <p class="text-center text-apple-text-tertiary text-sm">
+                    © 2026 PartnerScout AI
+                </p>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>

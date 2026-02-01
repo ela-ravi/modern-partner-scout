@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>PartnerScout AI - Profile Details</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "apple-bg": "#fbfbfd",
+                        "apple-card": "#ffffff",
+                        "apple-gray": "#f5f5f7",
+                        "apple-border": "rgba(0, 0, 0, 0.06)",
+                        "apple-blue": "#0071e3",
+                        "apple-blue-hover": "#0077ed",
+                        "apple-green": "#34c759",
+                        "apple-orange": "#ff9500",
+                        "apple-red": "#ff3b30",
+                        "apple-purple": "#af52de",
+                        "apple-text": "#1d1d1f",
+                        "apple-text-secondary": "#86868b",
+                        "apple-text-tertiary": "#aeaeb2",
+                    },
+                    fontFamily: {
+                        "sf": ["Inter", "-apple-system", "BlinkMacSystemFont", "sans-serif"]
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.4s ease-out forwards',
+                        'scale-in': 'scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        scaleIn: {
+                            '0%': { opacity: '0', transform: 'scale(0.95)' },
+                            '100%': { opacity: '1', transform: 'scale(1)' },
+                        }
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+        
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .modal-backdrop {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(8px);
+        }
+        
+        .modal-content {
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        
+        .score-ring {
+            background: conic-gradient(from 0deg, #0071e3 0%, #0071e3 var(--score), #f5f5f7 var(--score), #f5f5f7 100%);
+        }
+        
+        .score-bar {
+            background: #f5f5f7;
+            border-radius: 4px;
+        }
+        
+        .score-bar-fill {
+            background: linear-gradient(90deg, #0071e3, #00a2ff);
+            border-radius: 4px;
+        }
+        
+        .section-card {
+            background: #f5f5f7;
+            border-radius: 14px;
+        }
+        
+        .apple-button {
+            background: #0071e3;
+            color: white;
+            border-radius: 980px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .apple-button:hover {
+            background: #0077ed;
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.1); border-radius: 3px; }
+        
+        .animate-delay-100 { animation-delay: 0.1s; }
+    </style>
+</head>
+<body class="bg-apple-bg text-apple-text min-h-screen">
+    <!-- Modal Backdrop -->
+    <div class="modal-backdrop fixed inset-0 flex items-center justify-center p-4 z-50 animate-fade-in">
+        <!-- Modal Content -->
+        <div class="modal-content w-full max-w-4xl max-h-[90vh] overflow-hidden opacity-0 animate-scale-in animate-delay-100">
+            <!-- Header with Cover -->
+            <div class="relative h-36 bg-gradient-to-br from-emerald-100 to-teal-100">
+                <img src="https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800&q=80" alt="Cover" class="w-full h-full object-cover opacity-70"/>
+                
+                <!-- Close Button -->
+                <button class="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center text-apple-text-secondary hover:text-apple-text transition-colors shadow-sm">
+                    <span class="material-symbols-outlined text-xl">close</span>
+                </button>
+                
+                <!-- Badge -->
+                <div class="absolute top-4 left-4">
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-apple-orange/90 text-white text-xs font-semibold rounded-full shadow-sm">
+                        <span class="material-symbols-outlined text-xs" style="font-variation-settings: 'FILL' 1">star</span>
+                        TOP MATCH
+                    </span>
+                </div>
+            </div>
+
+            <!-- Profile Info -->
+            <div class="relative px-8 pb-8">
+                <!-- Avatar & Basic Info -->
+                <div class="flex flex-col md:flex-row gap-6 -mt-12 mb-6">
+                    <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80" alt="Avatar" class="w-24 h-24 rounded-2xl border-4 border-white object-cover shadow-lg"/>
+                    <div class="flex-1 pt-4 md:pt-6">
+                        <div class="flex flex-wrap items-start justify-between gap-4">
+                            <div>
+                                <h2 class="text-2xl font-semibold mb-1">Clean Eating Amy</h2>
+                                <a href="#" class="text-apple-blue hover:underline text-sm">@cleaneatingamy</a>
+                            </div>
+                            <button class="inline-flex items-center gap-2 px-4 py-2 bg-apple-gray hover:bg-gray-200 rounded-xl text-sm font-medium transition-colors">
+                                <span class="material-symbols-outlined text-lg">open_in_new</span>
+                                View on Instagram
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid lg:grid-cols-3 gap-6 overflow-y-auto max-h-[calc(90vh-240px)] scrollbar-thin pr-2">
+                    <!-- Left Column -->
+                    <div class="lg:col-span-2 space-y-5">
+                        <!-- Bio -->
+                        <div class="section-card p-5">
+                            <h3 class="font-medium text-apple-text-secondary text-xs uppercase tracking-wider mb-3">Bio</h3>
+                            <p class="text-apple-text-secondary text-sm leading-relaxed">
+                                🥗 Recipe developer & wellness advocate<br/>
+                                🌱 Whole30 enthusiast | Clean eating made delicious<br/>
+                                📧 collabs@cleaneatingamy.com<br/>
+                                📍 Los Angeles, CA
+                            </p>
+                        </div>
+
+                        <!-- Stats -->
+                        <div class="grid grid-cols-4 gap-3">
+                            <div class="section-card p-4 text-center">
+                                <p class="text-xl font-semibold">256K</p>
+                                <p class="text-apple-text-tertiary text-xs">Followers</p>
+                            </div>
+                            <div class="section-card p-4 text-center">
+                                <p class="text-xl font-semibold">1.2K</p>
+                                <p class="text-apple-text-tertiary text-xs">Following</p>
+                            </div>
+                            <div class="section-card p-4 text-center">
+                                <p class="text-xl font-semibold text-apple-green">6.8%</p>
+                                <p class="text-apple-text-tertiary text-xs">Engagement</p>
+                            </div>
+                            <div class="section-card p-4 text-center">
+                                <p class="text-xl font-semibold">847</p>
+                                <p class="text-apple-text-tertiary text-xs">Posts</p>
+                            </div>
+                        </div>
+
+                        <!-- AI Analysis -->
+                        <div class="section-card p-5">
+                            <h3 class="font-medium text-apple-text-secondary text-xs uppercase tracking-wider mb-3">AI Analysis</h3>
+                            <p class="text-apple-text-secondary text-sm leading-relaxed mb-4">
+                                Strong alignment with your brand's wellness positioning. Content focuses on clean eating, meal prep, and sustainable nutrition. Audience demographics show 78% female, ages 25-44, with high engagement on recipe content.
+                            </p>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="px-3 py-1.5 bg-apple-blue/10 text-apple-blue text-xs font-medium rounded-full">recipe content</span>
+                                <span class="px-3 py-1.5 bg-apple-blue/10 text-apple-blue text-xs font-medium rounded-full">meal prep</span>
+                                <span class="px-3 py-1.5 bg-apple-blue/10 text-apple-blue text-xs font-medium rounded-full">whole30</span>
+                                <span class="px-3 py-1.5 bg-apple-blue/10 text-apple-blue text-xs font-medium rounded-full">healthy living</span>
+                            </div>
+                        </div>
+
+                        <!-- Recent Posts -->
+                        <div class="section-card p-5">
+                            <h3 class="font-medium text-apple-text-secondary text-xs uppercase tracking-wider mb-3">Recent Content</h3>
+                            <div class="grid grid-cols-3 gap-3">
+                                <div class="aspect-square rounded-xl overflow-hidden bg-white">
+                                    <img src="https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=200&q=80" alt="Post" class="w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer"/>
+                                </div>
+                                <div class="aspect-square rounded-xl overflow-hidden bg-white">
+                                    <img src="https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=200&q=80" alt="Post" class="w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer"/>
+                                </div>
+                                <div class="aspect-square rounded-xl overflow-hidden bg-white">
+                                    <img src="https://images.unsplash.com/photo-1547592180-85f173990554?w=200&q=80" alt="Post" class="w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column - Score & Actions -->
+                    <div class="space-y-5">
+                        <!-- Match Score -->
+                        <div class="section-card p-5 text-center">
+                            <h3 class="font-medium text-apple-text-secondary text-xs uppercase tracking-wider mb-4">Match Score</h3>
+                            <div class="relative inline-flex items-center justify-center mb-3">
+                                <div class="score-ring w-28 h-28 rounded-full p-2" style="--score: 96%">
+                                    <div class="w-full h-full rounded-full bg-white flex flex-col items-center justify-center shadow-sm">
+                                        <span class="text-3xl font-semibold text-apple-orange">96</span>
+                                        <span class="text-apple-text-tertiary text-xs">of 100</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="text-apple-green text-sm font-medium">Excellent Match</p>
+                        </div>
+
+                        <!-- Score Breakdown -->
+                        <div class="section-card p-5">
+                            <h3 class="font-medium text-apple-text-secondary text-xs uppercase tracking-wider mb-4">Score Breakdown</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <div class="flex justify-between items-center mb-1.5">
+                                        <span class="text-sm text-apple-text-secondary">Aesthetic Match</span>
+                                        <span class="text-sm font-semibold text-apple-blue">92%</span>
+                                    </div>
+                                    <div class="score-bar h-1.5">
+                                        <div class="score-bar-fill h-full" style="width: 92%"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between items-center mb-1.5">
+                                        <span class="text-sm text-apple-text-secondary">Engagement</span>
+                                        <span class="text-sm font-semibold text-apple-blue">98%</span>
+                                    </div>
+                                    <div class="score-bar h-1.5">
+                                        <div class="score-bar-fill h-full" style="width: 98%"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between items-center mb-1.5">
+                                        <span class="text-sm text-apple-text-secondary">Content Fit</span>
+                                        <span class="text-sm font-semibold text-apple-blue">95%</span>
+                                    </div>
+                                    <div class="score-bar h-1.5">
+                                        <div class="score-bar-fill h-full" style="width: 95%"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between items-center mb-1.5">
+                                        <span class="text-sm text-apple-text-secondary">Audience Fit</span>
+                                        <span class="text-sm font-semibold text-apple-blue">97%</span>
+                                    </div>
+                                    <div class="score-bar h-1.5">
+                                        <div class="score-bar-fill h-full" style="width: 97%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Contact Info -->
+                        <div class="section-card p-5">
+                            <h3 class="font-medium text-apple-text-secondary text-xs uppercase tracking-wider mb-3">Contact</h3>
+                            <div class="flex items-center gap-3 p-3 bg-white rounded-xl">
+                                <span class="material-symbols-outlined text-apple-orange text-lg">mail</span>
+                                <span class="text-sm truncate flex-1">collabs@cleaneatingamy.com</span>
+                                <button class="text-apple-text-tertiary hover:text-apple-blue transition-colors">
+                                    <span class="material-symbols-outlined text-lg">content_copy</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="space-y-3">
+                            <button class="apple-button w-full inline-flex items-center justify-center gap-2 py-3.5 text-sm">
+                                <span class="material-symbols-outlined text-lg">mail</span>
+                                Compose Email
+                            </button>
+                            <div class="grid grid-cols-2 gap-3">
+                                <button class="inline-flex items-center justify-center gap-2 py-2.5 bg-apple-gray hover:bg-gray-200 rounded-xl text-sm font-medium transition-colors">
+                                    <span class="material-symbols-outlined text-lg text-apple-text-secondary">bookmark</span>
+                                    Save
+                                </button>
+                                <button class="inline-flex items-center justify-center gap-2 py-2.5 bg-apple-gray hover:bg-gray-200 rounded-xl text-sm font-medium transition-colors">
+                                    <span class="material-symbols-outlined text-lg text-apple-text-secondary">block</span>
+                                    Skip
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
