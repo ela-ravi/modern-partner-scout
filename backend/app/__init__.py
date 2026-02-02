@@ -1,0 +1,1 @@
+# PartnerScout AI - Backend Application

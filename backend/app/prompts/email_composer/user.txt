@@ -1,0 +1,60 @@
+Please compose a personalized partnership outreach email for the following influencer.
+
+## Brand Information
+
+**Brand Name:** {brand_name}
+**Brand Description:**
+{brand_description}
+
+## Influencer Information
+
+**Username:** {username}
+**Profile URL:** {profile_url}
+**Follower Count:** {follower_count}
+**Bio:** {bio}
+
+**Profile Summary:**
+{profile_summary}
+
+**Partnership Score:** {score}/100
+
+## Email Parameters
+
+**Requested Tone:** {tone}
+
+## Composition Instructions
+
+Please compose a personalized outreach email that:
+
+1. **Opens with Personalization**
+   - Reference specific content or aspects of their profile
+   - Show genuine familiarity with their work
+   - Make it clear this isn't a mass email
+
+2. **Introduces the Brand**
+   - Brief, compelling description
+   - Highlight brand values that align with the influencer
+   - Include relevant social proof if available
+
+3. **Proposes the Partnership**
+   - Clear explanation of collaboration opportunity
+   - Emphasize mutual benefits
+   - Be specific but flexible
+
+4. **Includes Clear Call-to-Action**
+   - Low-commitment next step
+   - Easy way to respond
+   - Offer flexibility for scheduling
+
+5. **Matches the Requested Tone**
+   - Adjust language, formality, and style
+   - Maintain professionalism regardless of tone
+   - Consider the influencer's own communication style
+
+## Length Guidelines
+
+- Subject: 40-60 characters
+- Body: 150-300 words
+- Paragraphs: 2-4 sentences each
+
+Please provide the email in the specified JSON format with subject line, body, and metadata.

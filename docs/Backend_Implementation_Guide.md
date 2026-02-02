@@ -94,7 +94,8 @@ flowchart TB
 │  - External service coordination                             │
 ├─────────────────────────────────────────────────────────────┤
 │                    Agent Layer                               │
-│  (agents/brand_analyzer.py, agents/discovery.py)            │
+│  (agents/brand_analyzer.py, agents/discovery.py,            │
+│   agents/scorer.py)                                          │
 │  - AI/ML logic using LangChain                              │
 │  - Prompt management                                         │
 │  - LLM provider abstraction                                  │

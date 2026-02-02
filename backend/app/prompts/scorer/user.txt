@@ -1,0 +1,71 @@
+Please evaluate the following Instagram profile for brand partnership potential.
+
+## Brand Context
+
+**Brand Description:**
+{brand_description}
+
+**Brand DNA:**
+{brand_dna}
+
+## Profile to Score
+
+**Username:** {username}
+**Profile URL:** {profile_url}
+
+**Profile Data:**
+{profile_data}
+
+## Scoring Instructions
+
+Please analyze this profile and provide scores across all 6 dimensions:
+
+### 1. Visual Aesthetic Match (20% weight)
+Evaluate the visual quality and style alignment with the brand.
+
+### 2. Content Theme Alignment (25% weight)
+Assess how well the content topics match the brand's industry and values.
+
+### 3. Engagement Rate Score (20% weight)
+Analyze the engagement patterns for authenticity and quality.
+
+### 4. Follower Quality (15% weight)
+Evaluate the follower base for authenticity and brand relevance.
+
+### 5. Business Indicators (10% weight)
+Check for professional setup and business readiness.
+
+### 6. Activity Recency (10% weight)
+Assess recent activity and posting consistency.
+
+## Additional Analysis
+
+1. **Fake Detection**: Analyze for any indicators of fake followers or engagement manipulation.
+
+2. **Contact Extraction**: Extract any contact information available in the profile.
+
+3. **Recommendation**: Based on all factors, provide your partnership recommendation.
+
+## Score Thresholds
+
+- 80-100: Highly Recommended - Excellent partnership potential
+- 60-79: Recommended - Good partnership potential
+- 40-59: Consider - Moderate potential, may require further review
+- 0-39: Not Recommended - Low partnership potential or red flags
+
+Please provide your complete analysis as a valid JSON object with these exact keys:
+- visual_aesthetic_match (0-100)
+- content_theme_alignment (0-100)
+- engagement_rate_score (0-100)
+- follower_quality (0-100)
+- business_indicators (0-100)
+- activity_recency (0-100)
+- is_fake (boolean)
+- fake_indicators (array of strings)
+- contact_email (string or null)
+- contact_website (string or null)
+- email_source (string or null)
+- reasoning (object with explanation for each dimension)
+- recommendation ("highly_recommended", "recommended", "consider", or "not_recommended")
+
+IMPORTANT: Return ONLY the JSON object, no additional text or markdown formatting.

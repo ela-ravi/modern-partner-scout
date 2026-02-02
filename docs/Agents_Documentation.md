@@ -255,21 +255,41 @@ The orchestrators use a simplified request with just IDs. The backend fetches `b
 
 ```json
 {
-  "score": 92,
+  "profile_id": "aaaa1111-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "job_id": "11111111-1111-1111-1111-111111111111",
+  "visual_aesthetic_match": 75,
+  "content_theme_alignment": 82,
+  "engagement_rate_score": 88,
+  "follower_quality": 70,
+  "business_indicators": 85,
+  "activity_recency": 90,
+  "final_score": 82,
+  "recommendation": "highly_recommended",
   "reasoning": {
-    "visual_aesthetic_match": 95,
-    "content_theme_alignment": 90,
-    "engagement_rate_score": 88,
-    "follower_quality": 95,
-    "business_indicators": 100,
-    "activity_recency": 90,
-    "summary": "Excellent match. Strong alignment with sustainable fashion values, consistent minimalist aesthetic. Genuine profile with healthy following ratio (0.03), strong engagement (3.2%), and complete business presence.",
-    "recommendation": "Highly recommended for partnership outreach."
+    "visual_aesthetic_match": "High quality photos with consistent minimalist aesthetic that aligns well with the brand's visual identity.",
+    "content_theme_alignment": "Content topics strongly align with sustainable fashion values and eco-conscious messaging.",
+    "engagement_rate_score": "Strong engagement rate of 3.2% with authentic comments and meaningful interactions.",
+    "follower_quality": "Healthy follower-to-following ratio (0.03) indicates genuine audience growth.",
+    "business_indicators": "Professional business account setup with verified contact information.",
+    "activity_recency": "Active posting within last week with consistent 2-3 posts per week schedule."
   },
+  "dimensions": [
+    {"name": "visual_aesthetic_match", "score": 75, "weight": 0.15, "reasoning": "High quality photos with consistent minimalist aesthetic..."},
+    {"name": "content_theme_alignment", "score": 82, "weight": 0.20, "reasoning": "Content topics strongly align with sustainable fashion..."},
+    {"name": "engagement_rate_score", "score": 88, "weight": 0.25, "reasoning": "Strong engagement rate of 3.2%..."},
+    {"name": "follower_quality", "score": 70, "weight": 0.15, "reasoning": "Healthy follower-to-following ratio..."},
+    {"name": "business_indicators", "score": 85, "weight": 0.15, "reasoning": "Professional business account setup..."},
+    {"name": "activity_recency", "score": 90, "weight": 0.10, "reasoning": "Active posting within last week..."}
+  ],
+  "is_fake_suspected": false,
+  "fake_indicators": [],
   "contact": {
     "email": "hello@sustainablecloset.com",
-    "source": "business_email"
-  }
+    "website": "https://sustainablecloset.com",
+    "source": "business_email",
+    "phone": null
+  },
+  "scoring_duration_seconds": 4.5
 }
 ```
 
@@ -319,12 +339,12 @@ The Scorer Agent includes heuristics to detect fake/bot accounts as part of the 
 
 | Signal | Genuine | Suspicious | Likely Fake |
 |--------|---------|------------|-------------|
-| Following/Follower Ratio | < 1.0 | 1.0 - 2.0 | > 2.0 |
-| Posts vs Followers | 50+ posts for 5K | 20-50 posts | < 20 posts for 5K+ |
+| Following/Follower Ratio | < 1.0 | 1.0 - 3.0 | > 3.0 |
+| Posts vs Followers | 50+ posts for 10K+ | 10-50 posts | < 10 posts for 10K+ |
 | Business Account | Yes | - | No |
 | Email Available | Yes | - | No |
 | Website Linked | Yes | - | No |
-| Engagement Rate | > 2% | 1-2% | < 1% |
+| Engagement Rate | > 1.5% | 0.5-1.5% | < 0.5% |
 | Bio Quality | Detailed, professional | Generic | Empty/spam |
 | Post Consistency | Regular (2-5/week) | Irregular | Burst then silent |
 
@@ -335,20 +355,28 @@ def calculate_follower_quality(profile: dict) -> int:
     """
     Calculate follower quality score (0-100).
     Higher = more genuine, Lower = more likely fake.
+    
+    Thresholds from actual implementation:
+    - MAX_FOLLOWING_RATIO = 3.0
+    - MIN_ENGAGEMENT_RATE = 0.5%
+    - MIN_POSTS_FOR_HIGH_FOLLOWERS = 10
+    - HIGH_FOLLOWER_THRESHOLD = 10,000
     """
     score = 100
     
     # Check 1: Following/Follower ratio
-    ratio = profile.get("following_ratio", 0)
-    if ratio > 2.0:
-        score -= 30  # High ratio - likely fake
-    elif ratio > 1.5:
-        score -= 15  # Elevated ratio - suspicious
-    
-    # Check 2: Posts vs Followers
     followers = profile.get("followers", 0)
+    following = profile.get("following", 0)
+    if followers > 0:
+        ratio = following / followers
+        if ratio > 3.0:
+            score -= 30  # High ratio - likely fake
+        elif ratio > 1.5:
+            score -= 15  # Elevated ratio - suspicious
+    
+    # Check 2: Posts vs Followers (for high-follower accounts)
     posts = profile.get("posts_count", 0)
-    if followers > 5000 and posts < 20:
+    if followers > 10000 and posts < 10:
         score -= 25  # Too few posts for follower count
     elif posts > 50:
         score += 0   # Good post history (no penalty)
@@ -363,10 +391,10 @@ def calculate_follower_quality(profile: dict) -> int:
     
     # Check 4: Engagement rate
     engagement = profile.get("engagement_rate", 0)
-    if engagement < 1.0:
-        score -= 20  # Very low engagement
-    elif engagement < 2.0:
-        score -= 10  # Low engagement
+    if engagement < 0.5:
+        score -= 20  # Very low engagement (< 0.5%)
+    elif engagement < 1.5:
+        score -= 10  # Low engagement (0.5-1.5%)
     
     # Cap score between 0-100
     return max(0, min(100, score))
@@ -716,63 +744,98 @@ Return as a JSON array of hashtag strings (include # prefix).
 #### Scorer Agent Prompts
 
 **`prompts/scorer/system.txt`**
+
+> **IMPORTANT:** When using LangChain prompt templates, curly braces in the system prompt
+> must be escaped with double braces `{{}}` to avoid being interpreted as template variables.
+
 ```
-You are an influencer partnership analyst and authenticity expert.
+You are an Expert Profile Scorer AI specializing in evaluating Instagram influencers 
+for brand partnership potential.
 
-Your task is to score candidate Instagram profiles against a brand's DNA 
-to determine partnership fit, while also detecting fake/bot accounts.
+Scoring Dimensions (0-100 each):
+- visual_aesthetic_match (15%): Visual style and content alignment with brand
+- content_theme_alignment (20%): Topic, values, and messaging alignment
+- engagement_rate_score (25%): Engagement metrics relative to follower count
+- follower_quality (15%): Authenticity signals - detect fake/bot accounts
+- business_indicators (15%): Business account, email, website presence
+- activity_recency (10%): Posting frequency and recency
 
-Scoring criteria (0-100 each):
-- visual_aesthetic_match: Visual style and content alignment with brand (25%)
-- content_theme_alignment: Topic, values, and messaging alignment (20%)
-- engagement_rate_score: Engagement metrics relative to follower count (15%)
-- follower_quality: Authenticity signals - detect fake/bot accounts (15%)
-- business_indicators: Business account, email, website presence (15%)
-- activity_recency: Posting frequency and recency (10%)
-
-Fake account detection rules:
-- Following/Follower ratio > 2.0 = likely fake
-- < 20 posts for 5K+ followers = suspicious
-- Engagement rate < 1% = likely fake
+Fake Account Detection Rules:
+- Following/Follower ratio > 3.0 = likely fake
+- < 10 posts for 10K+ followers = suspicious
+- Engagement rate < 0.5% = likely fake
 - No business account, email, or website = less trustworthy
 
-Also extract any contact email found in the profile bio or business info.
+## Output Format
 
-Always provide a summary and actionable recommendation.
+You MUST respond with a valid JSON object containing these exact fields:
+
+{{
+  "visual_aesthetic_match": 75,
+  "content_theme_alignment": 80,
+  "engagement_rate_score": 85,
+  "follower_quality": 70,
+  "business_indicators": 65,
+  "activity_recency": 90,
+  "is_fake": false,
+  "fake_indicators": [],
+  "contact_email": "creator@example.com",
+  "contact_website": "https://example.com",
+  "email_source": "bio",
+  "reasoning": {{
+    "visual_aesthetic_match": "High quality photos with consistent aesthetic",
+    "content_theme_alignment": "Content topics align well with brand values",
+    "engagement_rate_score": "Strong engagement with authentic comments",
+    "follower_quality": "Healthy follower-to-following ratio",
+    "business_indicators": "Professional account setup",
+    "activity_recency": "Active posting within last week"
+  }},
+  "recommendation": "highly_recommended"
+}}
+
+Note: Double braces {{ }} are used for escaping in LangChain prompt templates.
 ```
 
 **`prompts/scorer/user.txt`**
 ```
-=== BRAND DNA ===
-Hashtags: {brand_hashtags}
-Keywords: {brand_keywords}
+Please evaluate the following Instagram profile for brand partnership potential.
 
-=== CANDIDATE PROFILE ===
-Username: {username}
-Bio: {bio}
-Followers: {followers}
-Following: {following}
-Posts Count: {posts_count}
-Engagement Rate: {engagement_rate}%
-Following/Follower Ratio: {following_ratio}
-Is Business Account: {is_business}
-Has Email: {has_email}
-Has Website: {has_website}
-Last Post Date: {last_post_date}
-Recent Captions: 
-{captions}
+## Brand Context
 
-=== TASK ===
-Score this profile and return JSON with:
-- visual_aesthetic_match (0-100): Visual style alignment with brand
-- content_theme_alignment (0-100): Topic and messaging match
-- engagement_rate_score (0-100): Quality of engagement metrics
-- follower_quality (0-100): Authenticity score (100=genuine, 0=fake)
-- business_indicators (0-100): Business presence score
-- activity_recency (0-100): Recent posting activity score
-- summary (2-3 sentences including authenticity assessment)
-- recommendation (action to take)
-- email (extracted email or null)
+**Brand Description:**
+{brand_description}
+
+**Brand DNA:**
+{brand_dna}
+
+## Profile to Score
+
+**Username:** {username}
+**Profile URL:** {profile_url}
+
+**Profile Data:**
+{profile_data}
+
+## Scoring Instructions
+
+Analyze this profile and provide scores across all 6 dimensions.
+
+Please provide your complete analysis as a valid JSON object with these exact keys:
+- visual_aesthetic_match (0-100)
+- content_theme_alignment (0-100)
+- engagement_rate_score (0-100)
+- follower_quality (0-100)
+- business_indicators (0-100)
+- activity_recency (0-100)
+- is_fake (boolean)
+- fake_indicators (array of strings)
+- contact_email (string or null)
+- contact_website (string or null)
+- email_source (string or null)
+- reasoning (object with explanation for each dimension)
+- recommendation ("highly_recommended", "recommended", "consider", or "not_recommended")
+
+IMPORTANT: Return ONLY the JSON object, no additional text or markdown formatting.
 ```
 
 #### Prompt Loader Utility
@@ -1028,125 +1091,221 @@ class DiscoveryAgent(BaseAgent):
 
 Scores candidate profiles against brand DNA. See Section 4 for I/O format.
 
+#### Pydantic Models for Structured Output
+
+The Scorer Agent uses Pydantic models to define the expected LLM output structure:
+
 ```python
 # backend/app/agents/scorer.py
+from pydantic import BaseModel, Field
+from typing import Dict, List, Optional
+
+class ScoringAnalysisOutput(BaseModel):
+    """Schema for LLM scoring analysis output."""
+    
+    # 6 Dimension Scores (0-100)
+    visual_aesthetic_match: int = Field(default=50, ge=0, le=100)
+    content_theme_alignment: int = Field(default=50, ge=0, le=100)
+    engagement_rate_score: int = Field(default=50, ge=0, le=100)
+    follower_quality: int = Field(default=50, ge=0, le=100)
+    business_indicators: int = Field(default=50, ge=0, le=100)
+    activity_recency: int = Field(default=50, ge=0, le=100)
+    
+    # Fake Detection
+    is_fake: bool = Field(default=False)
+    fake_indicators: List[str] = Field(default_factory=list)
+    
+    # Contact Information
+    contact_email: Optional[str] = Field(default=None)
+    contact_website: Optional[str] = Field(default=None)
+    email_source: Optional[str] = Field(default=None)
+    
+    # Reasoning (per dimension)
+    reasoning: Dict[str, str] = Field(default_factory=dict)
+    recommendation: str = Field(default="consider")
+
+
+class ExtractedContact(BaseModel):
+    """Model for extracted contact information."""
+    email: Optional[str] = None
+    email_source: Optional[str] = None
+    website: Optional[str] = None
+    phone: Optional[str] = None
+    twitter: Optional[str] = None
+    tiktok: Optional[str] = None
+```
+
+#### Scorer Agent Class
+
+```python
+# backend/app/agents/scorer.py
+import logging
 from app.agents.base import BaseAgent
-from app.config import get_agent_config, get_scoring_config
-from langchain_core.output_parsers import JsonOutputParser
+from app.services.scoring_service import get_scoring_service
+
+logger = logging.getLogger(__name__)
 
 class ScorerAgent(BaseAgent):
-    """Scores Instagram profiles against brand DNA."""
+    """Scores Instagram profiles against brand DNA with 6-dimension analysis."""
     
-    # Loads prompts from: prompts/scorer/system.txt and user.txt
     AGENT_NAME = "scorer"
     
-    def __init__(self, llm=None):
-        super().__init__(llm)
-        # Load config from config/scoring.yaml (see Section 8.8)
-        self.scoring_config = get_scoring_config()
-        self.agent_config = get_agent_config("scorer")
+    # Fake detection thresholds
+    MIN_ENGAGEMENT_RATE = 0.005   # 0.5%
+    MAX_FOLLOWING_RATIO = 3.0
+    MIN_POSTS_FOR_HIGH_FOLLOWERS = 10
+    HIGH_FOLLOWER_THRESHOLD = 10000
     
-    def _build_chain(self):
-        # Prompts loaded from files (see Section 8.2)
-        prompt = self._build_prompt_template()
-        return prompt | self.llm | JsonOutputParser()
+    def __init__(self, llm_service=None, job_repo=None, profile_repo=None, 
+                 brand_repo=None, score_repo=None, contact_repo=None, 
+                 scoring_service=None, **kwargs):
+        super().__init__(llm_service=llm_service, **kwargs)
+        self._scoring_service = scoring_service or get_scoring_service()
+        # Initialize repositories...
     
-    async def run(self, profile_id: str, profile_data: dict, 
-                  brand_dna: dict) -> dict:
+    async def run(self, input_data: ScorerRequest) -> ScorerResponse:
         """
-        Pseudo code:
-        1. Calculate embedding similarity (brand_dna vs profile)
-        2. Prepare profile text for LLM analysis
-        3. Invoke scoring chain
-        4. Extract email from bio using regex (fallback)
-        5. Calculate final weighted score
-        6. Store score in profile_scores table
-        7. Store contact in profile_contacts table
-        8. Update profile status to 'done'
-        9. Return ScoreResponse object
+        Execute 6-dimension scoring for a discovered profile.
+        
+        Steps:
+        1. Fetch profile data and brand DNA
+        2. Detect fake profile indicators (heuristic)
+        3. Extract contact information
+        4. Analyze with LLM for 6-dimension scoring
+        5. Calculate weighted final score
+        6. Store results in database
         """
-        # Calculate embedding similarity
-        similarity = await self._calculate_similarity(
-            brand_dna["embedding_vector"],
-            profile_data
-        )
+        profile_id = str(input_data.profile_id)
+        job_id = str(input_data.job_id)
         
-        # Run LLM scoring chain
-        result = await self.chain.ainvoke({
-            "brand_hashtags": brand_dna["hashtags"],
-            "brand_keywords": brand_dna["keywords"],
-            "username": profile_data["username"],
-            "bio": profile_data["bio"],
-            "followers": profile_data["followers"],
-            "engagement_rate": profile_data["engagement_rate"],
-            "captions": self._extract_captions(profile_data["recent_posts"])
-        })
-        
-        # Calculate final score (weighted average)
-        final_score = self._calculate_final_score(result, similarity)
-        
-        # Extract email (LLM result or regex fallback)
-        email = result.get("email") or self._extract_email_regex(profile_data["bio"])
-        
-        # Save to database
-        await self._save_score(profile_id, final_score, result)
-        await self._save_contact(profile_id, email)
-        
-        return {
-            "score": final_score,
-            "reasoning": {
-                "visual_aesthetic_match": result["visual_aesthetic_match"],
-                "content_theme_alignment": result["content_theme_alignment"],
-                "engagement_rate_score": result["engagement_rate_score"],
-                "follower_quality": result["follower_quality"],
-                "business_indicators": result["business_indicators"],
-                "activity_recency": result["activity_recency"],
-                "summary": result["summary"],
-                "recommendation": result["recommendation"]
-            },
-            "contact": {
-                "email": email,
-                "source": "business_email" if email else None
+        try:
+            # Fetch data
+            profile_data = await self._fetch_profile(profile_id)
+            brand_dna = await self._fetch_brand_dna(job_id)
+            
+            # Pre-LLM heuristic checks
+            fake_indicators = self._detect_fake_indicators(profile_data)
+            contact = self._extract_contact_info(profile_data)
+            
+            # LLM Analysis with fallback
+            analysis = await self._analyze_profile(
+                profile_data, brand_dna, fake_indicators, contact
+            )
+            
+            # Calculate final score
+            dimensions = {
+                "visual_aesthetic_match": analysis.visual_aesthetic_match,
+                "content_theme_alignment": analysis.content_theme_alignment,
+                "engagement_rate_score": analysis.engagement_rate_score,
+                "follower_quality": analysis.follower_quality,
+                "business_indicators": analysis.business_indicators,
+                "activity_recency": analysis.activity_recency,
             }
-        }
-    
-    def _calculate_final_score(self, llm_result: dict) -> int:
-        """
-        Weighted score calculation using config values.
-        Weights defined in config/scoring.yaml (see Section 8.8)
-        """
-        weights = self.scoring_config["weights"]
-        
-        score = (
-            llm_result["visual_aesthetic_match"] * weights["visual_aesthetic_match"] +
-            llm_result["content_theme_alignment"] * weights["content_theme_alignment"] +
-            llm_result["engagement_rate_score"] * weights["engagement_rate_score"] +
-            llm_result["follower_quality"] * weights["follower_quality"] +
-            llm_result["business_indicators"] * weights["business_indicators"] +
-            llm_result["activity_recency"] * weights["activity_recency"]
-        )
-        
-        return int(min(100, max(0, score)))
-    
-    def _get_recommendation(self, score: int) -> str:
-        """Get recommendation based on configured thresholds."""
-        thresholds = self.scoring_config["thresholds"]
-        
-        if score >= thresholds["excellent"]:
-            return "Highly recommended for partnership"
-        elif score >= thresholds["good"]:
-            return "Recommended for partnership"
-        elif score >= thresholds["moderate"]:
-            return "Consider with further review"
-        else:
-            return "Not recommended"
-    
-    def _extract_email_regex(self, text: str) -> str | None:
-        """Fallback email extraction using regex."""
-        import re
-        match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', text)
-        return match.group(0) if match else None
+            final_score = self._scoring_service.calculate_final_score_from_dict(dimensions)
+            
+            # Store results
+            await self._store_results(profile_id, dimensions, final_score, analysis)
+            
+            return ScorerResponse(...)
+            
+        except Exception as e:
+            logger.error(f"Scoring failed: {e}", exc_info=True)
+            raise
 ```
+
+#### Fallback Scoring Mechanism
+
+When LLM analysis fails, the agent uses heuristic-based fallback scores:
+
+```python
+def _generate_fallback_scores(
+    self, profile_data: dict, brand_dna: dict,
+    fake_indicators: list, contact: ExtractedContact
+) -> ScoringAnalysisOutput:
+    """Generate heuristic scores when LLM fails."""
+    
+    scores = {}
+    reasoning = {}
+    
+    # Engagement rate scoring
+    engagement_rate = profile_data.get("engagement_rate", 0) or 0
+    if engagement_rate >= 5.0:
+        scores["engagement_rate_score"] = 90
+        reasoning["engagement_rate_score"] = "Excellent engagement rate"
+    elif engagement_rate >= 3.0:
+        scores["engagement_rate_score"] = 75
+        reasoning["engagement_rate_score"] = "Good engagement rate"
+    elif engagement_rate >= 1.0:
+        scores["engagement_rate_score"] = 50
+        reasoning["engagement_rate_score"] = "Average engagement rate"
+    else:
+        scores["engagement_rate_score"] = 20
+        reasoning["engagement_rate_score"] = "Low engagement rate"
+    
+    # Follower quality scoring (based on following/follower ratio)
+    followers = profile_data.get("followers_count", 0) or 0
+    following = profile_data.get("following_count", 0) or 0
+    if followers > 0:
+        ratio = following / followers
+        if ratio < 0.5:
+            scores["follower_quality"] = 90
+        elif ratio < 1.0:
+            scores["follower_quality"] = 80
+        else:
+            scores["follower_quality"] = 40
+    
+    # Visual and content (default without LLM)
+    scores["visual_aesthetic_match"] = 50
+    scores["content_theme_alignment"] = 50
+    reasoning["visual_aesthetic_match"] = "Unable to analyze visual content without LLM"
+    reasoning["content_theme_alignment"] = "Unable to analyze content themes without LLM"
+    
+    # Reduce scores if fake indicators present
+    if len(fake_indicators) >= 2:
+        for key in scores:
+            scores[key] = max(10, scores[key] - 20)
+    
+    return ScoringAnalysisOutput(
+        **scores,
+        is_fake=len(fake_indicators) >= 2,
+        fake_indicators=fake_indicators,
+        contact_email=contact.email,
+        contact_website=contact.website,
+        reasoning=reasoning,
+        recommendation="not_recommended" if len(fake_indicators) >= 2 else "consider"
+    )
+
+
+async def _analyze_profile(self, profile_data, brand_dna, 
+                           fake_indicators, contact) -> ScoringAnalysisOutput:
+    """Analyze profile with LLM, falling back to heuristics on failure."""
+    
+    try:
+        chain = self.build_json_chain(pydantic_schema=ScoringAnalysisOutput)
+        result = await self.invoke_chain(chain, input_vars)
+        
+        logger.info(f"LLM analysis complete for {profile_data.get('username')}")
+        return ScoringAnalysisOutput(**result)
+        
+    except Exception as e:
+        logger.error(f"LLM analysis failed: {e}", exc_info=True)
+        logger.warning(f"Falling back to heuristic scoring")
+        
+        return self._generate_fallback_scores(
+            profile_data, brand_dna, fake_indicators, contact
+        )
+```
+
+#### Key Implementation Features
+
+| Feature | Description |
+|---------|-------------|
+| **Structured Output** | Uses `ScoringAnalysisOutput` Pydantic model with `JsonOutputParser` |
+| **Fallback Scoring** | Heuristic-based scores when LLM fails |
+| **Fake Detection** | Rule-based indicators merged with LLM analysis |
+| **Contact Extraction** | Multi-source extraction (bio, business_email, website) |
+| **Error Handling** | Comprehensive logging with `exc_info=True` for debugging |
+| **Database Storage** | Upsert logic for `profile_scores` and `profile_contacts` |
 
 ### 8.7 LLM Provider Configuration
 
@@ -1296,31 +1455,46 @@ scorer:
 
 # Score component weights (must sum to 1.0)
 weights:
-  visual_aesthetic_match: 0.25   # Visual style and content alignment
+  visual_aesthetic_match: 0.15   # Visual style and content alignment
   content_theme_alignment: 0.20  # Topic, values, messaging alignment
-  engagement_rate_score: 0.15    # Engagement metrics relative to followers
+  engagement_rate_score: 0.25    # Engagement metrics relative to followers
   follower_quality: 0.15         # Authenticity (fake detection)
   business_indicators: 0.15      # Business account, email, website
   activity_recency: 0.10         # Posting frequency and recency
 
 # Score thresholds for recommendations
 thresholds:
-  excellent: 85    # "Highly recommended"
-  good: 70         # "Recommended"
-  moderate: 50     # "Consider with caution"
-  poor: 0          # "Not recommended"
+  min_recommendation_score: 50
+  high_score: 80
+  
+  excellent:
+    min: 90
+    max: 100
+    label: "Excellent Match"
+  good:
+    min: 75
+    max: 89
+    label: "Good Match"
+  moderate:
+    min: 50
+    max: 74
+    label: "Moderate Match"
+  low:
+    min: 0
+    max: 49
+    label: "Low Match"
 
 # Fake profile detection thresholds
 fake_detection:
   following_ratio:
     genuine: 1.0       # < 1.0 = genuine
-    suspicious: 2.0    # 1.0-2.0 = suspicious, > 2.0 = likely fake
+    suspicious: 3.0    # 1.0-3.0 = suspicious, > 3.0 = likely fake
   min_posts:
-    threshold_followers: 5000
-    min_posts_required: 20
+    threshold_followers: 10000
+    min_posts_required: 10
   engagement_rate:
-    fake: 1.0          # < 1% = likely fake
-    suspicious: 2.0    # 1-2% = suspicious
+    fake: 0.5          # < 0.5% = likely fake
+    suspicious: 1.5    # 0.5-1.5% = suspicious
 
 # Engagement rate benchmarks (by follower tier)
 engagement_benchmarks:

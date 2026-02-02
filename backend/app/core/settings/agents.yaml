@@ -1,0 +1,145 @@
+# PartnerScout AI - Agent Configuration
+# Configuration for AI agents including models, prompts, and behavior settings
+
+# Global agent settings
+global:
+  # Default LLM settings (can be overridden per agent)
+  default_model: "gpt-4-turbo-preview"
+  default_temperature: 0.7
+  default_max_tokens: 2048
+  
+  # Retry behavior
+  max_retries: 3
+  retry_delay_seconds: 2
+
+# Individual agent configurations
+agents:
+  brand_analyzer:
+    name: "Brand Analyzer"
+    description: "Analyzes brand identity from description and reference profiles"
+    enabled: true
+    
+    # Model settings (model defaults to provider's configured model)
+    # model: null  # Uses OPENAI_MODEL or GEMINI_MODEL from env
+    temperature: 0.5
+    max_tokens: 2048
+    
+    # Output configuration
+    output:
+      min_hashtags: 5
+      max_hashtags: 20
+      min_keywords: 5
+      max_keywords: 15
+      embedding_dimensions: 1536
+    
+    # Prompt files (relative to app/prompts/)
+    prompts:
+      system: "brand_analyzer/system.txt"
+      user: "brand_analyzer/user.txt"
+
+  discovery:
+    name: "Discovery Agent"
+    description: "Discovers similar Instagram profiles using hashtags and keywords"
+    enabled: true
+    
+    # Model settings (uses provider's default model from env)
+    # model: null  # Defaults to GEMINI_MODEL or OPENAI_MODEL from .env
+    temperature: 0.3
+    max_tokens: 1024
+    
+    # Discovery settings
+    discovery:
+      default_limit: 50
+      max_limit: 100
+      min_followers: 1000
+      max_followers: 1000000
+      batch_size: 10
+    
+    # Deduplication
+    deduplication:
+      enabled: true
+      check_username: true
+      check_profile_url: true
+    
+    # Prompts
+    prompts:
+      system: "discovery/system.txt"
+      user: "discovery/user.txt"
+
+  scorer:
+    name: "Profile Scorer"
+    description: "Scores discovered profiles across 6 dimensions"
+    enabled: true
+    
+    # Model settings (uses provider's default model from env)
+    # model: null  # Defaults to GEMINI_MODEL or OPENAI_MODEL from .env
+    temperature: 0.3
+    max_tokens: 2048
+    
+    # Scoring settings
+    scoring:
+      batch_size: 5
+      parallel_scoring: false
+      include_reasoning: true
+    
+    # Fake detection
+    fake_detection:
+      enabled: true
+      engagement_threshold: 0.01  # 1% minimum engagement rate
+      follower_following_ratio_min: 0.1
+      suspicious_patterns:
+        - "buy followers"
+        - "get followers fast"
+        - "dm for promo"
+    
+    # Contact extraction
+    contact_extraction:
+      extract_email: true
+      extract_website: true
+      check_business_account: true
+    
+    # Prompts
+    prompts:
+      system: "scorer/system.txt"
+      user: "scorer/user.txt"
+
+  email_composer:
+    name: "Email Composer"
+    description: "Generates personalized outreach emails"
+    enabled: true
+    
+    # Model settings (uses provider's default model from env)
+    # model: null  # Defaults to GEMINI_MODEL or OPENAI_MODEL from .env
+    temperature: 0.7
+    max_tokens: 1024
+    
+    # Email settings
+    email:
+      default_tone: "friendly"
+      available_tones:
+        - professional
+        - friendly
+        - casual
+      max_subject_length: 100
+      max_body_length: 2000
+      include_personalization: true
+    
+    # Prompts
+    prompts:
+      system: "email_composer/system.txt"
+      user: "email_composer/user.txt"
+
+# Apify actor configurations
+apify:
+  instagram_profile_scraper:
+    actor_id: "apify/instagram-profile-scraper"
+    timeout_seconds: 120
+    memory_mbytes: 1024
+    max_retries: 2
+    
+  instagram_hashtag_scraper:
+    actor_id: "apify/instagram-hashtag-scraper"
+    timeout_seconds: 180
+    memory_mbytes: 2048
+    max_retries: 2
+    results_limit: 100

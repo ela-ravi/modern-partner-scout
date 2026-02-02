@@ -1,0 +1,157 @@
+# PartnerScout AI - Rate Limits and Timeouts Configuration
+# Controls for quotas, rate limiting, timeouts, and retry behavior
+
+# User rate limits
+rate_limits:
+  # Job creation limits
+  jobs:
+    daily_limit: 10
+    hourly_limit: 5
+    concurrent_limit: 2
+  
+  # Profile discovery limits
+  profiles:
+    max_per_job: 100
+    default_per_job: 50
+    min_per_job: 10
+  
+  # API request limits
+  api:
+    requests_per_minute: 60
+    requests_per_hour: 1000
+  
+  # Email generation limits
+  email:
+    daily_limit: 50
+    per_profile_limit: 3
+
+# Timeouts (in seconds)
+timeouts:
+  # API request timeouts
+  api_request: 30
+  
+  # LLM call timeouts
+  llm_request: 60
+  llm_streaming: 120
+  
+  # Scraping timeouts
+  profile_scraping: 120
+  hashtag_scraping: 180
+  batch_scraping: 300
+  
+  # Agent operation timeouts
+  brand_analysis: 60
+  profile_discovery: 300
+  profile_scoring: 30
+  email_generation: 30
+  
+  # Full workflow timeout
+  full_discovery_workflow: 1800  # 30 minutes
+  
+  # Database operation timeouts
+  database_query: 10
+  database_transaction: 30
+
+# Retry configuration
+retry:
+  # Default retry settings
+  default:
+    max_retries: 3
+    initial_delay_seconds: 1
+    max_delay_seconds: 30
+    exponential_base: 2
+    jitter: true
+  
+  # LLM-specific retry settings
+  llm:
+    max_retries: 3
+    initial_delay_seconds: 2
+    max_delay_seconds: 60
+    exponential_base: 2
+    retryable_errors:
+      - "rate_limit_exceeded"
+      - "server_error"
+      - "timeout"
+  
+  # Scraping-specific retry settings
+  scraping:
+    max_retries: 2
+    initial_delay_seconds: 5
+    max_delay_seconds: 30
+    exponential_base: 2
+  
+  # Database-specific retry settings
+  database:
+    max_retries: 3
+    initial_delay_seconds: 0.5
+    max_delay_seconds: 5
+    exponential_base: 2
+
+# Batch processing configuration
+batching:
+  # Profile scoring batches
+  scoring:
+    batch_size: 5
+    delay_between_batches_seconds: 1
+    parallel_requests: 3
+  
+  # Profile discovery batches
+  discovery:
+    batch_size: 10
+    delay_between_batches_seconds: 2
+  
+  # Status update batches
+  status_updates:
+    batch_size: 20
+    delay_between_batches_seconds: 0.5
+
+# Queue configuration (for background processing)
+queue:
+  # Job processing queue
+  jobs:
+    max_queue_size: 100
+    processing_concurrency: 2
+    job_visibility_timeout_seconds: 600
+  
+  # Profile processing queue
+  profiles:
+    max_queue_size: 1000
+    processing_concurrency: 5
+    job_visibility_timeout_seconds: 120
+
+# Circuit breaker configuration
+circuit_breaker:
+  # LLM provider circuit breaker
+  llm:
+    failure_threshold: 5
+    recovery_timeout_seconds: 60
+    half_open_requests: 3
+  
+  # Apify circuit breaker
+  apify:
+    failure_threshold: 3
+    recovery_timeout_seconds: 120
+    half_open_requests: 2
+  
+  # N8N circuit breaker
+  n8n:
+    failure_threshold: 3
+    recovery_timeout_seconds: 60
+    half_open_requests: 2
+
+# Caching configuration
+caching:
+  # Profile data caching
+  profiles:
+    ttl_seconds: 3600  # 1 hour
+    max_size: 10000
+  
+  # Brand DNA caching
+  brand_dna:
+    ttl_seconds: 86400  # 24 hours
+    max_size: 1000
+  
+  # LLM response caching
+  llm_responses:
+    enabled: false  # Disable by default for fresh responses
+    ttl_seconds: 1800  # 30 minutes if enabled

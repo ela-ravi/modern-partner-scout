@@ -1,0 +1,30 @@
+Please analyze the following brand and extract hashtags, keywords, and brand DNA for partner discovery.
+
+## Brand Description
+{brand_description}
+
+## Reference Instagram Profiles
+The following profiles represent the brand's style and target influencer characteristics:
+
+{reference_profiles}
+
+## Analysis Instructions
+
+1. Analyze the brand description to understand:
+   - What products/services the brand offers
+   - The brand's values and mission
+   - Target audience characteristics
+   - Brand voice and personality
+
+2. Examine the reference profiles to identify:
+   - Content themes and topics
+   - Visual aesthetic patterns
+   - Engagement patterns
+   - Hashtag usage patterns
+
+3. Synthesize this information to generate:
+   - A diverse set of relevant hashtags (5-20)
+   - Key brand keywords (5-15)
+   - A comprehensive brand DNA summary
+
+Please provide your analysis in the specified JSON format.
