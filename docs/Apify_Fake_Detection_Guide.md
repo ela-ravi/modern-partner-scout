@@ -388,3 +388,6 @@ This detection logic is integrated into the **Scorer Agent** as the `follower_qu
 - [Backend_Implementation_Guide.md](./Backend_Implementation_Guide.md) - Section 5.4: scoring.yaml
 - [Supabase_Database_Guide.md](./Supabase_Database_Guide.md) - Section 3.5: Fake Detection
 
+
+
+
