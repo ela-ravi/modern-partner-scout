@@ -158,12 +158,13 @@ class TestGenerateEmail:
         mock_profile_repo.get_by_id.return_value = sample_profile
         mock_job_repo.get_by_id.return_value = sample_job
         mock_brand_repo.get_by_job_id_optional.return_value = None
-        
+
         result = email_service.generate_email(
             profile_id=sample_profile["id"],
             job_id=sample_job["id"],
+            use_ai=False,  # Use templates for deterministic test
         )
-        
+
         assert "@fashion_influencer" in result.body
     
     def test_generate_email_profile_not_found(
@@ -228,14 +229,15 @@ class TestGenerateEmail:
         mock_profile_repo.get_by_id.return_value = sample_profile
         mock_job_repo.get_by_id.return_value = sample_job
         mock_brand_repo.get_by_job_id_optional.return_value = None
-        
+
         result = email_service.generate_email(
             profile_id=sample_profile["id"],
             job_id=sample_job["id"],
             sender_name="John Doe",
             sender_company="Acme Inc",
+            use_ai=False,  # Use templates for deterministic test
         )
-        
+
         assert "John Doe" in result.body
         assert "Acme Inc" in result.body
     

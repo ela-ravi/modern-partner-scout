@@ -7,6 +7,7 @@ Implements AI-powered outreach email generation and mock sending functionality.
 STORY-2.3.2: Implement Scoring & Email Services
 """
 
+import asyncio
 import logging
 import re
 from datetime import datetime, timezone
@@ -99,10 +100,14 @@ class EmailService:
         custom_context: Optional[str] = None,
         sender_name: Optional[str] = None,
         sender_company: Optional[str] = None,
+        use_ai: bool = True,
     ) -> GeneratedEmail:
         """
         Generate a personalized outreach email for a profile.
-        
+
+        When use_ai=True (default), uses EmailComposerAgent for LLM-based generation.
+        Falls back to template-based generation if AI fails or use_ai=False.
+
         Args:
             profile_id: Target profile UUID
             job_id: Discovery job UUID
@@ -111,7 +116,8 @@ class EmailService:
             custom_context: Additional context to include
             sender_name: Sender's name for signature
             sender_company: Company name for signature
-            
+            use_ai: Use AI agent for generation (default True)
+
         Returns:
             GeneratedEmail with subject and body
             
@@ -140,8 +146,22 @@ class EmailService:
             brand_dna = self.brand_repo.get_by_job_id_optional(job_id)
         except Exception:
             pass
-        
-        # Generate the email
+
+        # Try AI generation first if enabled
+        if use_ai:
+            ai_email = self._try_ai_generation(
+                profile=profile,
+                job=job,
+                brand_dna=brand_dna,
+                tone=tone,
+                custom_context=custom_context,
+                sender_name=sender_name,
+                sender_company=sender_company,
+            )
+            if ai_email:
+                return ai_email
+
+        # Fall back to template-based generation
         return self._generate_email_content(
             profile=profile,
             job=job,
@@ -153,6 +173,54 @@ class EmailService:
             sender_company=sender_company,
         )
     
+    def _try_ai_generation(
+        self,
+        profile: Dict[str, Any],
+        job: Dict[str, Any],
+        brand_dna: Optional[Dict[str, Any]],
+        tone: EmailTone,
+        custom_context: Optional[str],
+        sender_name: Optional[str],
+        sender_company: Optional[str],
+    ) -> Optional[GeneratedEmail]:
+        """
+        Try to generate email using EmailComposerAgent.
+
+        Returns GeneratedEmail if successful, None to fall back to templates.
+        """
+        try:
+            from app.agents.email_composer import EmailComposerAgent
+
+            agent = EmailComposerAgent()
+            result = asyncio.run(agent.compose(
+                profile=profile,
+                brand_dna=brand_dna or {},
+                brand_description=job.get("brand_description", "our brand"),
+                tone=tone.value,
+                profile_score=None,  # Could fetch from profile_scores if needed
+            ))
+
+            body = result["body"]
+
+            # Append custom context if provided
+            if custom_context:
+                body = body.rstrip() + f"\n\n{custom_context}"
+
+            return GeneratedEmail(
+                subject=result["subject"],
+                body=body,
+                html_body=self._text_to_html(body),
+                tone=tone,
+                profile_id=UUID(profile["id"]),
+                job_id=UUID(job["id"]),
+                personalization_points=result.get("metadata", {}).get(
+                    "personalization_elements", []
+                ) or ["AI-generated"],
+            )
+        except Exception as e:
+            logger.warning(f"AI email generation failed, using templates: {e}")
+            return None
+
     def _generate_email_content(
         self,
         profile: Dict[str, Any],

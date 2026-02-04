@@ -1,0 +1,38 @@
+# PartnerScout AI - N8N Workflow Orchestration
+# STORY-4.1.1: Setup N8N Environment
+#
+# Usage:
+#   docker compose -f docker-compose.n8n.yml up -d
+#   Access N8N at http://localhost:5678
+
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: partnerscout-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      # N8N listens on all interfaces inside container
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      # PartnerScout API URL - use host.docker.internal for Docker Desktop (Windows/Mac)
+      # On Linux, use host network or your host IP
+      - FASTAPI_BASE_URL=${FASTAPI_BASE_URL:-http://host.docker.internal:8000}
+      # Service key must match backend .env N8N_SERVICE_KEY
+      - N8N_SERVICE_KEY=${N8N_SERVICE_KEY:-test-service-key-12345}
+      # Disable basic auth for local dev (set N8N_BASIC_AUTH_ACTIVE=true for production)
+      - N8N_BASIC_AUTH_ACTIVE=false
+    volumes:
+      - n8n_data:/home/node/.n8n
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5678/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  n8n_data:
+    name: partnerscout-n8n-data

@@ -41,10 +41,12 @@ from app.agents.base import (
 from app.agents.brand_analyzer import BrandAnalyzerAgent, get_brand_analyzer_agent
 from app.agents.discovery import DiscoveryAgent, get_discovery_agent
 from app.agents.scorer import ScorerAgent, get_scorer_agent
-
-# Placeholder exports for future agents (to be implemented in subsequent stories)
-# These will be uncommented as each agent is implemented:
-# from app.agents.email_composer import EmailComposerAgent
+from app.agents.email_composer import (
+    EmailComposerAgent,
+    EmailComposerRequest,
+    EmailComposerResponse,
+    get_email_composer_agent,
+)
 
 
 __all__ = [
@@ -67,7 +69,8 @@ __all__ = [
     "get_discovery_agent",
     "ScorerAgent",
     "get_scorer_agent",
-    
-    # Future agent exports (uncomment when implemented):
-    # "EmailComposerAgent",
+    "EmailComposerAgent",
+    "EmailComposerRequest",
+    "EmailComposerResponse",
+    "get_email_composer_agent",
 ]
