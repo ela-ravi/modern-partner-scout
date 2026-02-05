@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import jwt
-from fastapi import Depends, Header, HTTPException, Request
+from fastapi import Depends, Header, HTTPException, Request, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import settings
@@ -30,7 +30,8 @@ from app.core.exceptions import (
 # =============================================================================
 
 # Optional Bearer token scheme (doesn't auto-raise 403)
-oauth2_scheme = HTTPBearer(auto_error=False)
+# scheme_name must match the security scheme name in OpenAPI spec
+oauth2_scheme = HTTPBearer(auto_error=False, scheme_name="BearerAuth")
 
 
 # =============================================================================
@@ -415,7 +416,7 @@ _combined_guard = CombinedAuthGuard()
 
 async def get_current_user(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(oauth2_scheme),
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(oauth2_scheme),
 ) -> UserContext:
     """
     FastAPI dependency for user authentication.
@@ -487,7 +488,7 @@ async def get_service_context(
 
 async def get_optional_user(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(oauth2_scheme),
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(oauth2_scheme),
 ) -> Optional[UserContext]:
     """
     FastAPI dependency for optional user authentication.

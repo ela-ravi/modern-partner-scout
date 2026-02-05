@@ -63,7 +63,59 @@ app = FastAPI(
     redoc_url="/redoc",
     openapi_url="/openapi.json",
     lifespan=lifespan,
+    swagger_ui_init_oauth={
+        "usePkceWithAuthorizationCodeGrant": True,
+    },
 )
+
+
+# =============================================================================
+# OpenAPI Security Schemes
+# =============================================================================
+
+from fastapi.openapi.utils import get_openapi
+
+
+def custom_openapi():
+    """
+    Custom OpenAPI schema with security schemes for Swagger UI.
+    
+    Adds Bearer token authentication so users can authenticate via Swagger.
+    """
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    
+    # Add security schemes
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "Enter your JWT token from Supabase Auth. For testing, use the test token generator.",
+        },
+        "ServiceKeyAuth": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-Service-Key",
+            "description": "Service key for N8N/internal service authentication.",
+        },
+    }
+    
+    # Apply BearerAuth globally (can be overridden per-endpoint)
+    openapi_schema["security"] = [{"BearerAuth": []}]
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
 
 
 # =============================================================================

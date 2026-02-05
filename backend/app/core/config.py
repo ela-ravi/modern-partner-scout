@@ -143,6 +143,12 @@ class Settings(BaseSettings):
         description="LLM provider to use (openai, gemini, ollama)"
     )
     
+    # Embedding Provider Selection
+    embedding_provider: str = Field(
+        default="openai",
+        description="Embedding provider to use (openai, gemini)"
+    )
+    
     # Rate Limits and Quotas
     daily_job_limit: int = Field(default=10, description="Maximum jobs per user per day")
     max_profiles_per_job: int = Field(default=100, description="Maximum profiles per discovery job")
@@ -168,6 +174,15 @@ class Settings(BaseSettings):
         valid_providers = {"openai", "gemini", "ollama"}
         if v.lower() not in valid_providers:
             raise ValueError(f"LLM provider must be one of: {valid_providers}")
+        return v.lower()
+    
+    @field_validator("embedding_provider")
+    @classmethod
+    def validate_embedding_provider(cls, v: str) -> str:
+        """Validate that embedding provider is one of the supported options."""
+        valid_providers = {"openai", "gemini"}
+        if v.lower() not in valid_providers:
+            raise ValueError(f"Embedding provider must be one of: {valid_providers}")
         return v.lower()
     
     @field_validator("log_level")

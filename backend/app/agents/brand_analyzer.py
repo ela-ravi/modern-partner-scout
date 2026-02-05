@@ -510,43 +510,67 @@ Profile {i}: @{username}
         Generate embedding vector for brand DNA.
         
         Creates a combined text representation and generates
-        a 1536-dimensional embedding using OpenAI.
+        an embedding using the configured provider (OpenAI or Gemini).
         
         Args:
             brand_description: Original brand description
             analysis: Analyzed brand data
             
         Returns:
-            1536-dimensional embedding vector or None if generation fails
+            Embedding vector or None if generation fails
         """
-        logger.debug("Generating embedding vector for brand DNA")
+        logger.debug(f"Generating embedding vector using provider: {settings.embedding_provider}")
         
         # Combine brand data for embedding
         embedding_text = self._create_embedding_text(brand_description, analysis)
         
         try:
-            # Use OpenAI embeddings API
-            from langchain_openai import OpenAIEmbeddings
-            
-            embeddings = OpenAIEmbeddings(
-                api_key=settings.openai.api_key,
-                model="text-embedding-ada-002"
-            )
+            embeddings = self._get_embeddings_model()
+            if embeddings is None:
+                logger.warning("No embedding model available - check API keys")
+                return None
             
             # Generate embedding
             vector = await embeddings.aembed_query(embedding_text)
-            
-            # Validate dimensions (OpenAI ada-002 returns 1536 dims)
-            if len(vector) != 1536:
-                logger.warning(
-                    f"Unexpected embedding dimensions: {len(vector)}, expected 1536"
-                )
             
             logger.debug(f"Generated embedding with {len(vector)} dimensions")
             return vector
             
         except Exception as e:
             logger.warning(f"Embedding generation failed: {e}")
+            return None
+    
+    def _get_embeddings_model(self):
+        """
+        Get the configured embeddings model based on EMBEDDING_PROVIDER setting.
+        
+        Returns:
+            Embeddings instance (OpenAI or Gemini) or None if not configured
+        """
+        provider = settings.embedding_provider.lower()
+        
+        if provider == "openai":
+            if not settings.openai.api_key:
+                logger.warning("OpenAI API key not configured for embeddings")
+                return None
+            from langchain_openai import OpenAIEmbeddings
+            return OpenAIEmbeddings(
+                api_key=settings.openai.api_key,
+                model="text-embedding-ada-002"
+            )
+        
+        elif provider == "gemini":
+            if not settings.gemini.api_key:
+                logger.warning("Gemini API key not configured for embeddings")
+                return None
+            from langchain_google_genai import GoogleGenerativeAIEmbeddings
+            return GoogleGenerativeAIEmbeddings(
+                google_api_key=settings.gemini.api_key,
+                model="models/embedding-001"
+            )
+        
+        else:
+            logger.warning(f"Unknown embedding provider: {provider}")
             return None
     
     def _create_embedding_text(

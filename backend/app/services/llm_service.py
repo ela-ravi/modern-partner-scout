@@ -174,6 +174,7 @@ def create_gemini_llm(config: LLMConfig) -> BaseChatModel:
         temperature=config.temperature,
         max_output_tokens=config.max_tokens,
         timeout=config.timeout,
+        convert_system_message_to_human=True,  # Gemini doesn't support system messages natively
         **config.extra_kwargs
     )
 

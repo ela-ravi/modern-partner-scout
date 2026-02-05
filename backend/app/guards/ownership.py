@@ -13,7 +13,7 @@ from fastapi import Depends, HTTPException, Path, Request
 
 from app.core.constants import ErrorCodes, HttpStatus
 from app.core.exceptions import ForbiddenError, JobNotFoundError, ProfileNotFoundError
-from app.db import get_db, SupabaseClient
+from app.db import get_admin_db, SupabaseClient
 from app.guards.auth import (
     UserContext,
     ServiceContext,
@@ -41,9 +41,9 @@ class OwnershipGuard(ABC):
         Initialize the ownership guard.
         
         Args:
-            db: Optional database client (uses default if not provided)
+            db: Optional database client (uses admin client if not provided)
         """
-        self.db = db or get_db()
+        self.db = db or get_admin_db()
     
     @abstractmethod
     def check_ownership(
