@@ -10,6 +10,9 @@
 
 ---
 
+> [!NOTE]
+> **Test Data Layer Pattern**: All tests in this EPIC follow the layered format (`input → test → output`) with fixtures stored in `tests/fixtures/`. See [00-MASTER-PLAN.md](./00-MASTER-PLAN.md#test-data-layer-pattern) for details.
+
 ## Environment Variables Required
 
 ```bash
@@ -952,6 +955,151 @@ echo "=========================================="
 
 ---
 
+## Mock Data for Frontend Development
+
+### MSW (Mock Service Worker) Handlers
+
+**File:** `frontend/src/mocks/handlers.ts`
+
+```typescript
+/**
+ * MSW handlers using PRD-aligned mock data for development/testing.
+ * Data mirrors backend mock_data/ for consistent testing across stack.
+ */
+import { rest } from 'msw';
+import { mockUsers, mockJobs, mockProfiles, mockScores } from './data';
+
+export const handlers = [
+  // PRD 8.1: List sessions
+  rest.get('/api/discovery', (req, res, ctx) => {
+    const userId = req.headers.get('x-user-id') || 'user-001-uuid-0000-000000000001';
+    const userJobs = mockJobs.filter(j => j.user_id === userId);
+    return res(ctx.json({ sessions: userJobs }));
+  }),
+
+  // PRD 8.1: Get session details
+  rest.get('/api/discovery/:id', (req, res, ctx) => {
+    const job = mockJobs.find(j => j.id === req.params.id);
+    if (!job) return res(ctx.status(404));
+    
+    const profiles = mockProfiles.filter(p => p.job_id === job.id);
+    return res(ctx.json({ ...job, profiles }));
+  }),
+
+  // PRD 8.4: Get profile score
+  rest.get('/api/profiles/:id/score', (req, res, ctx) => {
+    const score = mockScores.find(s => s.profile_id === req.params.id);
+    if (!score) return res(ctx.status(404));
+    return res(ctx.json(score));
+  }),
+];
+```
+
+### TypeScript Mock Data
+
+**File:** `frontend/src/mocks/data.ts`
+
+```typescript
+/**
+ * Mock data matching PRD specifications.
+ * Mirrors backend tests/fixtures/mock_data/ for consistency.
+ */
+
+// PRD 10.2: Users
+export const mockUsers = [
+  {
+    id: 'user-001-uuid-0000-000000000001',
+    email: 'demo@partnerscout.ai',
+    full_name: 'Demo User',
+    avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=demo',
+  },
+];
+
+// PRD 10.3: Discovery Jobs (all statuses)
+export const mockJobs: DiscoveryJob[] = [
+  {
+    id: 'job-001-uuid-0000-000000000001',
+    user_id: 'user-001-uuid-0000-000000000001',
+    name: 'Sustainable Fashion Discovery',
+    brand_description: 'Eco-friendly sustainable fashion brand',
+    status: 'completed',
+    profiles_discovered: 47,
+    profiles_scored: 47,
+    created_at: '2026-01-31T10:00:00Z',
+  },
+  // ... include all job statuses for testing
+];
+
+// PRD 10.5: Profiles (genuine + fake for testing)
+export const mockProfiles: DiscoveredProfile[] = [
+  {
+    id: 'profile-001-uuid-0000-000000000001',
+    job_id: 'job-001-uuid-0000-000000000001',
+    username: 'eco_boutique_nyc',
+    followers: 45000,
+    following: 1200,
+    engagement_rate: 3.5,
+    is_business: true,
+    status: 'done',
+    // High-quality genuine profile
+  },
+  {
+    id: 'profile-004-uuid-0000-000000000004',
+    job_id: 'job-001-uuid-0000-000000000001',
+    username: 'bot_follower_farm',
+    followers: 85000,
+    following: 78000,
+    engagement_rate: 0.1,
+    is_business: false,
+    status: 'skipped',
+    // Fake profile - should show warning indicators in UI
+  },
+];
+
+// PRD 10.6: Scores with 6 dimensions
+export const mockScores: ProfileScore[] = [
+  {
+    id: 'score-001-uuid-0000-000000000001',
+    profile_id: 'profile-001-uuid-0000-000000000001',
+    score: 87,
+    visual_aesthetic_match: 92,
+    content_theme_alignment: 88,
+    engagement_rate_score: 82,
+    follower_quality: 95,
+    business_indicators: 90,
+    activity_recency: 85,
+    reasoning: {
+      summary: 'Excellent match for sustainable fashion brand.',
+      recommendation: 'Highly recommended for partnership outreach.',
+    },
+  },
+];
+```
+
+### Vitest Test Fixtures
+
+**File:** `frontend/src/test/fixtures.ts`
+
+```typescript
+/**
+ * Test fixtures for component tests.
+ * Uses same mock data as MSW handlers for consistency.
+ */
+import { mockJobs, mockProfiles, mockScores } from '../mocks/data';
+
+export const getCompletedJob = () => mockJobs.find(j => j.status === 'completed');
+export const getPendingJob = () => mockJobs.find(j => j.status === 'pending');
+export const getFailedJob = () => mockJobs.find(j => j.status === 'failed');
+
+export const getGenuineProfile = () => mockProfiles.find(p => p.engagement_rate > 2);
+export const getFakeProfile = () => mockProfiles.find(p => p.engagement_rate < 1);
+
+export const getHighScore = () => mockScores.find(s => s.score >= 80);
+export const getLowScore = () => mockScores.find(s => s.score < 50);
+```
+
+---
+
 ## Definition of Done
 
 - [ ] Project structure created with Vite
@@ -967,6 +1115,11 @@ echo "=========================================="
 - [ ] All TypeScript types defined
 - [ ] Components tested
 - [ ] Build completes without errors
+- [ ] **MSW handlers with PRD mock data**
+- [ ] **TypeScript mock data mirrors backend fixtures**
+- [ ] **UI correctly displays all 6 scoring dimensions (PRD 5.3)**
+- [ ] **Fake profile indicators visible in UI (PRD 5.3.1)**
+- [ ] **All job statuses display correctly (PRD 5.4)**
 
 ---
 

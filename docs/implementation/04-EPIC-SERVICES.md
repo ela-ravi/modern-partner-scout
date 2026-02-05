@@ -10,6 +10,9 @@
 
 ---
 
+> [!NOTE]
+> **Test Data Layer Pattern**: All tests in this EPIC follow the layered format (`input → test → output`) with fixtures stored in `tests/fixtures/`. See [00-MASTER-PLAN.md](./00-MASTER-PLAN.md#test-data-layer-pattern) for details.
+
 ## Environment Variables Required
 
 ```bash
@@ -1908,6 +1911,94 @@ if __name__ == "__main__":
 
 ---
 
+## Mock Data for Service Testing
+
+### LLM Service Mock Responses
+
+**File:** `backend/tests/fixtures/llm_responses.py`
+
+```python
+"""
+Mock LLM responses for service testing.
+Aligned with PRD Section 5 (Functional Requirements).
+"""
+from tests.fixtures.mock_data import get_brand_dna_for_job, get_profiles_for_job
+
+# === BRAND ANALYZER MOCK RESPONSES (PRD 5.1) ===
+BRAND_DNA_MOCK_RESPONSE = {
+    "input": {
+        "reference_profiles": ["https://instagram.com/everlane"],
+        "brand_description": "Sustainable fashion brand"
+    },
+    "expected_output": {
+        "hashtags": ["#sustainablefashion", "#ecofriendly", "#ethicalfashion"],
+        "keywords": ["sustainable", "ethical", "eco-friendly", "minimalist"],
+        "embedding_vector": [0.1, 0.2, 0.3],  # Mocked embedding
+    }
+}
+
+# === SCORER MOCK RESPONSES (PRD 5.3) ===
+def get_scorer_mock_response(profile_id: str):
+    """Get mock scorer response matching PRD scoring dimensions."""
+    from tests.fixtures.mock_data import get_score_for_profile
+    score = get_score_for_profile(profile_id)
+    if score:
+        return {
+            "score": score["score"],
+            "visual_aesthetic_match": score["visual_aesthetic_match"],
+            "content_theme_alignment": score["content_theme_alignment"],
+            "engagement_rate_score": score["engagement_rate_score"],
+            "follower_quality": score["follower_quality"],
+            "business_indicators": score["business_indicators"],
+            "activity_recency": score["activity_recency"],
+            "reasoning": score["reasoning"],
+        }
+    return None
+
+# === APIFY MOCK RESPONSES ===
+APIFY_PROFILE_MOCK = {
+    "input": {"username": "eco_boutique_nyc"},
+    "expected_output": get_profiles_for_job("job-001-uuid-0000-000000000001")[0]
+    if get_profiles_for_job("job-001-uuid-0000-000000000001") else {}
+}
+```
+
+### Validation Script Update
+
+The `validate_epic4.py` script should include:
+
+```python
+def validate_llm_with_mock_data():
+    """Validate LLM service processes mock data correctly."""
+    from tests.fixtures.llm_responses import BRAND_DNA_MOCK_RESPONSE
+    
+    # Verify mock response structure matches PRD 5.1
+    output = BRAND_DNA_MOCK_RESPONSE["expected_output"]
+    assert "hashtags" in output, "PRD 5.1: Must have hashtags"
+    assert "keywords" in output, "PRD 5.1: Must have keywords"
+    assert "embedding_vector" in output, "PRD 5.1: Must have embedding_vector"
+    
+    print("  ✓ LLM mock data validated against PRD 5.1")
+    return True
+
+def validate_scorer_mock_dimensions():
+    """Validate scorer mock data has all PRD 5.3 dimensions."""
+    from tests.fixtures.llm_responses import get_scorer_mock_response
+    from tests.fixtures.mock_data import PRD_SCORING_WEIGHTS
+    
+    response = get_scorer_mock_response("profile-001-uuid-0000-000000000001")
+    assert response is not None
+    
+    for dimension in PRD_SCORING_WEIGHTS.keys():
+        assert dimension in response, f"Missing PRD 5.3 dimension: {dimension}"
+        assert 0 <= response[dimension] <= 100, f"{dimension} must be 0-100"
+    
+    print("  ✓ Scorer mock data validated against PRD 5.3")
+    return True
+```
+
+---
+
 ## Definition of Done
 
 - [ ] LLM service implemented with OpenAI provider
@@ -1920,8 +2011,11 @@ if __name__ == "__main__":
 - [ ] All Apify service tests passing
 - [ ] Discovery service implemented with workflow management
 - [ ] All discovery service tests passing
+- [ ] **LLM mock responses match PRD 5.1 (Brand Analyzer)**
+- [ ] **Scorer mock responses match PRD 5.3 (Scoring Dimensions)**
+- [ ] **Apify mock data uses PRD profile schema**
 - [ ] Type checking with mypy passing
-- [ ] `validate_epic4.py` runs successfully
+- [ ] `validate_epic4.py` runs successfully with mock data tests
 
 ---
 

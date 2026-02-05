@@ -337,6 +337,69 @@ RATE_LIMIT_PERIOD=60
 - All variables from `.env.example`
 
 ##### SUB-TASK-1.1.1.2.1: Write Configuration Tests First (TDD)
+**File:** `backend/tests/fixtures/config.py`
+
+```python
+"""
+Test fixtures for configuration tests.
+Layered format: Input → Test → Output
+"""
+
+# === ENVIRONMENT INPUT DATA ===
+VALID_ENV_INPUT = {
+    "ENVIRONMENT": "testing",
+    "DEBUG": "true",
+    "SUPABASE_URL": "https://test.supabase.co",
+    "SUPABASE_KEY": "test-key",
+}
+
+MINIMAL_ENV_INPUT = {
+    "SUPABASE_URL": "https://test.supabase.co",
+    "SUPABASE_KEY": "test-key",
+}
+
+CORS_ENV_INPUT = {
+    **MINIMAL_ENV_INPUT,
+    "CORS_ORIGINS": '["http://localhost:3000","http://localhost:5173"]',
+}
+
+INVALID_LLM_ENV_INPUT = {
+    **MINIMAL_ENV_INPUT,
+    "LLM_PROVIDER": "invalid_provider",
+}
+
+PRODUCTION_MISSING_SECRETS_INPUT = {
+    "ENVIRONMENT": "production",
+    "SUPABASE_URL": "https://test.supabase.co",
+    "SUPABASE_KEY": "test-key",
+    # Missing SUPABASE_SERVICE_ROLE_KEY
+}
+
+SQLITE_FALLBACK_INPUT = {
+    "ENVIRONMENT": "development",
+    "USE_SQLITE_FALLBACK": "true",
+    "SQLITE_DATABASE_PATH": "./test.db",
+}
+
+# === EXPECTED OUTPUT ===
+VALID_ENV_OUTPUT = {
+    "environment": "testing",
+    "debug": True,
+    "supabase_url": "https://test.supabase.co",
+    "supabase_key": "test-key",
+}
+
+DEFAULT_VALUES_OUTPUT = {
+    "environment": "development",
+    "api_host": "0.0.0.0",
+    "api_port": 8000,
+}
+
+CORS_OUTPUT = {
+    "cors_count": 2,
+    "expected_origin": "http://localhost:3000",
+}
+```
 
 **File:** `backend/tests/unit/test_config.py`
 
@@ -349,38 +412,42 @@ import os
 import pytest
 from unittest.mock import patch
 
+from tests.fixtures.config import (
+    VALID_ENV_INPUT,
+    VALID_ENV_OUTPUT,
+    MINIMAL_ENV_INPUT,
+    DEFAULT_VALUES_OUTPUT,
+    CORS_ENV_INPUT,
+    CORS_OUTPUT,
+    INVALID_LLM_ENV_INPUT,
+    PRODUCTION_MISSING_SECRETS_INPUT,
+    SQLITE_FALLBACK_INPUT,
+)
+
 
 class TestSettings:
     """Test suite for Settings configuration class."""
 
     def test_settings_loads_from_environment(self):
         """Settings should load values from environment variables."""
-        with patch.dict(os.environ, {
-            "ENVIRONMENT": "testing",
-            "DEBUG": "true",
-            "SUPABASE_URL": "https://test.supabase.co",
-            "SUPABASE_KEY": "test-key",
-        }):
+        with patch.dict(os.environ, VALID_ENV_INPUT):
             from app.core.config import Settings
             settings = Settings()
             
-            assert settings.environment == "testing"
-            assert settings.debug is True
-            assert settings.supabase_url == "https://test.supabase.co"
-            assert settings.supabase_key == "test-key"
+            assert settings.environment == VALID_ENV_OUTPUT["environment"]
+            assert settings.debug is VALID_ENV_OUTPUT["debug"]
+            assert settings.supabase_url == VALID_ENV_OUTPUT["supabase_url"]
+            assert settings.supabase_key == VALID_ENV_OUTPUT["supabase_key"]
 
     def test_settings_has_default_values(self):
         """Settings should have sensible defaults."""
-        with patch.dict(os.environ, {
-            "SUPABASE_URL": "https://test.supabase.co",
-            "SUPABASE_KEY": "test-key",
-        }, clear=True):
+        with patch.dict(os.environ, MINIMAL_ENV_INPUT, clear=True):
             from app.core.config import Settings
             settings = Settings()
             
-            assert settings.environment == "development"
-            assert settings.api_host == "0.0.0.0"
-            assert settings.api_port == 8000
+            assert settings.environment == DEFAULT_VALUES_OUTPUT["environment"]
+            assert settings.api_host == DEFAULT_VALUES_OUTPUT["api_host"]
+            assert settings.api_port == DEFAULT_VALUES_OUTPUT["api_port"]
 
     def test_settings_validates_required_fields(self):
         """Settings should raise error if required fields missing."""
@@ -391,24 +458,16 @@ class TestSettings:
 
     def test_settings_cors_origins_parses_json(self):
         """CORS origins should parse from JSON string."""
-        with patch.dict(os.environ, {
-            "SUPABASE_URL": "https://test.supabase.co",
-            "SUPABASE_KEY": "test-key",
-            "CORS_ORIGINS": '["http://localhost:3000","http://localhost:5173"]',
-        }):
+        with patch.dict(os.environ, CORS_ENV_INPUT):
             from app.core.config import Settings
             settings = Settings()
             
-            assert len(settings.cors_origins) == 2
-            assert "http://localhost:3000" in settings.cors_origins
+            assert len(settings.cors_origins) == CORS_OUTPUT["cors_count"]
+            assert CORS_OUTPUT["expected_origin"] in settings.cors_origins
 
     def test_settings_llm_provider_validation(self):
         """LLM provider should only accept valid values."""
-        with patch.dict(os.environ, {
-            "SUPABASE_URL": "https://test.supabase.co",
-            "SUPABASE_KEY": "test-key",
-            "LLM_PROVIDER": "invalid_provider",
-        }):
+        with patch.dict(os.environ, INVALID_LLM_ENV_INPUT):
             from app.core.config import Settings
             with pytest.raises(ValueError):
                 Settings()
@@ -428,23 +487,14 @@ class TestEnvironmentValidation:
 
     def test_production_requires_all_secrets(self):
         """Production environment should require all secrets."""
-        with patch.dict(os.environ, {
-            "ENVIRONMENT": "production",
-            "SUPABASE_URL": "https://test.supabase.co",
-            "SUPABASE_KEY": "test-key",
-            # Missing SUPABASE_SERVICE_ROLE_KEY
-        }):
+        with patch.dict(os.environ, PRODUCTION_MISSING_SECRETS_INPUT):
             from app.core.config import Settings
             with pytest.raises(ValueError, match="SUPABASE_SERVICE_ROLE_KEY"):
                 Settings()
 
     def test_development_allows_sqlite_fallback(self):
         """Development can use SQLite fallback."""
-        with patch.dict(os.environ, {
-            "ENVIRONMENT": "development",
-            "USE_SQLITE_FALLBACK": "true",
-            "SQLITE_DATABASE_PATH": "./test.db",
-        }):
+        with patch.dict(os.environ, SQLITE_FALLBACK_INPUT):
             from app.core.config import Settings
             settings = Settings()
             
@@ -599,6 +649,95 @@ def get_settings() -> Settings:
 
 ##### SUB-TASK-1.1.1.3.1: Write Exception Tests First (TDD)
 
+**File:** `backend/tests/fixtures/exceptions.py`
+
+```python
+"""
+Test fixtures for exception tests.
+Layered format: Input → Test → Output
+"""
+
+# === EXCEPTION INPUT DATA ===
+BASE_EXCEPTION_INPUT = {
+    "message": "Test error",
+    "code": "TEST_ERROR",
+}
+
+VALIDATION_ERROR_INPUT = {
+    "message": "Invalid input",
+}
+
+NOT_FOUND_ERROR_INPUT = {
+    "message": "Resource not found",
+}
+
+AUTH_ERROR_INPUT = {
+    "message": "Invalid token",
+}
+
+AUTHZ_ERROR_INPUT = {
+    "message": "Permission denied",
+}
+
+LLM_ERROR_INPUT = {
+    "message": "OpenAI rate limited",
+    "provider": "openai",
+}
+
+APIFY_ERROR_INPUT = {
+    "message": "Actor failed",
+    "actor_id": "test-actor",
+}
+
+VALIDATION_WITH_DETAILS_INPUT = {
+    "message": "Invalid email",
+    "details": {"field": "email"},
+}
+
+# === EXPECTED OUTPUT ===
+BASE_EXCEPTION_OUTPUT = {
+    "message": "Test error",
+    "code": "TEST_ERROR",
+    "status_code": 500,
+}
+
+VALIDATION_ERROR_OUTPUT = {
+    "status_code": 400,
+    "code": "VALIDATION_ERROR",
+}
+
+NOT_FOUND_ERROR_OUTPUT = {
+    "status_code": 404,
+    "code": "NOT_FOUND",
+}
+
+AUTH_ERROR_OUTPUT = {
+    "status_code": 401,
+    "code": "AUTHENTICATION_ERROR",
+}
+
+AUTHZ_ERROR_OUTPUT = {
+    "status_code": 403,
+    "code": "AUTHORIZATION_ERROR",
+}
+
+LLM_ERROR_OUTPUT = {
+    "status_code": 503,
+    "provider": "openai",
+}
+
+APIFY_ERROR_OUTPUT = {
+    "status_code": 503,
+    "actor_id": "test-actor",
+}
+
+TO_DICT_OUTPUT = {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid email",
+    "field": "email",
+}
+```
+
 **File:** `backend/tests/unit/test_exceptions.py`
 
 ```python
@@ -608,6 +747,25 @@ TDD: Write these tests FIRST, then implement exceptions.py
 """
 import pytest
 
+from tests.fixtures.exceptions import (
+    BASE_EXCEPTION_INPUT,
+    BASE_EXCEPTION_OUTPUT,
+    VALIDATION_ERROR_INPUT,
+    VALIDATION_ERROR_OUTPUT,
+    NOT_FOUND_ERROR_INPUT,
+    NOT_FOUND_ERROR_OUTPUT,
+    AUTH_ERROR_INPUT,
+    AUTH_ERROR_OUTPUT,
+    AUTHZ_ERROR_INPUT,
+    AUTHZ_ERROR_OUTPUT,
+    LLM_ERROR_INPUT,
+    LLM_ERROR_OUTPUT,
+    APIFY_ERROR_INPUT,
+    APIFY_ERROR_OUTPUT,
+    VALIDATION_WITH_DETAILS_INPUT,
+    TO_DICT_OUTPUT,
+)
+
 
 class TestCustomExceptions:
     """Test suite for custom exception classes."""
@@ -616,69 +774,69 @@ class TestCustomExceptions:
         """PartnerScoutException should be base for all custom exceptions."""
         from app.core.exceptions import PartnerScoutException
         
-        exc = PartnerScoutException("Test error", code="TEST_ERROR")
-        assert str(exc) == "Test error"
-        assert exc.code == "TEST_ERROR"
-        assert exc.status_code == 500
+        exc = PartnerScoutException(**BASE_EXCEPTION_INPUT)
+        assert str(exc) == BASE_EXCEPTION_OUTPUT["message"]
+        assert exc.code == BASE_EXCEPTION_OUTPUT["code"]
+        assert exc.status_code == BASE_EXCEPTION_OUTPUT["status_code"]
 
     def test_validation_error(self):
         """ValidationError should have 400 status code."""
         from app.core.exceptions import ValidationError
         
-        exc = ValidationError("Invalid input")
-        assert exc.status_code == 400
-        assert exc.code == "VALIDATION_ERROR"
+        exc = ValidationError(**VALIDATION_ERROR_INPUT)
+        assert exc.status_code == VALIDATION_ERROR_OUTPUT["status_code"]
+        assert exc.code == VALIDATION_ERROR_OUTPUT["code"]
 
     def test_not_found_error(self):
         """NotFoundError should have 404 status code."""
         from app.core.exceptions import NotFoundError
         
-        exc = NotFoundError("Resource not found")
-        assert exc.status_code == 404
-        assert exc.code == "NOT_FOUND"
+        exc = NotFoundError(**NOT_FOUND_ERROR_INPUT)
+        assert exc.status_code == NOT_FOUND_ERROR_OUTPUT["status_code"]
+        assert exc.code == NOT_FOUND_ERROR_OUTPUT["code"]
 
     def test_authentication_error(self):
         """AuthenticationError should have 401 status code."""
         from app.core.exceptions import AuthenticationError
         
-        exc = AuthenticationError("Invalid token")
-        assert exc.status_code == 401
-        assert exc.code == "AUTHENTICATION_ERROR"
+        exc = AuthenticationError(**AUTH_ERROR_INPUT)
+        assert exc.status_code == AUTH_ERROR_OUTPUT["status_code"]
+        assert exc.code == AUTH_ERROR_OUTPUT["code"]
 
     def test_authorization_error(self):
         """AuthorizationError should have 403 status code."""
         from app.core.exceptions import AuthorizationError
         
-        exc = AuthorizationError("Permission denied")
-        assert exc.status_code == 403
-        assert exc.code == "AUTHORIZATION_ERROR"
+        exc = AuthorizationError(**AUTHZ_ERROR_INPUT)
+        assert exc.status_code == AUTHZ_ERROR_OUTPUT["status_code"]
+        assert exc.code == AUTHZ_ERROR_OUTPUT["code"]
 
     def test_llm_error(self):
         """LLMError should handle AI/LLM failures."""
         from app.core.exceptions import LLMError
         
-        exc = LLMError("OpenAI rate limited", provider="openai")
-        assert exc.status_code == 503
-        assert exc.provider == "openai"
+        exc = LLMError(**LLM_ERROR_INPUT)
+        assert exc.status_code == LLM_ERROR_OUTPUT["status_code"]
+        assert exc.provider == LLM_ERROR_OUTPUT["provider"]
 
     def test_apify_error(self):
         """ApifyError should handle scraping failures."""
         from app.core.exceptions import ApifyError
         
-        exc = ApifyError("Actor failed", actor_id="test-actor")
-        assert exc.status_code == 503
-        assert exc.actor_id == "test-actor"
+        exc = ApifyError(**APIFY_ERROR_INPUT)
+        assert exc.status_code == APIFY_ERROR_OUTPUT["status_code"]
+        assert exc.actor_id == APIFY_ERROR_OUTPUT["actor_id"]
 
     def test_exception_to_dict(self):
         """Exceptions should serialize to dict for API responses."""
         from app.core.exceptions import ValidationError
         
-        exc = ValidationError("Invalid email", details={"field": "email"})
+        exc = ValidationError(**VALIDATION_WITH_DETAILS_INPUT)
         result = exc.to_dict()
         
-        assert result["error"]["code"] == "VALIDATION_ERROR"
-        assert result["error"]["message"] == "Invalid email"
-        assert result["error"]["details"]["field"] == "email"
+        assert result["error"]["code"] == TO_DICT_OUTPUT["code"]
+        assert result["error"]["message"] == TO_DICT_OUTPUT["message"]
+        assert result["error"]["details"]["field"] == TO_DICT_OUTPUT["field"]
 ```
 
 ##### SUB-TASK-1.1.1.3.2: Implement exceptions.py

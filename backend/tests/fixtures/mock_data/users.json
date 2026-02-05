@@ -1,0 +1,30 @@
+{
+  "_prd_reference": "PRD Section 10.2 - users (Supabase Auth)",
+  "_description": "Mock users for testing multi-user isolation",
+  "users": [
+    {
+      "id": "11111111-1111-1111-1111-111111111111",
+      "email": "demo@partnerscout.ai",
+      "full_name": "Demo User",
+      "avatar_url": "https://api.dicebear.com/7.x/avataaars/svg?seed=demo",
+      "created_at": "2026-01-15T10:00:00Z",
+      "_test_role": "primary_demo_user"
+    },
+    {
+      "id": "22222222-2222-2222-2222-222222222222",
+      "email": "test@partnerscout.ai",
+      "full_name": "Test User",
+      "avatar_url": "https://api.dicebear.com/7.x/avataaars/svg?seed=test",
+      "created_at": "2026-01-20T14:30:00Z",
+      "_test_role": "secondary_user_for_isolation_tests"
+    },
+    {
+      "id": "33333333-3333-3333-3333-333333333333",
+      "email": "edge@partnerscout.ai",
+      "full_name": "Edge Case User",
+      "avatar_url": null,
+      "created_at": "2026-02-01T00:00:00Z",
+      "_test_role": "edge_case_null_avatar"
+    }
+  ]
+}

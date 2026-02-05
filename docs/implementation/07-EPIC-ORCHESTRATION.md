@@ -10,6 +10,9 @@
 
 ---
 
+> [!NOTE]
+> **Test Data Layer Pattern**: All tests in this EPIC follow the layered format (`input → test → output`) with fixtures stored in `tests/fixtures/`. See [00-MASTER-PLAN.md](./00-MASTER-PLAN.md#test-data-layer-pattern) for details.
+
 ## Environment Variables Required
 
 ```bash
@@ -866,6 +869,164 @@ if __name__ == "__main__":
 
 ---
 
+## Mock Data for Orchestration Testing
+
+### Pipeline Test Fixtures
+
+**File:** `backend/tests/fixtures/orchestration.py`
+
+```python
+"""
+Test fixtures for orchestration - pipeline stages and workflow testing.
+Uses mock data to test full discovery pipeline per PRD Section 7.2.
+"""
+from tests.fixtures.mock_data import (
+    get_job,
+    get_brand_dna_for_job,
+    get_profiles_for_job,
+    get_score_for_profile,
+    PRD_JOB_STATUSES,
+)
+
+# === PIPELINE STAGE TEST DATA (PRD 7.2) ===
+PIPELINE_TEST_JOB = get_job("job-001-uuid-0000-000000000001")
+
+PIPELINE_STAGES = [
+    {
+        "stage": "brand_analyzer",
+        "input_status": "pending",
+        "output_status": "analyzing",
+        "expected_output": get_brand_dna_for_job("job-001-uuid-0000-000000000001"),
+    },
+    {
+        "stage": "discovery",
+        "input_status": "analyzing",
+        "output_status": "discovering",
+        "expected_profiles_min": 1,
+    },
+    {
+        "stage": "scoring",
+        "input_status": "discovering",
+        "output_status": "scoring",
+        "profiles_to_score": get_profiles_for_job("job-001-uuid-0000-000000000001"),
+    },
+    {
+        "stage": "complete",
+        "input_status": "scoring",
+        "output_status": "completed",
+    },
+]
+
+# === STATUS TRANSITION VALIDATION ===
+VALID_STATUS_TRANSITIONS = {
+    "pending": ["analyzing", "failed"],
+    "analyzing": ["discovering", "failed"],
+    "discovering": ["scoring", "failed"],
+    "scoring": ["completed", "failed"],
+    "completed": [],  # Terminal state
+    "failed": ["pending"],  # Can retry
+}
+
+# === FULL PIPELINE E2E TEST DATA ===
+E2E_PIPELINE_INPUT = {
+    "job": {
+        "brand_description": "Sustainable fashion for eco-conscious consumers",
+        "reference_profiles": ["https://instagram.com/everlane"],
+    },
+    "expected_flow": [
+        ("pending", "Job created"),
+        ("analyzing", "Brand DNA extraction started"),
+        ("discovering", "Profile discovery started"),
+        ("scoring", "Scoring profiles"),
+        ("completed", "Pipeline finished"),
+    ],
+    "expected_outcomes": {
+        "brand_dna_created": True,
+        "profiles_discovered_min": 5,
+        "profiles_scored_min": 5,
+        "fake_profiles_filtered": True,
+    },
+}
+
+def get_mock_pipeline_result():
+    """Get mock result of a complete pipeline run."""
+    job = get_job("job-001-uuid-0000-000000000001")
+    profiles = get_profiles_for_job("job-001-uuid-0000-000000000001")
+    
+    return {
+        "job": job,
+        "brand_dna": get_brand_dna_for_job("job-001-uuid-0000-000000000001"),
+        "profiles_discovered": len(profiles),
+        "profiles_scored": len([p for p in profiles if p["status"] == "done"]),
+        "high_score_profiles": [p for p in profiles if p.get("_expected_score_range", [0])[0] >= 70],
+        "filtered_profiles": [p for p in profiles if p["status"] == "skipped"],
+    }
+```
+
+### Orchestration Validation
+
+The `validate_epic7.py` script should include:
+
+```python
+def validate_status_transitions():
+    """Validate job status transitions per PRD Section 5.4."""
+    from tests.fixtures.orchestration import VALID_STATUS_TRANSITIONS
+    from tests.fixtures.mock_data import PRD_JOB_STATUSES
+    
+    # All PRD statuses must have defined transitions
+    for status in PRD_JOB_STATUSES:
+        assert status in VALID_STATUS_TRANSITIONS, \
+            f"Missing transition rules for status: {status}"
+    
+    # Verify terminal states
+    assert VALID_STATUS_TRANSITIONS["completed"] == [], \
+        "completed should be terminal state"
+    
+    print("  ✓ Status transitions validated (PRD 5.4)")
+    return True
+
+def validate_pipeline_with_mock_data():
+    """Validate pipeline produces expected results with mock data."""
+    from tests.fixtures.orchestration import get_mock_pipeline_result
+    
+    result = get_mock_pipeline_result()
+    
+    # Verify job completed
+    assert result["job"]["status"] == "completed"
+    
+    # Verify profiles discovered and scored
+    assert result["profiles_discovered"] >= 5, "Should discover multiple profiles"
+    assert result["profiles_scored"] >= 3, "Should score most profiles"
+    
+    # Verify fake profiles were filtered
+    assert len(result["filtered_profiles"]) >= 1, "Should filter fake profiles"
+    
+    # Verify high-quality matches exist
+    assert len(result["high_score_profiles"]) >= 2, "Should have quality matches"
+    
+    print("  ✓ Pipeline mock execution validated")
+    return True
+
+def validate_n8n_workflow_data():
+    """Validate data structure matches n8n workflow expectations."""
+    from tests.fixtures.orchestration import PIPELINE_STAGES, E2E_PIPELINE_INPUT
+    
+    # Verify all stages have required fields
+    for stage in PIPELINE_STAGES:
+        assert "stage" in stage
+        assert "input_status" in stage
+        assert "output_status" in stage
+    
+    # Verify E2E input matches what n8n would receive
+    assert "brand_description" in E2E_PIPELINE_INPUT["job"]
+    assert "reference_profiles" in E2E_PIPELINE_INPUT["job"]
+    
+    print("  ✓ n8n workflow data structure validated")
+    return True
+```
+
+---
+
 ## Definition of Done
 
 - [ ] Discovery pipeline implemented with all stages
@@ -873,7 +1034,11 @@ if __name__ == "__main__":
 - [ ] Job scheduler implemented for background processing
 - [ ] CLI script working for manual job execution
 - [ ] n8n webhook endpoint implemented
-- [ ] `validate_epic7.py` runs successfully
+- [ ] **Pipeline tested with PRD mock data end-to-end**
+- [ ] **Status transitions validated (PRD 5.4)**
+- [ ] **Fake profiles correctly filtered in pipeline**
+- [ ] **Pipeline results match expected mock outcomes**
+- [ ] `validate_epic7.py` runs successfully with mock data tests
 
 ---
 

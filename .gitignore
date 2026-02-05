@@ -1,0 +1,36 @@
+.env
+.env.*
+!.env.example
+
+# Python bytecode/cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+venv/
+.venv/
+backend/venv/
+
+# Test/coverage caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+
+# Node/Frontend (future)
+node_modules/
+dist/
+build/
+
+# OS/editor
+.DS_Store

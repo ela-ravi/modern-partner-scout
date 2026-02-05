@@ -10,6 +10,9 @@
 
 ---
 
+> [!NOTE]
+> **Test Data Layer Pattern**: All tests in this EPIC follow the layered format (`input → test → output`) with fixtures stored in `tests/fixtures/`. See [00-MASTER-PLAN.md](./00-MASTER-PLAN.md#test-data-layer-pattern) for details.
+
 ## Environment Variables Required
 
 ```bash
@@ -1779,6 +1782,101 @@ if __name__ == "__main__":
 
 ---
 
+## Mock Data for Testing
+
+### User Authentication Mock Data
+
+Tests in this EPIC use mock user data from `tests/fixtures/mock_data/users.json` (created in EPIC-2).
+
+**File:** `backend/tests/fixtures/guards.py`
+
+```python
+"""
+Test fixtures for guards - auth tokens and mock requests.
+Uses PRD user data from mock_data/users.json.
+"""
+from tests.fixtures.mock_data import get_user
+
+# Get demo user from mock data
+DEMO_USER = get_user("user-001-uuid-0000-000000000001")
+SECONDARY_USER = get_user("user-002-uuid-0000-000000000002")
+
+# === VALID JWT TEST DATA ===
+VALID_JWT_INPUT = {
+    "user_id": DEMO_USER["id"],
+    "email": DEMO_USER["email"],
+    "exp": 9999999999,  # Far future
+    "iat": 1700000000,
+}
+
+VALID_JWT_OUTPUT = {
+    "user_id": DEMO_USER["id"],
+    "email": DEMO_USER["email"],
+    "is_authenticated": True,
+}
+
+# === INVALID JWT TEST DATA ===
+EXPIRED_JWT_INPUT = {
+    "user_id": DEMO_USER["id"],
+    "email": DEMO_USER["email"],
+    "exp": 1600000000,  # Expired
+    "iat": 1500000000,
+}
+
+# === MULTI-USER ISOLATION TEST DATA (PRD Section 6) ===
+USER_ISOLATION_TEST = {
+    "user1_id": DEMO_USER["id"],
+    "user2_id": SECONDARY_USER["id"],
+    "user1_job_id": "job-001-uuid-0000-000000000001",  # Belongs to user1
+    "user2_job_id": "job-007-uuid-0000-000000000007",  # Belongs to user2
+}
+
+# === API KEY TEST DATA ===
+VALID_API_KEY = "ps_test_api_key_12345"
+INVALID_API_KEY = "invalid_key"
+
+# === RATE LIMIT TEST DATA ===
+RATE_LIMIT_CONFIG = {
+    "requests": 100,
+    "period_seconds": 60,
+}
+```
+
+### Validation Script Update
+
+The `validate_epic3.py` script should include:
+
+```python
+def validate_auth_with_mock_users():
+    """Validate auth works with PRD-defined mock users."""
+    from tests.fixtures.mock_data import get_user
+    
+    user = get_user("user-001-uuid-0000-000000000001")
+    assert user is not None, "Demo user must exist in mock data"
+    assert user["email"] == "demo@partnerscout.ai"
+    
+    # Test JWT creation for mock user
+    from app.guards.auth_guard import create_test_jwt
+    token = create_test_jwt(user["id"], user["email"])
+    assert token is not None
+    
+    print("  ✓ Auth validated with PRD mock users")
+    return True
+
+def validate_user_isolation():
+    """Validate user isolation per PRD Section 6."""
+    from tests.fixtures.guards import USER_ISOLATION_TEST
+    
+    # Verify isolation test data exists
+    assert USER_ISOLATION_TEST["user1_id"] != USER_ISOLATION_TEST["user2_id"]
+    assert USER_ISOLATION_TEST["user1_job_id"] != USER_ISOLATION_TEST["user2_job_id"]
+    
+    print("  ✓ User isolation data validated")
+    return True
+```
+
+---
+
 ## Definition of Done
 
 - [ ] Auth guard implemented with JWT validation
@@ -1789,8 +1887,10 @@ if __name__ == "__main__":
 - [ ] API key guard implemented
 - [ ] All API key tests passing
 - [ ] API dependencies module created
+- [ ] **Guards tested with PRD mock user data**
+- [ ] **User isolation validated (PRD Section 6)**
 - [ ] Type checking with mypy passing
-- [ ] `validate_epic3.py` runs successfully
+- [ ] `validate_epic3.py` runs successfully with mock data tests
 
 ---
 

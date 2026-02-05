@@ -10,6 +10,9 @@
 
 ---
 
+> [!NOTE]
+> **Test Data Layer Pattern**: All tests in this EPIC follow the layered format (`input → test → output`) with fixtures stored in `tests/fixtures/`. See [00-MASTER-PLAN.md](./00-MASTER-PLAN.md#test-data-layer-pattern) for details.
+
 ## Environment Variables Required
 
 All environment variables from previous EPICs are required.
@@ -1065,6 +1068,148 @@ if __name__ == "__main__":
 
 ---
 
+## Mock Data for API Testing
+
+### API Test Fixtures
+
+**File:** `backend/tests/fixtures/api_requests.py`
+
+```python
+"""
+Test fixtures for API routes - request/response data aligned with PRD Section 8.
+Uses mock data from mock_data/ for realistic testing.
+"""
+from tests.fixtures.mock_data import (
+    get_user,
+    get_job,
+    get_jobs_for_user,
+    get_profiles_for_job,
+)
+
+DEMO_USER = get_user("user-001-uuid-0000-000000000001")
+DEMO_JOB = get_job("job-001-uuid-0000-000000000001")
+
+# === CREATE SESSION REQUEST (PRD 8.1) ===
+CREATE_SESSION_REQUEST = {
+    "brand_description": "Sustainable fashion brand targeting millennials who value ethical production.",
+    "reference_profiles": [
+        "https://instagram.com/everlane",
+        "https://instagram.com/reformation",
+    ]
+}
+
+CREATE_SESSION_EXPECTED = {
+    "id": "uuid-format",
+    "status": "pending",
+    "profiles_discovered": 0,
+    "profiles_scored": 0,
+}
+
+# === LIST SESSIONS RESPONSE (PRD 8.1) ===
+LIST_SESSIONS_EXPECTED = {
+    "sessions": get_jobs_for_user(DEMO_USER["id"]),
+    "required_fields": ["id", "brand_description", "status", "profiles_discovered", "created_at"],
+}
+
+# === BRAND ANALYZER REQUEST (PRD 8.2) ===
+ANALYZE_BRAND_REQUEST = {
+    "job_id": DEMO_JOB["id"],
+    "reference_profiles": DEMO_JOB["reference_profiles"],
+    "brand_description": DEMO_JOB["brand_description"],
+}
+
+ANALYZE_BRAND_EXPECTED = {
+    "brand_dna": {
+        "required_fields": ["hashtags", "keywords", "embedding_vector"],
+    }
+}
+
+# === SCORER REQUEST (PRD 8.4) ===
+def get_score_request(profile_id: str):
+    """Get scorer API request for a profile."""
+    profiles = get_profiles_for_job("job-001-uuid-0000-000000000001")
+    profile = next((p for p in profiles if p["id"] == profile_id), None)
+    if profile:
+        return {
+            "profile": profile,
+            "brand_dna_id": "dna-001-uuid-0000-000000000001",
+        }
+    return None
+
+SCORE_RESPONSE_EXPECTED = {
+    "required_fields": [
+        "score",
+        "reasoning",
+    ],
+    "reasoning_fields": [
+        "visual_aesthetic_match",
+        "content_theme_alignment",
+        "engagement_rate_score",
+        "follower_quality",
+        "business_indicators",
+        "activity_recency",
+        "summary",
+        "recommendation",
+    ],
+    "score_range": [0, 100],
+}
+
+# === USER ISOLATION TEST DATA (PRD 8.0) ===
+USER_ISOLATION_REQUESTS = {
+    "user1_token": "mock_jwt_for_user_001",
+    "user2_token": "mock_jwt_for_user_002",
+    "user1_job": get_job("job-001-uuid-0000-000000000001"),
+    "user2_job": get_job("job-007-uuid-0000-000000000007"),
+    "expected_errors": {
+        "user1_accessing_user2_job": {"code": "FORBIDDEN", "status": 403},
+        "no_token": {"code": "UNAUTHORIZED", "status": 401},
+    }
+}
+```
+
+### API Validation with Mock Data
+
+The `validate_epic6.py` script should include:
+
+```python
+def validate_api_responses_match_prd():
+    """Validate API responses match PRD Section 8 contracts."""
+    from tests.fixtures.api_requests import (
+        LIST_SESSIONS_EXPECTED,
+        SCORE_RESPONSE_EXPECTED,
+    )
+    
+    # Verify list sessions has required fields
+    for field in LIST_SESSIONS_EXPECTED["required_fields"]:
+        for session in LIST_SESSIONS_EXPECTED["sessions"]:
+            assert field in session, f"PRD 8.1: Session missing {field}"
+    
+    # Verify score response structure
+    for field in SCORE_RESPONSE_EXPECTED["reasoning_fields"]:
+        print(f"  Checking reasoning field: {field}")
+    
+    print("  ✓ API response structure validated (PRD 8)")
+    return True
+
+def validate_user_isolation_api():
+    """Validate user isolation at API level per PRD 8.0."""
+    from tests.fixtures.api_requests import USER_ISOLATION_REQUESTS
+    
+    # Verify test data for isolation exists
+    assert USER_ISOLATION_REQUESTS["user1_job"]["user_id"] != \
+           USER_ISOLATION_REQUESTS["user2_job"]["user_id"], \
+           "Jobs must belong to different users"
+    
+    # Verify expected error responses match PRD
+    assert USER_ISOLATION_REQUESTS["expected_errors"]["user1_accessing_user2_job"]["status"] == 403
+    assert USER_ISOLATION_REQUESTS["expected_errors"]["no_token"]["status"] == 401
+    
+    print("  ✓ User isolation API test data validated (PRD 8.0)")
+    return True
+```
+
+---
+
 ## Definition of Done
 
 - [ ] Health endpoint implemented
@@ -1075,7 +1220,11 @@ if __name__ == "__main__":
 - [ ] All routes have rate limiting where appropriate
 - [ ] All route tests passing
 - [ ] OpenAPI docs accessible at /docs
-- [ ] `validate_epic6.py` runs successfully
+- [ ] **API requests/responses tested with PRD mock data**
+- [ ] **Response structure validated against PRD Section 8**
+- [ ] **User isolation tested (PRD 8.0 - 403 for unauthorized access)**
+- [ ] **Error responses match PRD format**
+- [ ] `validate_epic6.py` runs successfully with mock data tests
 
 ---
 

@@ -10,6 +10,9 @@
 
 ---
 
+> [!NOTE]
+> **Test Data Layer Pattern**: All tests in this EPIC follow the layered format (`input → test → output`) with fixtures stored in `tests/fixtures/`. See [00-MASTER-PLAN.md](./00-MASTER-PLAN.md#test-data-layer-pattern) for details.
+
 ## Environment Variables Required
 
 ```bash
@@ -771,6 +774,262 @@ if __name__ == "__main__":
 
 ---
 
+## Demo Data Seeding
+
+### Comprehensive Demo Seed Script
+
+**File:** `backend/scripts/seed_demo_data.py`
+
+```python
+#!/usr/bin/env python3
+"""
+Seed database with comprehensive demo data for presentations.
+
+This script creates a complete, realistic dataset that demonstrates
+all features of PartnerScout AI as specified in the PRD.
+
+Usage:
+    python scripts/seed_demo_data.py
+    python scripts/seed_demo_data.py --scenario sustainable_fashion
+    python scripts/seed_demo_data.py --verify
+"""
+
+import asyncio
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from tests.fixtures.mock_data import load_mock_data, PRD_JOB_STATUSES
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
+
+
+DEMO_SCENARIOS = {
+    "sustainable_fashion": {
+        "description": "Complete sustainable fashion brand discovery demo",
+        "jobs": ["job-001-uuid-0000-000000000001"],
+        "show_fake_detection": True,
+        "show_all_statuses": False,
+    },
+    "multi_session": {
+        "description": "Demo showing multiple concurrent sessions",
+        "jobs": [
+            "job-001-uuid-0000-000000000001",
+            "job-002-uuid-0000-000000000002",
+            "job-003-uuid-0000-000000000003",
+        ],
+        "show_fake_detection": False,
+        "show_all_statuses": True,
+    },
+    "full_demo": {
+        "description": "Complete demo with all data types",
+        "jobs": "all",
+        "show_fake_detection": True,
+        "show_all_statuses": True,
+    },
+}
+
+
+async def seed_demo_scenario(scenario_name: str):
+    """Seed database with a specific demo scenario."""
+    scenario = DEMO_SCENARIOS.get(scenario_name, DEMO_SCENARIOS["full_demo"])
+    logger.info(f"Seeding demo scenario: {scenario['description']}")
+    
+    data = load_mock_data()
+    
+    # Filter data for scenario
+    if scenario["jobs"] == "all":
+        jobs_to_seed = data["discovery_jobs"]
+    else:
+        jobs_to_seed = [j for j in data["discovery_jobs"] if j["id"] in scenario["jobs"]]
+    
+    # Always include user data
+    await seed_users(data["users"][:1])  # Demo user only
+    
+    # Seed jobs and related data
+    for job in jobs_to_seed:
+        await seed_job_complete(job, data)
+    
+    logger.info(f"✓ Demo scenario '{scenario_name}' seeded successfully")
+    logger.info(f"  - Jobs seeded: {len(jobs_to_seed)}")
+    
+    return True
+
+
+async def seed_job_complete(job: dict, data: dict):
+    """Seed a complete job with all related data."""
+    job_id = job["id"]
+    
+    # 1. Seed job
+    await seed_job(job)
+    
+    # 2. Seed brand DNA if exists
+    dna = next((d for d in data["brand_dna"] if d["job_id"] == job_id), None)
+    if dna:
+        await seed_brand_dna(dna)
+    
+    # 3. Seed profiles for job
+    profiles = [p for p in data["profiles"] if p["job_id"] == job_id]
+    for profile in profiles:
+        await seed_profile(profile)
+        
+        # 4. Seed score for profile
+        score = next(
+            (s for s in data["scores"] if s["profile_id"] == profile["id"]),
+            None
+        )
+        if score:
+            await seed_score(score)
+        
+        # 5. Seed contact for profile
+        contact = next(
+            (c for c in data["contacts"] if c["profile_id"] == profile["id"]),
+            None
+        )
+        if contact:
+            await seed_contact(contact)
+
+
+async def verify_demo_data():
+    """Verify demo data is correctly seeded and matches PRD."""
+    logger.info("Verifying demo data...")
+    
+    from tests.fixtures.mock_data import (
+        PRD_JOB_STATUSES,
+        PRD_SCORING_WEIGHTS,
+        get_fake_profiles,
+        get_genuine_profiles,
+    )
+    
+    errors = []
+    
+    # 1. Verify demo user exists
+    # 2. Verify completed job exists with profiles
+    # 3. Verify scores have all 6 dimensions
+    # 4. Verify fake profiles have low scores
+    # 5. Verify genuine profiles have high scores
+    
+    if not errors:
+        logger.info("✓ Demo data verification passed")
+        return True
+    else:
+        for error in errors:
+            logger.error(f"  ✗ {error}")
+        return False
+
+
+# Main entry point
+if __name__ == "__main__":
+    import argparse
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--scenario", default="full_demo", choices=DEMO_SCENARIOS.keys())
+    parser.add_argument("--verify", action="store_true")
+    
+    args = parser.parse_args()
+    
+    if args.verify:
+        asyncio.run(verify_demo_data())
+    else:
+        asyncio.run(seed_demo_scenario(args.scenario))
+```
+
+### E2E Test with Demo Data
+
+**File:** `backend/tests/e2e/test_full_demo.py`
+
+```python
+"""
+E2E tests using seeded demo data to validate full system behavior.
+Tests the complete PRD user journey (Section 4).
+"""
+import pytest
+
+
+class TestDemoUserJourney:
+    """
+    Test the complete PRD Section 4 user journey:
+    1. User logs in
+    2. User creates discovery
+    3. System processes (analyze, discover, score)
+    4. User views results with scores
+    5. User reviews profiles
+    """
+
+    @pytest.fixture
+    async def seeded_demo(self):
+        """Seed demo data before test."""
+        from scripts.seed_demo_data import seed_demo_scenario
+        await seed_demo_scenario("full_demo")
+
+    async def test_demo_flow_end_to_end(self, seeded_demo, client):
+        """Complete demo flow matching PRD Section 4."""
+        # Step 1: Login
+        response = await client.post("/api/auth/signin", json={
+            "email": "demo@partnerscout.ai",
+            "password": "demo123"
+        })
+        assert response.status_code == 200
+        token = response.json()["access_token"]
+        
+        # Step 2: View dashboard with past sessions
+        response = await client.get("/api/discovery", headers={
+            "Authorization": f"Bearer {token}"
+        })
+        assert response.status_code == 200
+        sessions = response.json()["sessions"]
+        assert len(sessions) >= 1
+        
+        # Step 3: View completed session results
+        completed = next(s for s in sessions if s["status"] == "completed")
+        response = await client.get(f"/api/discovery/{completed['id']}")
+        assert response.status_code == 200
+        
+        job = response.json()
+        assert job["profiles_scored"] >= 5
+        
+        # Step 4: View profile scores
+        profiles = job.get("profiles", [])
+        for profile in profiles[:3]:
+            response = await client.get(f"/api/profiles/{profile['id']}/score")
+            score_data = response.json()
+            
+            # Verify all 6 PRD scoring dimensions
+            assert "visual_aesthetic_match" in score_data
+            assert "content_theme_alignment" in score_data
+            assert "engagement_rate_score" in score_data
+            assert "follower_quality" in score_data
+            assert "business_indicators" in score_data
+            assert "activity_recency" in score_data
+            
+            # Verify reasoning
+            assert "reasoning" in score_data
+            assert "summary" in score_data["reasoning"]
+
+    async def test_fake_detection_visible_in_demo(self, seeded_demo, client):
+        """Verify fake profiles are flagged per PRD 5.3.1."""
+        # Get profiles from completed job
+        response = await client.get("/api/discovery/job-001-uuid-0000-000000000001")
+        profiles = response.json()["profiles"]
+        
+        # Find profiles with fake indicators
+        suspicious_profiles = [
+            p for p in profiles 
+            if p.get("following_ratio", 0) > 0.5 or p.get("engagement_rate", 5) < 1
+        ]
+        
+        # Verify they're marked as skipped or have low scores
+        for profile in suspicious_profiles:
+            if profile["status"] == "done":
+                score_resp = await client.get(f"/api/profiles/{profile['id']}/score")
+                score = score_resp.json()["score"]
+                assert score < 50, f"Suspicious profile {profile['username']} should score < 50"
+```
+
+---
+
 ## Definition of Done
 
 - [ ] Playwright E2E tests configured
@@ -783,6 +1042,11 @@ if __name__ == "__main__":
 - [ ] Pre-demo checklist created
 - [ ] Full system validation script passing
 - [ ] Demo can run end-to-end without errors
+- [ ] **Demo scenarios seed correctly (sustainable_fashion, multi_session, full_demo)**
+- [ ] **Demo data passes PRD verification**
+- [ ] **E2E tests validate full PRD user journey (Section 4)**
+- [ ] **Fake detection visible in demo results (PRD 5.3.1)**
+- [ ] **All 6 scoring dimensions visible in demo (PRD 5.3)**
 
 ---
 

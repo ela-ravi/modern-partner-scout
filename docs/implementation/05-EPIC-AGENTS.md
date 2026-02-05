@@ -10,6 +10,9 @@
 
 ---
 
+> [!NOTE]
+> **Test Data Layer Pattern**: All tests in this EPIC follow the layered format (`input → test → output`) with fixtures stored in `tests/fixtures/`. See [00-MASTER-PLAN.md](./00-MASTER-PLAN.md#test-data-layer-pattern) for details.
+
 ## Environment Variables Required
 
 ```bash
@@ -1906,6 +1909,147 @@ if __name__ == "__main__":
 
 ---
 
+## Mock Data for Agent Testing
+
+### Agent Test Fixtures
+
+**File:** `backend/tests/fixtures/agents.py`
+
+```python
+"""
+Test fixtures for AI agents - aligned with PRD Sections 5.1-5.3.
+Uses mock data from mock_data/ for realistic testing.
+"""
+from tests.fixtures.mock_data import (
+    get_job,
+    get_brand_dna_for_job,
+    get_profiles_for_job,
+    get_genuine_profiles,
+    get_fake_profiles,
+    PRD_SCORING_WEIGHTS,
+)
+
+# === BRAND ANALYZER TEST DATA (PRD 5.1) ===
+BRAND_ANALYZER_INPUT = {
+    "job_id": "job-001-uuid-0000-000000000001",
+    "reference_profiles": [
+        "https://instagram.com/everlane",
+        "https://instagram.com/reformation",
+    ],
+    "brand_description": "Eco-friendly sustainable fashion brand targeting millennials",
+}
+
+BRAND_ANALYZER_EXPECTED_OUTPUT = get_brand_dna_for_job("job-001-uuid-0000-000000000001")
+
+# === SCORER AGENT TEST DATA (PRD 5.3) ===
+def get_scorer_test_cases():
+    """Get test cases for scorer agent with expected score ranges."""
+    profiles = get_profiles_for_job("job-001-uuid-0000-000000000001")
+    return [
+        {
+            "profile": p,
+            "expected_score_range": p.get("_expected_score_range", [0, 100]),
+            "test_purpose": p.get("_test_purpose", "unknown"),
+        }
+        for p in profiles
+    ]
+
+# === FAKE DETECTION TEST DATA (PRD 5.3.1) ===
+FAKE_DETECTION_TEST_CASES = {
+    "genuine_profiles": get_genuine_profiles(),
+    "fake_profiles": get_fake_profiles(),
+    "prd_signals": {
+        "high_following_ratio_threshold": 2.0,
+        "low_engagement_threshold": 1.0,
+        "min_posts_for_5k_followers": 50,
+    },
+    "prd_scoring_penalties": {
+        "high_following_ratio": -30,
+        "too_few_posts": -25,
+        "business_verified": +5,
+        "email_available": +5,
+        "website_linked": +5,
+    }
+}
+
+# === DISCOVERY AGENT TEST DATA (PRD 5.2) ===
+DISCOVERY_AGENT_INPUT = {
+    "hashtags": ["#sustainablefashion", "#ecofriendly"],
+    "keywords": ["sustainable", "ethical"],
+    "result_limit": 50,
+}
+
+DISCOVERY_AGENT_EXPECTED = {
+    "min_profiles": 1,
+    "max_profiles": 50,
+    "required_fields": ["instagram_url", "username", "followers", "following"],
+}
+```
+
+### Agent Validation with Mock Data
+
+The `validate_epic5.py` script should include:
+
+```python
+def validate_brand_analyzer_output():
+    """Validate Brand Analyzer output matches PRD 5.1."""
+    from tests.fixtures.agents import BRAND_ANALYZER_EXPECTED_OUTPUT
+    
+    assert BRAND_ANALYZER_EXPECTED_OUTPUT is not None
+    assert "hashtags" in BRAND_ANALYZER_EXPECTED_OUTPUT
+    assert "keywords" in BRAND_ANALYZER_EXPECTED_OUTPUT
+    assert len(BRAND_ANALYZER_EXPECTED_OUTPUT["hashtags"]) >= 5, \
+        "PRD 5.1: Should extract meaningful hashtags"
+    
+    print("  ✓ Brand Analyzer output validated (PRD 5.1)")
+    return True
+
+def validate_scorer_with_fake_detection():
+    """Validate Scorer agent with fake detection per PRD 5.3.1."""
+    from tests.fixtures.agents import FAKE_DETECTION_TEST_CASES, get_scorer_test_cases
+    
+    # Verify genuine profiles score above 50
+    genuine = FAKE_DETECTION_TEST_CASES["genuine_profiles"]
+    for profile in genuine:
+        min_score, max_score = profile.get("_expected_score_range", [50, 100])
+        assert min_score >= 50, f"Genuine profile {profile['username']} should score >= 50"
+    
+    # Verify fake profiles score below 50
+    fake = FAKE_DETECTION_TEST_CASES["fake_profiles"]
+    for profile in fake:
+        min_score, max_score = profile.get("_expected_score_range", [0, 50])
+        assert max_score < 50, f"Fake profile {profile['username']} should score < 50"
+    
+    print("  ✓ Fake detection validated (PRD 5.3.1)")
+    return True
+
+def validate_scoring_weights():
+    """Validate scoring weights match PRD 5.3."""
+    from tests.fixtures.mock_data import PRD_SCORING_WEIGHTS
+    
+    expected_weights = {
+        "visual_aesthetic_match": 0.25,
+        "content_theme_alignment": 0.20,
+        "engagement_rate_score": 0.15,
+        "follower_quality": 0.15,
+        "business_indicators": 0.15,
+        "activity_recency": 0.10,
+    }
+    
+    for dim, weight in expected_weights.items():
+        assert PRD_SCORING_WEIGHTS[dim] == weight, \
+            f"PRD 5.3: {dim} should be {weight}, got {PRD_SCORING_WEIGHTS[dim]}"
+    
+    # Verify weights sum to 1.0
+    total = sum(PRD_SCORING_WEIGHTS.values())
+    assert abs(total - 1.0) < 0.01, f"Weights should sum to 1.0, got {total}"
+    
+    print("  ✓ Scoring weights validated (PRD 5.3)")
+    return True
+```
+
+---
+
 ## Definition of Done
 
 - [ ] Base agent class implemented with retry logic
@@ -1914,8 +2058,13 @@ if __name__ == "__main__":
 - [ ] Discovery agent implemented
 - [ ] All agent unit tests passing
 - [ ] Prompt templates created for all agents
+- [ ] **Agent tests use PRD-aligned mock data**
+- [ ] **Brand Analyzer outputs validated (PRD 5.1)**
+- [ ] **Scorer implements all 6 dimensions (PRD 5.3)**
+- [ ] **Fake detection test cases included (PRD 5.3.1)**
+- [ ] **Scoring weights match PRD exactly**
 - [ ] Type checking passing
-- [ ] `validate_epic5.py` runs successfully
+- [ ] `validate_epic5.py` runs successfully with mock data tests
 
 ---
 

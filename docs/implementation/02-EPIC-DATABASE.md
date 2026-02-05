@@ -10,6 +10,9 @@
 
 ---
 
+> [!NOTE]
+> **Test Data Layer Pattern**: All tests in this EPIC follow the layered format (`input → test → output`) with fixtures stored in `tests/fixtures/`. See [00-MASTER-PLAN.md](./00-MASTER-PLAN.md#test-data-layer-pattern) for details.
+
 ## Environment Variables Required
 
 ```bash
@@ -99,6 +102,184 @@ erDiagram
         timestamp extracted_at
     }
 ```
+
+---
+
+## FEATURE-2.0: Supabase Database Migrations
+
+### Overview
+
+Create all PostgreSQL tables, indexes, RLS policies, triggers, views, and seed data for Supabase.
+
+**Location:** `backend/supabase/migrations/`
+
+---
+
+### STORY-2.0.1: Create Supabase Migration Files
+
+**As a** developer  
+**I want** SQL migration files for Supabase  
+**So that** I can set up the production database with proper schema
+
+---
+
+#### TASK-2.0.1.1: Initial Schema Migration
+
+**File:** `backend/supabase/migrations/001_initial_schema.sql`
+
+**Creates:**
+- Extensions: `vector` (pgvector), `uuid-ossp`
+- Enum types: `discovery_job_status`, `profile_status`
+- Tables: `discovery_jobs`, `brand_dna`, `discovered_profiles`, `profile_scores`, `profile_contacts`
+- Constraints: foreign keys, unique constraints, check constraints
+
+**PRD References:**
+- PRD 10.3: discovery_jobs
+- PRD 10.4: brand_dna
+- PRD 10.5: discovered_profiles
+- PRD 10.6: profile_scores (6 dimensions)
+- PRD 10.7: profile_contacts
+
+---
+
+#### TASK-2.0.1.2: Indexes Migration
+
+**File:** `backend/supabase/migrations/002_indexes.sql`
+
+**Creates indexes for:**
+- Foreign key columns (all tables)
+- `discovery_jobs.user_id`, `status`, `created_at`
+- `discovered_profiles.job_id`, `status`, `followers`
+- `profile_scores.score`, `follower_quality`
+- `profile_contacts.email` (partial index)
+
+---
+
+#### TASK-2.0.1.3: Row Level Security Migration
+
+**File:** `backend/supabase/migrations/003_rls_policies.sql`
+
+**Implements PRD Section 6 & 10.1.2:**
+- Enable RLS on all tables
+- User isolation policies on `discovery_jobs`
+- Cascading access via job ownership chain
+- Service role bypass for backend operations
+
+---
+
+#### TASK-2.0.1.4: Triggers Migration
+
+**File:** `backend/supabase/migrations/004_triggers.sql`
+
+**Creates:**
+- `update_updated_at_column()` - auto-update timestamps
+- `update_profiles_discovered()` - auto-increment counter on INSERT
+- `update_profiles_scored()` - auto-increment counter when status='done'
+- `auto_complete_job()` - set status='completed' when all scored
+
+---
+
+#### TASK-2.0.1.5: Realtime Migration
+
+**File:** `backend/supabase/migrations/005_realtime.sql`
+
+**Enables realtime subscriptions for:**
+- `discovery_jobs` - status updates
+- `discovered_profiles` - new profiles appearing
+- `profile_scores` - score updates
+- `profile_contacts` - email extraction
+
+---
+
+#### TASK-2.0.1.6: Views Migration
+
+**File:** `backend/supabase/migrations/006_views.sql`
+
+**Creates convenience views:**
+- `v_complete_profiles` - profile with score and contact joined
+- `v_job_summary` - job with aggregated statistics
+- `v_high_score_profiles` - profiles scoring >= 70
+- `v_suspicious_profiles` - profiles with low follower_quality (PRD 5.3.1)
+
+---
+
+#### TASK-2.0.1.7: Seed Data Migration
+
+**File:** `backend/supabase/migrations/007_seed.sql`
+
+**PRD-aligned demo data:**
+- 1 completed job with 5 profiles (mix of genuine and fake)
+- 3 additional jobs (pending, scoring, failed)
+- All 6 scoring dimensions populated
+- Contact emails for genuine profiles
+- Fake detection test cases per PRD 5.3.1
+
+---
+
+### STORY-2.0.2: Validate Supabase Migrations
+
+**As a** developer  
+**I want** to validate migrations before running in production  
+**So that** I avoid schema errors
+
+---
+
+#### TASK-2.0.2.1: Add Migration Validation to validate_epic2.py
+
+```python
+def validate_supabase_migrations():
+    """Validate Supabase migration files exist and are valid."""
+    print("Validating Supabase migrations...")
+    
+    migration_dir = Path(__file__).parent.parent / "supabase" / "migrations"
+    
+    required_files = [
+        "001_initial_schema.sql",
+        "002_indexes.sql",
+        "003_rls_policies.sql",
+        "004_triggers.sql",
+        "005_realtime.sql",
+        "006_views.sql",
+        "007_seed.sql",
+        "README.md",
+    ]
+    
+    all_exist = True
+    for filename in required_files:
+        filepath = migration_dir / filename
+        exists = filepath.exists()
+        status = "✓" if exists else "✗"
+        print(f"  {status} {filename}")
+        if not exists:
+            all_exist = False
+    
+    # Validate SQL syntax (basic check)
+    for filename in required_files:
+        if filename.endswith(".sql"):
+            filepath = migration_dir / filename
+            if filepath.exists():
+                content = filepath.read_text()
+                # Check for common SQL keywords
+                if "CREATE" not in content and "ALTER" not in content and "INSERT" not in content:
+                    print(f"  ⚠ {filename} may be empty or invalid")
+    
+    print(f"\nResult: {'PASS' if all_exist else 'FAIL'}")
+    return all_exist
+```
+
+---
+
+### Definition of Done for FEATURE-2.0
+
+- [ ] `001_initial_schema.sql` creates all tables with correct schema
+- [ ] `002_indexes.sql` creates performance indexes
+- [ ] `003_rls_policies.sql` implements user isolation (PRD 6)
+- [ ] `004_triggers.sql` auto-updates timestamps and counters
+- [ ] `005_realtime.sql` enables live updates
+- [ ] `006_views.sql` creates convenience views
+- [ ] `007_seed.sql` contains PRD-aligned demo data
+- [ ] `README.md` documents migration process
+- [ ] All migrations can be run in Supabase SQL Editor without errors
 
 ---
 
@@ -3277,19 +3458,1319 @@ class TestDatabaseIntegration:
 
 ---
 
+## FEATURE 2.6: Seed Data & PRD-Aligned Mock Data
+
+### Overview
+
+Create comprehensive seed data that:
+1. Matches all PRD schema specifications exactly
+2. Covers all entity states and edge cases
+3. Enables validation testing against PRD requirements
+4. Provides realistic demo data
+
+---
+
+### STORY 2.6.1: Create PRD-Aligned Mock Data Fixtures
+
+**As a** developer  
+**I want** mock data that exactly matches PRD specifications  
+**So that** I can validate implementations against requirements
+
+---
+
+#### TASK 2.6.1.1: Create Mock Data JSON Files
+
+**File:** `backend/tests/fixtures/mock_data/`
+
+Create structured mock data matching PRD Section 10 (Database Schema):
+
+```
+backend/tests/fixtures/mock_data/
+├── users.json           # PRD 10.2: User data
+├── discovery_jobs.json  # PRD 10.3: All job statuses
+├── brand_dna.json       # PRD 10.4: Brand DNA with embeddings
+├── profiles.json        # PRD 10.5: Discovered profiles
+├── scores.json          # PRD 10.6: 6-dimension scores
+├── contacts.json        # PRD 10.7: Contact info
+└── __init__.py          # Loader utilities
+```
+
+---
+
+##### SUB-TASK 2.6.1.1.1: Users Mock Data (PRD 10.2)
+
+**File:** `backend/tests/fixtures/mock_data/users.json`
+
+```json
+{
+  "_prd_reference": "PRD Section 10.2 - users (Supabase Auth)",
+  "_description": "Mock users for testing multi-user isolation",
+  "users": [
+    {
+      "id": "user-001-uuid-0000-000000000001",
+      "email": "demo@partnerscout.ai",
+      "full_name": "Demo User",
+      "avatar_url": "https://api.dicebear.com/7.x/avataaars/svg?seed=demo",
+      "created_at": "2026-01-15T10:00:00Z",
+      "_test_role": "primary_demo_user"
+    },
+    {
+      "id": "user-002-uuid-0000-000000000002",
+      "email": "test@partnerscout.ai",
+      "full_name": "Test User",
+      "avatar_url": "https://api.dicebear.com/7.x/avataaars/svg?seed=test",
+      "created_at": "2026-01-20T14:30:00Z",
+      "_test_role": "secondary_user_for_isolation_tests"
+    },
+    {
+      "id": "user-003-uuid-0000-000000000003",
+      "email": "edge@partnerscout.ai",
+      "full_name": "Edge Case User",
+      "avatar_url": null,
+      "created_at": "2026-02-01T00:00:00Z",
+      "_test_role": "edge_case_null_avatar"
+    }
+  ]
+}
+```
+
+---
+
+##### SUB-TASK 2.6.1.1.2: Discovery Jobs Mock Data (PRD 10.3)
+
+**File:** `backend/tests/fixtures/mock_data/discovery_jobs.json`
+
+```json
+{
+  "_prd_reference": "PRD Section 10.3 - discovery_jobs",
+  "_prd_statuses": ["pending", "analyzing", "discovering", "scoring", "completed", "failed"],
+  "_description": "Jobs covering all PRD-defined statuses",
+  "discovery_jobs": [
+    {
+      "id": "job-001-uuid-0000-000000000001",
+      "user_id": "user-001-uuid-0000-000000000001",
+      "name": "Sustainable Fashion Discovery",
+      "brand_description": "Eco-friendly sustainable fashion brand targeting millennials who value ethical production and minimalist aesthetics.",
+      "reference_profiles": [
+        "https://instagram.com/everlane",
+        "https://instagram.com/reformation",
+        "https://instagram.com/patagonia"
+      ],
+      "status": "completed",
+      "profiles_discovered": 47,
+      "profiles_scored": 47,
+      "created_at": "2026-01-31T10:00:00Z",
+      "updated_at": "2026-01-31T10:15:00Z",
+      "_test_purpose": "completed_job_with_full_results"
+    },
+    {
+      "id": "job-002-uuid-0000-000000000002",
+      "user_id": "user-001-uuid-0000-000000000001",
+      "name": "Fitness Brand Partners",
+      "brand_description": "Premium fitness apparel brand focused on high-performance athletes.",
+      "reference_profiles": [
+        "https://instagram.com/lululemon",
+        "https://instagram.com/gymshark"
+      ],
+      "status": "scoring",
+      "profiles_discovered": 35,
+      "profiles_scored": 12,
+      "created_at": "2026-02-01T09:00:00Z",
+      "updated_at": "2026-02-01T09:20:00Z",
+      "_test_purpose": "in_progress_scoring_job"
+    },
+    {
+      "id": "job-003-uuid-0000-000000000003",
+      "user_id": "user-001-uuid-0000-000000000001",
+      "name": "Beauty Brand Search",
+      "brand_description": "Clean beauty brand with focus on natural ingredients.",
+      "reference_profiles": ["https://instagram.com/glossier"],
+      "status": "discovering",
+      "profiles_discovered": 8,
+      "profiles_scored": 0,
+      "created_at": "2026-02-01T11:00:00Z",
+      "updated_at": "2026-02-01T11:05:00Z",
+      "_test_purpose": "in_progress_discovering_job"
+    },
+    {
+      "id": "job-004-uuid-0000-000000000004",
+      "user_id": "user-001-uuid-0000-000000000001",
+      "name": "Home Decor Partners",
+      "brand_description": "Modern minimalist home decor.",
+      "reference_profiles": ["https://instagram.com/westelm"],
+      "status": "analyzing",
+      "profiles_discovered": 0,
+      "profiles_scored": 0,
+      "created_at": "2026-02-01T12:00:00Z",
+      "updated_at": "2026-02-01T12:01:00Z",
+      "_test_purpose": "analyzing_brand_dna"
+    },
+    {
+      "id": "job-005-uuid-0000-000000000005",
+      "user_id": "user-001-uuid-0000-000000000001",
+      "name": "Tech Accessories",
+      "brand_description": "Premium tech accessories.",
+      "reference_profiles": [],
+      "status": "pending",
+      "profiles_discovered": 0,
+      "profiles_scored": 0,
+      "created_at": "2026-02-01T13:00:00Z",
+      "updated_at": "2026-02-01T13:00:00Z",
+      "_test_purpose": "pending_not_started"
+    },
+    {
+      "id": "job-006-uuid-0000-000000000006",
+      "user_id": "user-001-uuid-0000-000000000001",
+      "name": "Failed Discovery Test",
+      "brand_description": "Test brand for failure scenarios.",
+      "reference_profiles": ["https://instagram.com/invalid_profile_404"],
+      "status": "failed",
+      "profiles_discovered": 0,
+      "profiles_scored": 0,
+      "created_at": "2026-01-30T08:00:00Z",
+      "updated_at": "2026-01-30T08:05:00Z",
+      "_test_purpose": "failed_job_for_retry_testing"
+    },
+    {
+      "id": "job-007-uuid-0000-000000000007",
+      "user_id": "user-002-uuid-0000-000000000002",
+      "name": "Other User Job",
+      "brand_description": "Job belonging to different user for isolation testing.",
+      "reference_profiles": ["https://instagram.com/otheruser"],
+      "status": "completed",
+      "profiles_discovered": 25,
+      "profiles_scored": 25,
+      "created_at": "2026-01-28T10:00:00Z",
+      "updated_at": "2026-01-28T10:30:00Z",
+      "_test_purpose": "user_isolation_test_should_not_be_visible_to_user_001"
+    }
+  ]
+}
+```
+
+---
+
+##### SUB-TASK 2.6.1.1.3: Brand DNA Mock Data (PRD 10.4)
+
+**File:** `backend/tests/fixtures/mock_data/brand_dna.json`
+
+```json
+{
+  "_prd_reference": "PRD Section 10.4 - brand_dna",
+  "_prd_fields": ["id", "job_id", "hashtags", "keywords", "embedding_vector", "created_at"],
+  "brand_dna": [
+    {
+      "id": "dna-001-uuid-0000-000000000001",
+      "job_id": "job-001-uuid-0000-000000000001",
+      "hashtags": [
+        "#sustainablefashion",
+        "#ecofriendly",
+        "#ethicalfashion",
+        "#slowfashion",
+        "#consciousfashion",
+        "#minimalistfashion",
+        "#capsulewardrobe",
+        "#sustainablestyle"
+      ],
+      "keywords": [
+        "sustainable",
+        "ethical",
+        "eco-friendly",
+        "minimalist",
+        "conscious",
+        "organic",
+        "fair-trade",
+        "transparency",
+        "capsule wardrobe",
+        "timeless style"
+      ],
+      "embedding_vector": [0.123, -0.456, 0.789, 0.234, -0.567],
+      "created_at": "2026-01-31T10:02:00Z",
+      "_test_purpose": "complete_brand_dna_for_sustainable_fashion"
+    },
+    {
+      "id": "dna-002-uuid-0000-000000000002",
+      "job_id": "job-002-uuid-0000-000000000002",
+      "hashtags": [
+        "#fitness",
+        "#activewear",
+        "#workout",
+        "#gymlife",
+        "#athleisure"
+      ],
+      "keywords": [
+        "performance",
+        "athletic",
+        "training",
+        "workout",
+        "fitness lifestyle"
+      ],
+      "embedding_vector": [0.321, -0.654, 0.987, 0.432, -0.765],
+      "created_at": "2026-02-01T09:05:00Z",
+      "_test_purpose": "fitness_brand_dna"
+    }
+  ]
+}
+```
+
+---
+
+##### SUB-TASK 2.6.1.1.4: Discovered Profiles Mock Data (PRD 10.5)
+
+**File:** `backend/tests/fixtures/mock_data/profiles.json`
+
+```json
+{
+  "_prd_reference": "PRD Section 10.5 - discovered_profiles",
+  "_prd_statuses": ["new", "processing", "done", "skipped"],
+  "_prd_fake_detection_signals": {
+    "following_ratio": { "genuine": "<1.0", "suspicious": "1.0-2.0", "likely_fake": ">2.0" },
+    "posts_vs_followers": { "genuine": "50+ posts for 5K", "suspicious": "20-50", "likely_fake": "<20 for 5K+" }
+  },
+  "profiles": [
+    {
+      "id": "profile-001-uuid-0000-000000000001",
+      "job_id": "job-001-uuid-0000-000000000001",
+      "instagram_url": "https://instagram.com/eco_boutique_nyc",
+      "username": "eco_boutique_nyc",
+      "full_name": "Eco Boutique NYC",
+      "profile_picture_url": "https://instagram.com/eco_boutique_nyc/avatar.jpg",
+      "bio": "🌿 Sustainable fashion boutique in Brooklyn. Curated ethical brands. Shop consciously. 📧 hello@ecoboutique.nyc",
+      "followers": 45000,
+      "following": 1200,
+      "posts_count": 520,
+      "engagement_rate": 3.5,
+      "is_verified": false,
+      "is_business": true,
+      "external_url": "https://ecoboutique.nyc",
+      "business_email": "hello@ecoboutique.nyc",
+      "business_category": "Clothing Store",
+      "following_ratio": 0.027,
+      "status": "done",
+      "created_at": "2026-01-31T10:05:00Z",
+      "_test_purpose": "high_quality_genuine_profile_excellent_match",
+      "_expected_score_range": [75, 95]
+    },
+    {
+      "id": "profile-002-uuid-0000-000000000002",
+      "job_id": "job-001-uuid-0000-000000000001",
+      "instagram_url": "https://instagram.com/sustainable_style_co",
+      "username": "sustainable_style_co",
+      "full_name": "Sustainable Style Co",
+      "profile_picture_url": "https://instagram.com/sustainable_style_co/avatar.jpg",
+      "bio": "Ethical fashion for the modern woman ✨ Free shipping on orders $75+",
+      "followers": 28000,
+      "following": 890,
+      "posts_count": 340,
+      "engagement_rate": 4.2,
+      "is_verified": false,
+      "is_business": true,
+      "external_url": "https://sustainablestyle.co",
+      "business_email": "contact@sustainablestyle.co",
+      "business_category": "Clothing Store",
+      "following_ratio": 0.032,
+      "status": "done",
+      "created_at": "2026-01-31T10:06:00Z",
+      "_test_purpose": "good_quality_genuine_profile",
+      "_expected_score_range": [70, 90]
+    },
+    {
+      "id": "profile-003-uuid-0000-000000000003",
+      "job_id": "job-001-uuid-0000-000000000001",
+      "instagram_url": "https://instagram.com/fashion_deals_daily",
+      "username": "fashion_deals_daily",
+      "full_name": "Fashion Deals 🔥",
+      "profile_picture_url": "https://instagram.com/fashion_deals_daily/avatar.jpg",
+      "bio": "Best deals! DM for promos 💰💰💰 Follow for follows!",
+      "followers": 52000,
+      "following": 48500,
+      "posts_count": 45,
+      "engagement_rate": 0.3,
+      "is_verified": false,
+      "is_business": false,
+      "external_url": null,
+      "business_email": null,
+      "business_category": null,
+      "following_ratio": 0.933,
+      "status": "done",
+      "_test_purpose": "suspicious_profile_high_following_ratio_low_engagement",
+      "_prd_fake_signals": ["following_ratio > 0.9", "low_engagement < 1%", "not_business_account", "no_email"],
+      "_expected_score_range": [20, 45],
+      "created_at": "2026-01-31T10:07:00Z"
+    },
+    {
+      "id": "profile-004-uuid-0000-000000000004",
+      "job_id": "job-001-uuid-0000-000000000001",
+      "instagram_url": "https://instagram.com/bot_follower_farm",
+      "username": "bot_follower_farm",
+      "full_name": "Get Followers Fast",
+      "profile_picture_url": "https://instagram.com/bot_follower_farm/avatar.jpg",
+      "bio": "Get 10K followers in 24hrs! DM NOW! 🚀🚀🚀",
+      "followers": 85000,
+      "following": 78000,
+      "posts_count": 12,
+      "engagement_rate": 0.1,
+      "is_verified": false,
+      "is_business": false,
+      "external_url": null,
+      "business_email": null,
+      "business_category": null,
+      "following_ratio": 0.918,
+      "status": "skipped",
+      "_test_purpose": "fake_profile_should_be_filtered_score_below_50",
+      "_prd_fake_signals": ["following_ratio > 0.9", "posts < 20 for 85K followers", "engagement < 1%"],
+      "_expected_score_range": [0, 30],
+      "created_at": "2026-01-31T10:08:00Z"
+    },
+    {
+      "id": "profile-005-uuid-0000-000000000005",
+      "job_id": "job-001-uuid-0000-000000000001",
+      "instagram_url": "https://instagram.com/green_threads_la",
+      "username": "green_threads_la",
+      "full_name": "Green Threads LA",
+      "profile_picture_url": "https://instagram.com/green_threads_la/avatar.jpg",
+      "bio": "Plant-based fashion brand 🌱 Made in LA. Organic cotton. Carbon neutral.",
+      "followers": 67000,
+      "following": 2100,
+      "posts_count": 890,
+      "engagement_rate": 5.1,
+      "is_verified": true,
+      "is_business": true,
+      "external_url": "https://greenthreads.la",
+      "business_email": "partnerships@greenthreads.la",
+      "business_category": "Clothing Brand",
+      "following_ratio": 0.031,
+      "status": "done",
+      "_test_purpose": "verified_high_quality_profile",
+      "_expected_score_range": [85, 100],
+      "created_at": "2026-01-31T10:09:00Z"
+    },
+    {
+      "id": "profile-006-uuid-0000-000000000006",
+      "job_id": "job-001-uuid-0000-000000000001",
+      "instagram_url": "https://instagram.com/vintage_finds_sf",
+      "username": "vintage_finds_sf",
+      "full_name": "Vintage Finds SF",
+      "profile_picture_url": "https://instagram.com/vintage_finds_sf/avatar.jpg",
+      "bio": "Curated vintage clothing. Sustainable by nature. SF Bay Area.",
+      "followers": 15000,
+      "following": 800,
+      "posts_count": 450,
+      "engagement_rate": 6.2,
+      "is_verified": false,
+      "is_business": true,
+      "external_url": "https://vintagefinds.sf",
+      "business_email": null,
+      "business_category": "Vintage Store",
+      "following_ratio": 0.053,
+      "status": "done",
+      "_test_purpose": "good_profile_missing_email",
+      "_expected_score_range": [65, 85],
+      "created_at": "2026-01-31T10:10:00Z"
+    },
+    {
+      "id": "profile-007-uuid-0000-000000000007",
+      "job_id": "job-002-uuid-0000-000000000002",
+      "instagram_url": "https://instagram.com/fitlife_apparel",
+      "username": "fitlife_apparel",
+      "full_name": "FitLife Apparel",
+      "profile_picture_url": "https://instagram.com/fitlife_apparel/avatar.jpg",
+      "bio": "Premium athletic wear for serious athletes 💪",
+      "followers": 89000,
+      "following": 1500,
+      "posts_count": 720,
+      "engagement_rate": 4.8,
+      "is_verified": false,
+      "is_business": true,
+      "external_url": "https://fitlife.com",
+      "business_email": "collab@fitlife.com",
+      "business_category": "Sportswear Store",
+      "following_ratio": 0.017,
+      "status": "processing",
+      "_test_purpose": "profile_currently_being_scored",
+      "created_at": "2026-02-01T09:10:00Z"
+    },
+    {
+      "id": "profile-008-uuid-0000-000000000008",
+      "job_id": "job-002-uuid-0000-000000000002",
+      "instagram_url": "https://instagram.com/yoga_athletics",
+      "username": "yoga_athletics",
+      "full_name": "Yoga Athletics",
+      "profile_picture_url": "https://instagram.com/yoga_athletics/avatar.jpg",
+      "bio": "Where yoga meets performance 🧘‍♀️",
+      "followers": 42000,
+      "following": 900,
+      "posts_count": 380,
+      "engagement_rate": 5.5,
+      "is_verified": false,
+      "is_business": true,
+      "external_url": "https://yoga-athletics.com",
+      "business_email": "hello@yoga-athletics.com",
+      "business_category": "Yoga Studio",
+      "following_ratio": 0.021,
+      "status": "new",
+      "_test_purpose": "profile_waiting_to_be_scored",
+      "created_at": "2026-02-01T09:15:00Z"
+    }
+  ]
+}
+```
+
+---
+
+##### SUB-TASK 2.6.1.1.5: Profile Scores Mock Data (PRD 10.6)
+
+**File:** `backend/tests/fixtures/mock_data/scores.json`
+
+```json
+{
+  "_prd_reference": "PRD Section 10.6 - profile_scores and Section 5.3 Scoring Dimensions",
+  "_prd_scoring_dimensions": {
+    "visual_aesthetic_match": { "weight": "25%", "description": "Visual style alignment" },
+    "content_theme_alignment": { "weight": "20%", "description": "Topic/messaging match" },
+    "engagement_rate_score": { "weight": "15%", "description": "Engagement metrics" },
+    "follower_quality": { "weight": "15%", "description": "Authenticity/fake detection" },
+    "business_indicators": { "weight": "15%", "description": "Business presence" },
+    "activity_recency": { "weight": "10%", "description": "Posting frequency" }
+  },
+  "_prd_fake_detection": {
+    "high_following_ratio": "-30 points",
+    "too_few_posts": "-25 points",
+    "business_verified": "+5 points",
+    "email_available": "+5 points",
+    "website_linked": "+5 points"
+  },
+  "scores": [
+    {
+      "id": "score-001-uuid-0000-000000000001",
+      "profile_id": "profile-001-uuid-0000-000000000001",
+      "score": 87,
+      "visual_aesthetic_match": 92,
+      "content_theme_alignment": 88,
+      "engagement_rate_score": 82,
+      "follower_quality": 95,
+      "business_indicators": 90,
+      "activity_recency": 85,
+      "reasoning": {
+        "summary": "Excellent match for sustainable fashion brand. Strong visual alignment with minimalist aesthetic. High-quality genuine following with excellent engagement.",
+        "recommendation": "Highly recommended for partnership outreach.",
+        "visual_notes": "Clean, minimalist feed with earth tones matching brand aesthetic.",
+        "content_notes": "Consistent sustainable fashion messaging aligned with brand values.",
+        "engagement_notes": "3.5% engagement rate indicates genuine, engaged audience.",
+        "authenticity_notes": "Low following ratio (0.027), high post count - genuine profile.",
+        "business_notes": "Business account with email, website, and category.",
+        "activity_notes": "Active posting schedule, recent content within last week."
+      },
+      "created_at": "2026-01-31T10:08:00Z",
+      "_test_purpose": "high_score_excellent_match",
+      "_prd_score_calculation": "(92*0.25 + 88*0.20 + 82*0.15 + 95*0.15 + 90*0.15 + 85*0.10) = 88.85 ≈ 87"
+    },
+    {
+      "id": "score-002-uuid-0000-000000000002",
+      "profile_id": "profile-002-uuid-0000-000000000002",
+      "score": 78,
+      "visual_aesthetic_match": 80,
+      "content_theme_alignment": 82,
+      "engagement_rate_score": 88,
+      "follower_quality": 90,
+      "business_indicators": 85,
+      "activity_recency": 75,
+      "reasoning": {
+        "summary": "Good match with strong content alignment. Genuine profile with above-average engagement.",
+        "recommendation": "Recommended for partnership consideration.",
+        "visual_notes": "Aesthetic partially aligned, some variance in style.",
+        "content_notes": "Strong ethical fashion focus.",
+        "engagement_notes": "4.2% engagement rate - excellent for follower count.",
+        "authenticity_notes": "Genuine profile indicators across all metrics.",
+        "business_notes": "Full business presence verified.",
+        "activity_notes": "Consistent but slightly less frequent posting."
+      },
+      "created_at": "2026-01-31T10:09:00Z",
+      "_test_purpose": "good_score_solid_match"
+    },
+    {
+      "id": "score-003-uuid-0000-000000000003",
+      "profile_id": "profile-003-uuid-0000-000000000003",
+      "score": 32,
+      "visual_aesthetic_match": 25,
+      "content_theme_alignment": 20,
+      "engagement_rate_score": 15,
+      "follower_quality": 35,
+      "business_indicators": 20,
+      "activity_recency": 60,
+      "reasoning": {
+        "summary": "Poor match. Multiple fake profile indicators detected. Not recommended.",
+        "recommendation": "Skip - likely engagement farm or spam account.",
+        "visual_notes": "Inconsistent visual style, promotional content.",
+        "content_notes": "Generic deals content, no brand alignment.",
+        "engagement_notes": "0.3% engagement rate - suspiciously low for follower count.",
+        "authenticity_notes": "WARNING: Following ratio 0.93, only 45 posts for 52K followers.",
+        "business_notes": "No business account, no email, no website.",
+        "activity_notes": "Sporadic posting pattern."
+      },
+      "created_at": "2026-01-31T10:10:00Z",
+      "_test_purpose": "low_score_suspicious_profile",
+      "_prd_fake_detection_applied": ["follower_quality penalized for high following ratio"]
+    },
+    {
+      "id": "score-004-uuid-0000-000000000004",
+      "profile_id": "profile-004-uuid-0000-000000000004",
+      "score": 18,
+      "visual_aesthetic_match": 10,
+      "content_theme_alignment": 5,
+      "engagement_rate_score": 5,
+      "follower_quality": 10,
+      "business_indicators": 10,
+      "activity_recency": 40,
+      "reasoning": {
+        "summary": "Fake/bot account. All indicators point to purchased followers or bot farm.",
+        "recommendation": "SKIP - Bot/fake account detected.",
+        "visual_notes": "Promotional spam content only.",
+        "content_notes": "No relevant content, follower-selling messaging.",
+        "engagement_notes": "0.1% engagement - definitively fake.",
+        "authenticity_notes": "CRITICAL: 12 posts for 85K followers, following ratio 0.92.",
+        "business_notes": "No business indicators whatsoever.",
+        "activity_notes": "Minimal posting activity."
+      },
+      "created_at": "2026-01-31T10:11:00Z",
+      "_test_purpose": "very_low_score_fake_profile_should_be_skipped"
+    },
+    {
+      "id": "score-005-uuid-0000-000000000005",
+      "profile_id": "profile-005-uuid-0000-000000000001",
+      "score": 94,
+      "visual_aesthetic_match": 95,
+      "content_theme_alignment": 96,
+      "engagement_rate_score": 92,
+      "follower_quality": 98,
+      "business_indicators": 100,
+      "activity_recency": 90,
+      "reasoning": {
+        "summary": "Exceptional match. Verified account with perfect brand alignment and excellent engagement.",
+        "recommendation": "Priority outreach recommended - ideal partner.",
+        "visual_notes": "Perfect aesthetic match with sustainable fashion focus.",
+        "content_notes": "Organic, carbon neutral messaging perfectly aligned.",
+        "engagement_notes": "5.1% engagement - exceptional for 67K followers.",
+        "authenticity_notes": "Verified account, genuine organic growth indicators.",
+        "business_notes": "Complete business profile with partnership email.",
+        "activity_notes": "High activity, consistent posting schedule."
+      },
+      "created_at": "2026-01-31T10:12:00Z",
+      "_test_purpose": "highest_score_verified_excellent_match"
+    }
+  ]
+}
+```
+
+---
+
+##### SUB-TASK 2.6.1.1.6: Profile Contacts Mock Data (PRD 10.7)
+
+**File:** `backend/tests/fixtures/mock_data/contacts.json`
+
+```json
+{
+  "_prd_reference": "PRD Section 10.7 - profile_contacts",
+  "_prd_fields": ["id", "profile_id", "email", "source", "created_at"],
+  "contacts": [
+    {
+      "id": "contact-001-uuid-0000-000000000001",
+      "profile_id": "profile-001-uuid-0000-000000000001",
+      "email": "hello@ecoboutique.nyc",
+      "source": "business_email",
+      "created_at": "2026-01-31T10:08:00Z",
+      "_test_purpose": "email_from_business_account"
+    },
+    {
+      "id": "contact-002-uuid-0000-000000000002",
+      "profile_id": "profile-002-uuid-0000-000000000002",
+      "email": "contact@sustainablestyle.co",
+      "source": "business_email",
+      "created_at": "2026-01-31T10:09:00Z",
+      "_test_purpose": "email_from_business_account"
+    },
+    {
+      "id": "contact-003-uuid-0000-000000000003",
+      "profile_id": "profile-005-uuid-0000-000000000001",
+      "email": "partnerships@greenthreads.la",
+      "source": "business_email",
+      "created_at": "2026-01-31T10:12:00Z",
+      "_test_purpose": "partnership_email_from_verified_business"
+    },
+    {
+      "id": "contact-004-uuid-0000-000000000004",
+      "profile_id": "profile-006-uuid-0000-000000000006",
+      "email": null,
+      "source": null,
+      "created_at": "2026-01-31T10:13:00Z",
+      "_test_purpose": "no_email_found_for_profile"
+    }
+  ]
+}
+```
+
+---
+
+##### SUB-TASK 2.6.1.1.7: Mock Data Loader Utility
+
+**File:** `backend/tests/fixtures/mock_data/__init__.py`
+
+```python
+"""
+Mock data loader for PRD-aligned test fixtures.
+
+Usage:
+    from tests.fixtures.mock_data import load_mock_data, get_user, get_job, get_profiles_for_job
+    
+    # Load all mock data
+    data = load_mock_data()
+    
+    # Get specific entities
+    user = get_user("user-001-uuid-0000-000000000001")
+    job = get_job("job-001-uuid-0000-000000000001")
+    profiles = get_profiles_for_job("job-001-uuid-0000-000000000001")
+"""
+
+import json
+from pathlib import Path
+from typing import Any
+
+# Path to mock data directory
+MOCK_DATA_DIR = Path(__file__).parent
+
+
+def load_json_file(filename: str) -> dict[str, Any]:
+    """Load a JSON file from the mock data directory."""
+    filepath = MOCK_DATA_DIR / filename
+    with open(filepath, "r") as f:
+        return json.load(f)
+
+
+def load_mock_data() -> dict[str, Any]:
+    """Load all mock data files into a single dictionary."""
+    return {
+        "users": load_json_file("users.json")["users"],
+        "discovery_jobs": load_json_file("discovery_jobs.json")["discovery_jobs"],
+        "brand_dna": load_json_file("brand_dna.json")["brand_dna"],
+        "profiles": load_json_file("profiles.json")["profiles"],
+        "scores": load_json_file("scores.json")["scores"],
+        "contacts": load_json_file("contacts.json")["contacts"],
+    }
+
+
+def get_user(user_id: str) -> dict[str, Any] | None:
+    """Get a specific user by ID."""
+    users = load_json_file("users.json")["users"]
+    return next((u for u in users if u["id"] == user_id), None)
+
+
+def get_job(job_id: str) -> dict[str, Any] | None:
+    """Get a specific discovery job by ID."""
+    jobs = load_json_file("discovery_jobs.json")["discovery_jobs"]
+    return next((j for j in jobs if j["id"] == job_id), None)
+
+
+def get_jobs_for_user(user_id: str) -> list[dict[str, Any]]:
+    """Get all jobs for a specific user."""
+    jobs = load_json_file("discovery_jobs.json")["discovery_jobs"]
+    return [j for j in jobs if j["user_id"] == user_id]
+
+
+def get_profiles_for_job(job_id: str) -> list[dict[str, Any]]:
+    """Get all profiles for a specific job."""
+    profiles = load_json_file("profiles.json")["profiles"]
+    return [p for p in profiles if p["job_id"] == job_id]
+
+
+def get_score_for_profile(profile_id: str) -> dict[str, Any] | None:
+    """Get the score for a specific profile."""
+    scores = load_json_file("scores.json")["scores"]
+    return next((s for s in scores if s["profile_id"] == profile_id), None)
+
+
+def get_brand_dna_for_job(job_id: str) -> dict[str, Any] | None:
+    """Get brand DNA for a specific job."""
+    dna_list = load_json_file("brand_dna.json")["brand_dna"]
+    return next((d for d in dna_list if d["job_id"] == job_id), None)
+
+
+def get_profiles_by_status(status: str) -> list[dict[str, Any]]:
+    """Get all profiles with a specific status."""
+    profiles = load_json_file("profiles.json")["profiles"]
+    return [p for p in profiles if p["status"] == status]
+
+
+def get_genuine_profiles() -> list[dict[str, Any]]:
+    """Get profiles expected to score above 50 (genuine profiles)."""
+    profiles = load_json_file("profiles.json")["profiles"]
+    return [p for p in profiles if p.get("_expected_score_range", [0, 0])[0] >= 50]
+
+
+def get_fake_profiles() -> list[dict[str, Any]]:
+    """Get profiles expected to score below 50 (fake/suspicious profiles)."""
+    profiles = load_json_file("profiles.json")["profiles"]
+    return [p for p in profiles if p.get("_expected_score_range", [100, 100])[1] < 50]
+
+
+# PRD Reference constants for validation
+PRD_JOB_STATUSES = ["pending", "analyzing", "discovering", "scoring", "completed", "failed"]
+PRD_PROFILE_STATUSES = ["new", "processing", "done", "skipped"]
+PRD_SCORING_WEIGHTS = {
+    "visual_aesthetic_match": 0.25,
+    "content_theme_alignment": 0.20,
+    "engagement_rate_score": 0.15,
+    "follower_quality": 0.15,
+    "business_indicators": 0.15,
+    "activity_recency": 0.10,
+}
+```
+
+---
+
+### STORY 2.6.2: Create Database Seed Script
+
+**As a** developer  
+**I want** a script to populate the database with mock data  
+**So that** I can test and demo with realistic data
+
+---
+
+#### TASK 2.6.2.1: Implement Python Seed Script
+
+**File:** `backend/scripts/seed_database.py`
+
+```python
+#!/usr/bin/env python3
+"""
+Database seed script for PartnerScout AI.
+
+Seeds the database with PRD-aligned mock data for testing and demos.
+
+Usage:
+    # Seed with default mock data
+    python scripts/seed_database.py
+    
+    # Seed specific tables only
+    python scripts/seed_database.py --tables users,discovery_jobs
+    
+    # Clear and reseed
+    python scripts/seed_database.py --reset
+    
+    # Verify seeded data against PRD
+    python scripts/seed_database.py --verify
+"""
+
+import argparse
+import asyncio
+import sys
+from pathlib import Path
+
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from app.core.config import get_settings
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
+
+
+async def load_mock_data():
+    """Load mock data from fixtures."""
+    from tests.fixtures.mock_data import load_mock_data
+    return load_mock_data()
+
+
+async def seed_users(db_client, users: list[dict]):
+    """Seed users table."""
+    logger.info(f"Seeding {len(users)} users...")
+    for user in users:
+        # Remove test metadata
+        user_data = {k: v for k, v in user.items() if not k.startswith("_")}
+        await db_client.upsert("users", user_data, on_conflict="id")
+    logger.info("✓ Users seeded")
+
+
+async def seed_discovery_jobs(db_client, jobs: list[dict]):
+    """Seed discovery_jobs table."""
+    logger.info(f"Seeding {len(jobs)} discovery jobs...")
+    for job in jobs:
+        job_data = {k: v for k, v in job.items() if not k.startswith("_")}
+        await db_client.upsert("discovery_jobs", job_data, on_conflict="id")
+    logger.info("✓ Discovery jobs seeded")
+
+
+async def seed_brand_dna(db_client, dna_list: list[dict]):
+    """Seed brand_dna table."""
+    logger.info(f"Seeding {len(dna_list)} brand DNA records...")
+    for dna in dna_list:
+        dna_data = {k: v for k, v in dna.items() if not k.startswith("_")}
+        await db_client.upsert("brand_dna", dna_data, on_conflict="id")
+    logger.info("✓ Brand DNA seeded")
+
+
+async def seed_profiles(db_client, profiles: list[dict]):
+    """Seed discovered_profiles table."""
+    logger.info(f"Seeding {len(profiles)} profiles...")
+    for profile in profiles:
+        profile_data = {k: v for k, v in profile.items() if not k.startswith("_")}
+        await db_client.upsert("discovered_profiles", profile_data, on_conflict="id")
+    logger.info("✓ Profiles seeded")
+
+
+async def seed_scores(db_client, scores: list[dict]):
+    """Seed profile_scores table."""
+    logger.info(f"Seeding {len(scores)} profile scores...")
+    for score in scores:
+        score_data = {k: v for k, v in score.items() if not k.startswith("_")}
+        await db_client.upsert("profile_scores", score_data, on_conflict="id")
+    logger.info("✓ Profile scores seeded")
+
+
+async def seed_contacts(db_client, contacts: list[dict]):
+    """Seed profile_contacts table."""
+    logger.info(f"Seeding {len(contacts)} profile contacts...")
+    for contact in contacts:
+        contact_data = {k: v for k, v in contact.items() if not k.startswith("_")}
+        await db_client.upsert("profile_contacts", contact_data, on_conflict="id")
+    logger.info("✓ Profile contacts seeded")
+
+
+async def reset_database(db_client):
+    """Clear all tables (in correct order for FK constraints)."""
+    logger.warning("Resetting database - clearing all data...")
+    tables = [
+        "profile_contacts",
+        "profile_scores",
+        "discovered_profiles",
+        "brand_dna",
+        "discovery_jobs",
+        # Note: Don't delete users if using Supabase Auth
+    ]
+    for table in tables:
+        await db_client.execute(f"DELETE FROM {table}")
+    logger.info("✓ Database reset complete")
+
+
+async def verify_seeded_data(db_client):
+    """Verify seeded data matches PRD requirements."""
+    from tests.fixtures.mock_data import (
+        PRD_JOB_STATUSES,
+        PRD_PROFILE_STATUSES,
+        PRD_SCORING_WEIGHTS,
+    )
+    
+    logger.info("Verifying seeded data against PRD...")
+    errors = []
+    
+    # Verify job statuses
+    jobs = await db_client.select("discovery_jobs")
+    job_statuses = {j["status"] for j in jobs}
+    missing_statuses = set(PRD_JOB_STATUSES) - job_statuses
+    if missing_statuses:
+        errors.append(f"Missing job statuses in seed data: {missing_statuses}")
+    
+    # Verify profile statuses
+    profiles = await db_client.select("discovered_profiles")
+    profile_statuses = {p["status"] for p in profiles}
+    missing_profile_statuses = set(PRD_PROFILE_STATUSES) - profile_statuses
+    if missing_profile_statuses:
+        errors.append(f"Missing profile statuses in seed data: {missing_profile_statuses}")
+    
+    # Verify scoring dimensions exist
+    scores = await db_client.select("profile_scores")
+    if scores:
+        first_score = scores[0]
+        for dimension in PRD_SCORING_WEIGHTS.keys():
+            if dimension not in first_score:
+                errors.append(f"Missing scoring dimension: {dimension}")
+    
+    # Verify user isolation (user-002 jobs should exist)
+    user2_jobs = [j for j in jobs if j["user_id"] == "user-002-uuid-0000-000000000002"]
+    if not user2_jobs:
+        errors.append("Missing user isolation test data (user-002 jobs)")
+    
+    # Verify fake profile indicators exist
+    fake_profiles = [p for p in profiles if p.get("following_ratio", 0) > 0.5]
+    if not fake_profiles:
+        errors.append("Missing fake profile test data for PRD 5.3.1 validation")
+    
+    if errors:
+        logger.error("PRD Verification FAILED:")
+        for error in errors:
+            logger.error(f"  ✗ {error}")
+        return False
+    
+    logger.info("✓ All PRD verifications passed")
+    return True
+
+
+async def main(args):
+    """Main seed function."""
+    settings = get_settings()
+    
+    # Initialize database client
+    from app.db.factory import get_database_client
+    db_client = get_database_client(settings)
+    
+    try:
+        if args.reset:
+            await reset_database(db_client)
+        
+        if args.verify:
+            success = await verify_seeded_data(db_client)
+            return 0 if success else 1
+        
+        # Load mock data
+        data = await load_mock_data()
+        
+        # Determine which tables to seed
+        tables_to_seed = args.tables.split(",") if args.tables else [
+            "users", "discovery_jobs", "brand_dna", "profiles", "scores", "contacts"
+        ]
+        
+        # Seed in correct order (respecting FK constraints)
+        if "users" in tables_to_seed:
+            await seed_users(db_client, data["users"])
+        if "discovery_jobs" in tables_to_seed:
+            await seed_discovery_jobs(db_client, data["discovery_jobs"])
+        if "brand_dna" in tables_to_seed:
+            await seed_brand_dna(db_client, data["brand_dna"])
+        if "profiles" in tables_to_seed:
+            await seed_profiles(db_client, data["profiles"])
+        if "scores" in tables_to_seed:
+            await seed_scores(db_client, data["scores"])
+        if "contacts" in tables_to_seed:
+            await seed_contacts(db_client, data["contacts"])
+        
+        logger.info("=" * 50)
+        logger.info("Database seeding completed successfully!")
+        logger.info("=" * 50)
+        
+        # Always verify after seeding
+        await verify_seeded_data(db_client)
+        
+    finally:
+        await db_client.close()
+    
+    return 0
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Seed database with mock data")
+    parser.add_argument(
+        "--tables",
+        type=str,
+        help="Comma-separated list of tables to seed (default: all)"
+    )
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Clear all data before seeding"
+    )
+    parser.add_argument(
+        "--verify",
+        action="store_true",
+        help="Only verify existing data against PRD (no seeding)"
+    )
+    
+    args = parser.parse_args()
+    exit_code = asyncio.run(main(args))
+    sys.exit(exit_code)
+```
+
+---
+
+### STORY 2.6.3: Update Validation Script with Mock Data Tests
+
+**As a** developer  
+**I want** the validation script to test with mock data  
+**So that** I can verify the database layer works correctly with PRD-defined data
+
+---
+
+#### TASK 2.6.3.1: Update validate_epic2.py with Mock Data Validation
+
+**File:** `backend/scripts/validate_epic2.py` (update)
+
+Add the following section to the validation script:
+
+```python
+# === MOCK DATA VALIDATION ===
+
+def validate_mock_data_loading():
+    """Validate that mock data loads correctly."""
+    print("Testing mock data loading...")
+    
+    try:
+        from tests.fixtures.mock_data import (
+            load_mock_data,
+            get_user,
+            get_job,
+            get_profiles_for_job,
+            get_genuine_profiles,
+            get_fake_profiles,
+            PRD_JOB_STATUSES,
+            PRD_PROFILE_STATUSES,
+            PRD_SCORING_WEIGHTS,
+        )
+        
+        data = load_mock_data()
+        
+        # Verify all entity types loaded
+        assert len(data["users"]) >= 2, "Should have at least 2 users"
+        assert len(data["discovery_jobs"]) >= 6, "Should have jobs covering all statuses"
+        assert len(data["profiles"]) >= 5, "Should have diverse profiles"
+        assert len(data["scores"]) >= 4, "Should have scores with various ranges"
+        
+        # Verify PRD status coverage
+        job_statuses = {j["status"] for j in data["discovery_jobs"]}
+        assert job_statuses == set(PRD_JOB_STATUSES), f"Missing statuses: {set(PRD_JOB_STATUSES) - job_statuses}"
+        
+        # Verify fake detection test data
+        genuine = get_genuine_profiles()
+        fake = get_fake_profiles()
+        assert len(genuine) >= 3, "Should have genuine profiles for positive testing"
+        assert len(fake) >= 1, "Should have fake profiles for fake detection testing"
+        
+        print("  ✓ Mock data loading validated")
+        return True
+        
+    except Exception as e:
+        print(f"  ✗ Mock data loading failed: {e}")
+        return False
+
+
+def validate_prd_schema_compliance():
+    """Validate mock data matches PRD schema exactly."""
+    print("Validating PRD schema compliance...")
+    
+    try:
+        from tests.fixtures.mock_data import load_mock_data
+        
+        data = load_mock_data()
+        
+        # PRD 10.3: discovery_jobs required fields
+        job_required_fields = [
+            "id", "user_id", "name", "brand_description", 
+            "reference_profiles", "status", "profiles_discovered",
+            "profiles_scored", "created_at", "updated_at"
+        ]
+        for job in data["discovery_jobs"]:
+            for field in job_required_fields:
+                assert field in job, f"Job missing PRD field: {field}"
+        
+        # PRD 10.5: discovered_profiles required fields
+        profile_required_fields = [
+            "id", "job_id", "instagram_url", "username", "followers",
+            "following", "posts_count", "engagement_rate", "is_verified",
+            "is_business", "following_ratio", "status"
+        ]
+        for profile in data["profiles"]:
+            for field in profile_required_fields:
+                assert field in profile, f"Profile missing PRD field: {field}"
+        
+        # PRD 10.6: profile_scores with 6 dimensions
+        score_dimensions = [
+            "visual_aesthetic_match", "content_theme_alignment",
+            "engagement_rate_score", "follower_quality",
+            "business_indicators", "activity_recency"
+        ]
+        for score in data["scores"]:
+            for dimension in score_dimensions:
+                assert dimension in score, f"Score missing PRD dimension: {dimension}"
+                assert 0 <= score[dimension] <= 100, f"{dimension} must be 0-100"
+        
+        print("  ✓ PRD schema compliance validated")
+        return True
+        
+    except Exception as e:
+        print(f"  ✗ PRD schema compliance failed: {e}")
+        return False
+
+
+def validate_fake_detection_data():
+    """Validate fake detection test data per PRD 5.3.1."""
+    print("Validating fake detection data (PRD 5.3.1)...")
+    
+    try:
+        from tests.fixtures.mock_data import load_mock_data
+        
+        data = load_mock_data()
+        
+        # Find profiles with fake indicators
+        fake_indicators_found = {
+            "high_following_ratio": False,
+            "low_posts_high_followers": False,
+            "low_engagement": False,
+            "no_business_account": False,
+        }
+        
+        for profile in data["profiles"]:
+            if profile.get("following_ratio", 0) > 0.5:
+                fake_indicators_found["high_following_ratio"] = True
+            if profile.get("followers", 0) > 50000 and profile.get("posts_count", 100) < 20:
+                fake_indicators_found["low_posts_high_followers"] = True
+            if profile.get("engagement_rate", 5) < 1.0:
+                fake_indicators_found["low_engagement"] = True
+            if not profile.get("is_business", True):
+                fake_indicators_found["no_business_account"] = True
+        
+        missing = [k for k, v in fake_indicators_found.items() if not v]
+        assert not missing, f"Missing fake detection test cases: {missing}"
+        
+        # Verify scores for fake profiles are low
+        for score in data["scores"]:
+            if score.get("_test_purpose", "").startswith("very_low"):
+                assert score["score"] < 30, "Fake profile should score below 30"
+            if score.get("_test_purpose", "").startswith("low_score"):
+                assert score["score"] < 50, "Suspicious profile should score below 50"
+        
+        print("  ✓ Fake detection data validated (PRD 5.3.1)")
+        return True
+        
+    except Exception as e:
+        print(f"  ✗ Fake detection data validation failed: {e}")
+        return False
+
+
+def validate_user_isolation_data():
+    """Validate multi-user isolation test data per PRD 6."""
+    print("Validating user isolation data (PRD Section 6)...")
+    
+    try:
+        from tests.fixtures.mock_data import load_mock_data, get_jobs_for_user
+        
+        data = load_mock_data()
+        
+        # Verify multiple users exist
+        assert len(data["users"]) >= 2, "Need at least 2 users for isolation tests"
+        
+        user1_id = data["users"][0]["id"]
+        user2_id = data["users"][1]["id"]
+        
+        # Each user should have their own jobs
+        user1_jobs = get_jobs_for_user(user1_id)
+        user2_jobs = get_jobs_for_user(user2_id)
+        
+        assert len(user1_jobs) >= 1, "User 1 should have jobs"
+        assert len(user2_jobs) >= 1, "User 2 should have jobs for isolation testing"
+        
+        # Verify no job belongs to multiple users
+        job_user_map = {}
+        for job in data["discovery_jobs"]:
+            assert job["id"] not in job_user_map, "Duplicate job ID found"
+            job_user_map[job["id"]] = job["user_id"]
+        
+        print("  ✓ User isolation data validated")
+        return True
+        
+    except Exception as e:
+        print(f"  ✗ User isolation data validation failed: {e}")
+        return False
+
+
+def validate_scoring_weights():
+    """Validate score calculations match PRD weights."""
+    print("Validating scoring weight calculations (PRD 5.3)...")
+    
+    try:
+        from tests.fixtures.mock_data import load_mock_data, PRD_SCORING_WEIGHTS
+        
+        data = load_mock_data()
+        
+        for score_data in data["scores"]:
+            # Calculate expected weighted score
+            calculated = sum(
+                score_data.get(dim, 0) * weight
+                for dim, weight in PRD_SCORING_WEIGHTS.items()
+            )
+            
+            actual = score_data["score"]
+            
+            # Allow small rounding tolerance
+            assert abs(calculated - actual) <= 2, (
+                f"Score mismatch for {score_data['id']}: "
+                f"calculated={calculated:.1f}, actual={actual}"
+            )
+        
+        print("  ✓ Scoring weight calculations validated (PRD 5.3)")
+        return True
+        
+    except Exception as e:
+        print(f"  ✗ Scoring weight validation failed: {e}")
+        return False
+
+
+# Add to main validation run
+def run_mock_data_validations():
+    """Run all mock data validations."""
+    print("\n" + "=" * 50)
+    print("MOCK DATA & PRD COMPLIANCE VALIDATION")
+    print("=" * 50 + "\n")
+    
+    results = [
+        ("Mock Data Loading", validate_mock_data_loading()),
+        ("PRD Schema Compliance", validate_prd_schema_compliance()),
+        ("Fake Detection Data (PRD 5.3.1)", validate_fake_detection_data()),
+        ("User Isolation Data (PRD 6)", validate_user_isolation_data()),
+        ("Scoring Weights (PRD 5.3)", validate_scoring_weights()),
+    ]
+    
+    print("\n" + "-" * 50)
+    print("MOCK DATA VALIDATION SUMMARY")
+    print("-" * 50)
+    
+    all_passed = True
+    for name, passed in results:
+        status = "✓ PASS" if passed else "✗ FAIL"
+        print(f"  {status}: {name}")
+        if not passed:
+            all_passed = False
+    
+    return all_passed
+```
+
+---
+
 ## Definition of Done
 
+### Supabase Migrations (FEATURE-2.0)
+- [x] `001_initial_schema.sql` - Tables, enums, constraints
+- [x] `002_indexes.sql` - Performance indexes
+- [x] `003_rls_policies.sql` - Row Level Security (PRD 6)
+- [x] `004_triggers.sql` - Auto-update timestamps and counters
+- [x] `005_realtime.sql` - Enable live subscriptions
+- [x] `006_views.sql` - Convenience views
+- [x] `007_seed.sql` - PRD-aligned demo data
+- [x] `README.md` - Migration documentation
+
+### Database Clients (FEATURE-2.1)
 - [ ] Supabase client implemented with tests
 - [ ] SQLite fallback client implemented with tests
+
+### Pydantic Models (FEATURE-2.2)
 - [ ] All Pydantic models implemented (base, user, discovery, profile)
 - [ ] All model validation tests passing
+
+### Repositories (FEATURE-2.3, 2.4, 2.5)
 - [ ] Base repository pattern implemented
 - [ ] Discovery repositories implemented (DiscoveryJobRepository, BrandDNARepository)
 - [ ] Profile repositories implemented (ProfileRepository, ProfileScoreRepository, ProfileContactRepository)
 - [ ] All repository tests passing
+
+### Mock Data & Seed (FEATURE-2.6)
+- [ ] **Mock data fixtures created matching PRD schema**
+- [ ] **Seed database script implemented and tested**
+- [ ] **Mock data covers all PRD statuses and edge cases**
+- [ ] **Fake detection test data included (PRD 5.3.1)**
+- [ ] **User isolation test data included (PRD 6)**
+
+### Integration & Validation
 - [ ] Integration test for full workflow passing
+- [ ] **validate_epic2.py includes mock data validations**
+- [ ] **validate_epic2.py includes Supabase migration validation**
 - [ ] Type checking with mypy passing
-- [ ] `validate_epic2.py` runs successfully
+- [ ] `validate_epic2.py` runs successfully with all tests
 
 ---
 

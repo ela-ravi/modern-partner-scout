@@ -10,6 +10,9 @@
 
 ---
 
+> [!NOTE]
+> **Test Data Layer Pattern**: All tests in this EPIC follow the layered format (`input → test → output`) with fixtures stored in `tests/fixtures/`. See [00-MASTER-PLAN.md](./00-MASTER-PLAN.md#test-data-layer-pattern) for details.
+
 ## Environment Variables Required
 
 ```bash
@@ -675,15 +678,183 @@ if __name__ == "__main__":
 
 ---
 
+## Mock Data Integration in Tests
+
+### Comprehensive Test Fixtures Configuration
+
+All tests should use the PRD-aligned mock data from EPIC-2:
+
+**File:** `backend/tests/conftest.py` (additions)
+
+```python
+"""
+Shared fixtures for all tests - using PRD mock data.
+"""
+import pytest
+from tests.fixtures.mock_data import (
+    load_mock_data,
+    get_user,
+    get_job,
+    get_profiles_for_job,
+    get_genuine_profiles,
+    get_fake_profiles,
+    PRD_JOB_STATUSES,
+    PRD_SCORING_WEIGHTS,
+)
+
+@pytest.fixture
+def mock_data():
+    """Load all PRD mock data."""
+    return load_mock_data()
+
+@pytest.fixture
+def demo_user():
+    """Get the primary demo user."""
+    return get_user("user-001-uuid-0000-000000000001")
+
+@pytest.fixture
+def demo_job():
+    """Get a completed demo job with full data."""
+    return get_job("job-001-uuid-0000-000000000001")
+
+@pytest.fixture
+def demo_profiles():
+    """Get profiles for the demo job."""
+    return get_profiles_for_job("job-001-uuid-0000-000000000001")
+
+@pytest.fixture
+def genuine_profiles():
+    """Get profiles expected to score above 50."""
+    return get_genuine_profiles()
+
+@pytest.fixture
+def fake_profiles():
+    """Get profiles expected to score below 50 (fake detection)."""
+    return get_fake_profiles()
+
+@pytest.fixture
+def prd_constants():
+    """PRD-defined constants for validation."""
+    return {
+        "job_statuses": PRD_JOB_STATUSES,
+        "scoring_weights": PRD_SCORING_WEIGHTS,
+    }
+```
+
+### PRD Compliance Test Suite
+
+**File:** `backend/tests/integration/test_prd_compliance.py`
+
+```python
+"""
+Integration tests validating implementation matches PRD requirements.
+These tests ensure the system behaves according to specification.
+"""
+import pytest
+
+
+class TestPRDCompliance:
+    """Test suite for PRD compliance validation."""
+
+    def test_job_status_values_match_prd(self, prd_constants, mock_data):
+        """PRD 5.4: All job statuses are implemented."""
+        jobs = mock_data["discovery_jobs"]
+        actual_statuses = {job["status"] for job in jobs}
+        expected_statuses = set(prd_constants["job_statuses"])
+        
+        assert actual_statuses == expected_statuses, \
+            f"Missing statuses: {expected_statuses - actual_statuses}"
+
+    def test_scoring_dimensions_match_prd(self, prd_constants, mock_data):
+        """PRD 5.3: All 6 scoring dimensions are implemented."""
+        scores = mock_data["scores"]
+        dimensions = set(prd_constants["scoring_weights"].keys())
+        
+        for score in scores:
+            for dim in dimensions:
+                assert dim in score, f"Score missing dimension: {dim}"
+                assert 0 <= score[dim] <= 100, f"{dim} out of range"
+
+    def test_scoring_weights_sum_to_one(self, prd_constants):
+        """PRD 5.3: Scoring weights must sum to 1.0."""
+        weights = prd_constants["scoring_weights"]
+        total = sum(weights.values())
+        assert abs(total - 1.0) < 0.001, f"Weights sum to {total}, expected 1.0"
+
+    def test_fake_detection_flags_low_scores(self, fake_profiles, mock_data):
+        """PRD 5.3.1: Fake profiles must score below 50."""
+        scores = mock_data["scores"]
+        
+        for profile in fake_profiles:
+            score = next(
+                (s for s in scores if s["profile_id"] == profile["id"]),
+                None
+            )
+            if score:
+                assert score["score"] < 50, \
+                    f"Fake profile {profile['username']} scored {score['score']}, should be < 50"
+
+    def test_genuine_profiles_score_above_threshold(self, genuine_profiles, mock_data):
+        """PRD 5.3.1: Genuine profiles should score >= 50."""
+        scores = mock_data["scores"]
+        
+        for profile in genuine_profiles:
+            score = next(
+                (s for s in scores if s["profile_id"] == profile["id"]),
+                None
+            )
+            if score:
+                assert score["score"] >= 50, \
+                    f"Genuine profile {profile['username']} scored {score['score']}, should be >= 50"
+
+    def test_user_data_isolation(self, mock_data):
+        """PRD 6: User data must be properly isolated."""
+        jobs = mock_data["discovery_jobs"]
+        users = mock_data["users"]
+        
+        # Group jobs by user
+        user_jobs = {}
+        for job in jobs:
+            uid = job["user_id"]
+            user_jobs.setdefault(uid, []).append(job)
+        
+        # Verify each user has their own jobs
+        assert len(user_jobs) >= 2, "Need multiple users to test isolation"
+        
+        for uid, user_job_list in user_jobs.items():
+            # All jobs for a user should have same user_id
+            for job in user_job_list:
+                assert job["user_id"] == uid
+
+    def test_profile_fields_match_prd_schema(self, mock_data):
+        """PRD 10.5: Profiles have all required fields."""
+        required_fields = [
+            "id", "job_id", "instagram_url", "username",
+            "followers", "following", "posts_count",
+            "engagement_rate", "is_verified", "is_business",
+            "following_ratio", "status"
+        ]
+        
+        for profile in mock_data["profiles"]:
+            for field in required_fields:
+                assert field in profile, f"Profile missing PRD field: {field}"
+```
+
+---
+
 ## Definition of Done
 
-- [ ] Test configuration (conftest.py) complete
+- [ ] Test configuration (conftest.py) complete with PRD fixtures
 - [ ] All unit tests passing
 - [ ] Integration tests for database operations
 - [ ] Integration tests for API endpoints
 - [ ] E2E test for discovery flow
+- [ ] **PRD compliance test suite implemented**
+- [ ] **Fake detection tests passing (PRD 5.3.1)**
+- [ ] **User isolation tests passing (PRD 6)**
+- [ ] **Scoring validation tests passing (PRD 5.3)**
 - [ ] Coverage > 80%
-- [ ] `validate_epic8.py` runs successfully
+- [ ] `validate_epic8.py` runs successfully with PRD tests
 
 ---
 

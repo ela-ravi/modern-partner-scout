@@ -187,6 +187,14 @@ partner-scout/
 │   ├── tests/
 │   │   ├── __init__.py
 │   │   ├── conftest.py                # Shared fixtures
+│   │   ├── fixtures/                  # Test data layer (input/output)
+│   │   │   ├── __init__.py
+│   │   │   ├── discovery_jobs.py      # Job fixtures
+│   │   │   ├── profiles.py            # Profile fixtures
+│   │   │   └── agents/                # Agent test data
+│   │   │       ├── __init__.py
+│   │   │       ├── brand_analyzer.py
+│   │   │       └── scorer.py
 │   │   ├── unit/
 │   │   │   ├── __init__.py
 │   │   │   ├── test_config.py
@@ -327,6 +335,183 @@ def test_create_job_with_missing_profiles_raises_validation_error():
 def test_update_status_with_invalid_transition_raises_error():
 ```
 
+### Test Data Layer Pattern
+
+Tests follow a **layered format** where input data and expected outputs are stored in dedicated fixture files. This enables multiple agents to modify test data independently without changing test logic.
+
+**Fixture Directory Structure:**
+
+```
+tests/
+├── fixtures/
+│   ├── __init__.py
+│   ├── discovery_jobs.py      # Job input/output fixtures
+│   ├── profiles.py            # Profile fixtures
+│   ├── brand_dna.py           # Brand DNA fixtures
+│   └── agents/
+│       ├── __init__.py
+│       ├── brand_analyzer.py  # Brand analyzer test data
+│       ├── discovery.py       # Discovery agent test data
+│       └── scorer.py          # Scorer agent test data
+├── unit/
+├── integration/
+└── e2e/
+```
+
+**Fixture File Format:**
+
+Each fixture file contains both input and expected output as Python dicts:
+
+```python
+# tests/fixtures/discovery_jobs.py
+
+# === INPUT DATA ===
+VALID_JOB_INPUT = {
+    "user_id": "user-123",
+    "status": "pending",
+    "reference_profiles": '["brand1", "brand2"]',
+    "settings": '{"limit": 50}'
+}
+
+INVALID_JOB_INPUT = {
+    "user_id": "",  # Missing required field
+}
+
+# === EXPECTED OUTPUT ===
+VALID_JOB_OUTPUT = {
+    "user_id": "user-123",
+    "status": "pending"
+}
+
+# === MOCK RESPONSES (for external services) ===
+MOCK_LLM_RESPONSE = {
+    "hashtags": ["fashion", "style"],
+    "keywords": ["trendy", "modern"]
+}
+```
+
+**Test References Fixtures:**
+
+```python
+from tests.fixtures.discovery_jobs import (
+    VALID_JOB_INPUT,
+    VALID_JOB_OUTPUT,
+    INVALID_JOB_INPUT
+)
+
+def test_create_job_with_valid_data(self, db_client):
+    job = repo.create(VALID_JOB_INPUT)
+    assert job.user_id == VALID_JOB_OUTPUT["user_id"]
+
+def test_create_job_with_invalid_data_raises_error(self, db_client):
+    with pytest.raises(ValidationError):
+        repo.create(INVALID_JOB_INPUT)
+```
+
+> **Benefits:**
+> - Input/output changes don't require modifying test logic
+> - Multiple agents can update fixture files independently
+> - Easy to add new test cases by extending fixtures
+> - Clear separation of concerns
+
+---
+
+### PRD-Aligned Mock Data Strategy
+
+All implementation EPICs include **mock data that maps directly to PRD specifications**. This ensures:
+
+1. **Correctness Validation** - Tests verify implementation matches PRD requirements
+2. **Demo Readiness** - Mock data provides realistic demo scenarios
+3. **Fake Detection Testing** - Mock profiles include both genuine and fake indicators (PRD 5.3.1)
+4. **User Isolation Testing** - Multiple mock users test data isolation (PRD Section 6)
+
+#### Mock Data Directory Structure
+
+```
+backend/tests/fixtures/mock_data/
+├── __init__.py          # Loader utilities
+├── users.json           # PRD 10.2: User data
+├── discovery_jobs.json  # PRD 10.3: All job statuses (pending→completed→failed)
+├── brand_dna.json       # PRD 10.4: Brand DNA with embeddings
+├── profiles.json        # PRD 10.5: Genuine + fake profiles
+├── scores.json          # PRD 10.6: 6-dimension scores
+└── contacts.json        # PRD 10.7: Contact extraction
+```
+
+#### PRD Coverage in Mock Data
+
+| PRD Section | Coverage | Mock Data Location |
+|-------------|----------|-------------------|
+| 5.1 Brand Analyzer | ✅ | `brand_dna.json` |
+| 5.2 Discovery Agent | ✅ | `profiles.json` |
+| 5.3 Scorer Agent | ✅ | `scores.json` (6 dimensions) |
+| 5.3.1 Fake Detection | ✅ | `profiles.json` (fake indicators) |
+| 5.4 Session Management | ✅ | `discovery_jobs.json` (all statuses) |
+| 6 Multi-User | ✅ | Multiple users with isolated data |
+| 8 API Contracts | ✅ | Request/response test fixtures |
+| 10 Database Schema | ✅ | All tables with relationships |
+
+#### Mock Data Validation Rules
+
+Each validation script (`validate_epicX.py`) includes PRD compliance checks:
+
+```python
+def validate_prd_compliance():
+    """Validate implementation matches PRD."""
+    from tests.fixtures.mock_data import (
+        PRD_JOB_STATUSES,
+        PRD_SCORING_WEIGHTS,
+        get_fake_profiles,
+        get_genuine_profiles,
+    )
+    
+    # 1. All job statuses exist
+    # 2. All 6 scoring dimensions present
+    # 3. Scoring weights sum to 1.0
+    # 4. Fake profiles score < 50
+    # 5. Genuine profiles score >= 50
+    # 6. User isolation enforced
+```
+
+#### Using Mock Data in Tests
+
+```python
+# In any test file
+from tests.fixtures.mock_data import (
+    load_mock_data,
+    get_user,
+    get_job,
+    get_profiles_for_job,
+    get_genuine_profiles,
+    get_fake_profiles,
+    PRD_JOB_STATUSES,
+    PRD_SCORING_WEIGHTS,
+)
+
+def test_scorer_with_fake_detection():
+    """Test scorer penalizes fake profiles per PRD 5.3.1."""
+    fake_profiles = get_fake_profiles()
+    
+    for profile in fake_profiles:
+        score = scorer.score(profile)
+        assert score < 50, f"Fake profile should score below 50"
+```
+
+#### Database Seeding
+
+Mock data can be seeded for development and demos:
+
+```bash
+# Seed all mock data
+python scripts/seed_database.py
+
+# Seed specific demo scenario
+python scripts/seed_demo_data.py --scenario sustainable_fashion
+
+# Verify seeded data matches PRD
+python scripts/seed_database.py --verify
+```
+
 ---
 
 ## Validation Approach
@@ -368,8 +553,8 @@ echo "=== EPIC-X Complete ==="
 
 | EPIC | Key Implementation Files | Key Test Files |
 |------|-------------------------|----------------|
-| 1 | `config.py`, `constants.py`, migrations | `test_config.py` |
-| 2 | `supabase.py`, `models/*.py`, `repositories/*.py` | `test_models.py`, `test_repositories.py` |
+| 1 | `config.py`, `constants.py`, `exceptions.py` | `test_config.py`, `test_exceptions.py` |
+| 2 | `supabase/migrations/*.sql`, `db/*.py`, `models/*.py`, `repositories/*.py` | `test_models*.py`, `test_*_client.py` |
 | 3 | `guards/*.py` | `test_guards.py` |
 | 4 | `services/*.py` | `test_services.py` |
 | 5 | `agents/*.py`, `prompts/*.yaml` | `test_agents.py` |
