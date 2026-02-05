@@ -69,6 +69,36 @@ class OllamaSettings(BaseSettings):
     model: str = Field(default="llama2", description="Ollama model to use")
 
 
+class OpenRouterSettings(BaseSettings):
+    """OpenRouter LLM provider settings (access to multiple models via single API)."""
+    
+    model_config = SettingsConfigDict(
+        env_prefix="OPENROUTER_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+    
+    api_key: str = Field(default="", description="OpenRouter API key")
+    model: str = Field(default="anthropic/claude-3.5-sonnet", description="OpenRouter model to use")
+    base_url: str = Field(default="https://openrouter.ai/api/v1", description="OpenRouter API base URL")
+
+
+class HuggingFaceSettings(BaseSettings):
+    """Hugging Face LLM provider settings."""
+    
+    model_config = SettingsConfigDict(
+        env_prefix="HUGGINGFACE_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+    
+    api_key: str = Field(default="", description="Hugging Face API key")
+    model: str = Field(default="mistralai/Mistral-7B-Instruct-v0.2", description="Hugging Face model to use")
+
+
+
 class ApifySettings(BaseSettings):
     """Apify web scraping service settings."""
     
@@ -164,6 +194,8 @@ class Settings(BaseSettings):
     openai: OpenAISettings = Field(default_factory=OpenAISettings)
     gemini: GeminiSettings = Field(default_factory=GeminiSettings)
     ollama: OllamaSettings = Field(default_factory=OllamaSettings)
+    openrouter: OpenRouterSettings = Field(default_factory=OpenRouterSettings)
+    huggingface: HuggingFaceSettings = Field(default_factory=HuggingFaceSettings)
     apify: ApifySettings = Field(default_factory=ApifySettings)
     n8n: N8NSettings = Field(default_factory=N8NSettings)
     
@@ -171,7 +203,7 @@ class Settings(BaseSettings):
     @classmethod
     def validate_llm_provider(cls, v: str) -> str:
         """Validate that LLM provider is one of the supported options."""
-        valid_providers = {"openai", "gemini", "ollama"}
+        valid_providers = {"openai", "gemini", "ollama", "openrouter", "huggingface"}
         if v.lower() not in valid_providers:
             raise ValueError(f"LLM provider must be one of: {valid_providers}")
         return v.lower()

@@ -34,6 +34,8 @@ class LLMProvider(str, Enum):
     OPENAI = "openai"
     GEMINI = "gemini"
     OLLAMA = "ollama"
+    OPENROUTER = "openrouter"
+    HUGGINGFACE = "huggingface"
 
 
 class LLMModel(str, Enum):
@@ -203,11 +205,73 @@ def create_ollama_llm(config: LLMConfig) -> BaseChatModel:
     )
 
 
+
+def create_openrouter_llm(config: LLMConfig) -> BaseChatModel:
+    """
+    Create an OpenRouter Chat LLM instance.
+    OpenRouter provides access to multiple models via a unified API.
+    """
+    from langchain_openai import ChatOpenAI
+    
+    api_key = settings.openrouter.api_key
+    if not api_key:
+        raise AgentError(
+            message="OpenRouter API key is not configured",
+            agent_name="llm_service",
+            details={"provider": "openrouter"}
+        )
+    
+    model = config.model or settings.openrouter.model
+    base_url = settings.openrouter.base_url
+    
+    return ChatOpenAI(
+        api_key=api_key,
+        base_url=base_url,
+        model=model,
+        temperature=config.temperature,
+        max_tokens=config.max_tokens,
+        timeout=config.timeout,
+        **config.extra_kwargs
+    )
+
+
+
+def create_huggingface_llm(config: LLMConfig) -> BaseChatModel:
+    """
+    Create a Hugging Face Chat LLM instance.
+    Uses Hugging Face Inference API for serverless model access.
+    """
+    from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
+    
+    api_key = settings.huggingface.api_key
+    if not api_key:
+        raise AgentError(
+            message="Hugging Face API key is not configured",
+            agent_name="llm_service",
+            details={"provider": "huggingface"}
+        )
+    
+    model = config.model or settings.huggingface.model
+    
+    # Create endpoint
+    llm = HuggingFaceEndpoint(
+        repo_id=model,
+        huggingfacehub_api_token=api_key,
+        temperature=config.temperature,
+        max_new_tokens=config.max_tokens or 4096,
+        timeout=config.timeout,
+    )
+    
+    return ChatHuggingFace(llm=llm)
+
+
 # Provider factory registry
 _PROVIDER_FACTORIES = {
     LLMProvider.OPENAI: create_openai_llm,
     LLMProvider.GEMINI: create_gemini_llm,
     LLMProvider.OLLAMA: create_ollama_llm,
+    LLMProvider.OPENROUTER: create_openrouter_llm,
+    LLMProvider.HUGGINGFACE: create_huggingface_llm,
 }
 
 
@@ -290,6 +354,10 @@ class LLMService:
             return settings.openai.model
         elif self._config.provider == LLMProvider.GEMINI:
             return settings.gemini.model
+        elif self._config.provider == LLMProvider.OPENROUTER:
+            return settings.openrouter.model
+        elif self._config.provider == LLMProvider.HUGGINGFACE:
+            return settings.huggingface.model
         else:
             return settings.ollama.model
     
