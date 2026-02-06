@@ -28,6 +28,12 @@
   - Add `?search=` query parameter to `GET /api/jobs/{job_id}`
   - Filter profiles by username or full_name (case-insensitive)
 
+- [ ] **4b. Profile Sorting** *(NEW)*
+  - Add `?sort=score&order=desc` query parameters to `GET /api/jobs/{job_id}`
+  - Support sorting by: `score`, `followers_count`, `engagement_rate`, `created_at`
+  - Order: `asc` or `desc` (default: `desc` for score)
+  - Frontend design shows "Sort by: Score (High to Low)" dropdown
+
 ---
 
 ## MEDIUM Priority (Enhanced UX)

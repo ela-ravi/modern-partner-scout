@@ -9,6 +9,7 @@ Implements authentication guards for securing API endpoints.
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+import logging
 
 import jwt
 from fastapi import Depends, Header, HTTPException, Request, Security
@@ -23,6 +24,8 @@ from app.core.exceptions import (
     InvalidTokenError,
     UnauthorizedError,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -146,6 +149,7 @@ class UserGuard(AuthGuard):
     Guard for user authentication via Supabase JWT tokens.
     
     Validates JWT tokens and extracts user information.
+    Supports both HS256 (legacy) and ES256 (modern Supabase) algorithms.
     """
     
     def __init__(self, jwt_secret: Optional[str] = None, algorithms: list = None):
@@ -154,10 +158,11 @@ class UserGuard(AuthGuard):
         
         Args:
             jwt_secret: JWT secret for validation (defaults to settings)
-            algorithms: List of allowed algorithms (defaults to HS256)
+            algorithms: List of allowed algorithms (defaults to HS256 and ES256)
         """
         self.jwt_secret = jwt_secret or settings.supabase.jwt_secret
-        self.algorithms = algorithms or ["HS256"]
+        # Support both HS256 (legacy) and ES256 (modern Supabase)
+        self.algorithms = algorithms or ["HS256", "ES256"]
     
     def get_auth_header(self, request: Request) -> Optional[str]:
         """Extract Bearer token from Authorization header."""
@@ -212,37 +217,82 @@ class UserGuard(AuthGuard):
             ExpiredTokenError: If token has expired
         """
         try:
-            # Decode and validate the token
-            payload = jwt.decode(
-                token,
-                self.jwt_secret,
-                algorithms=self.algorithms,
-                options={
-                    "verify_signature": True,
-                    "verify_exp": True,
-                    "verify_iat": True,
-                    "verify_aud": False,  # Skip audience verification
-                    "require": ["sub", "exp"],
-                }
-            )
+            # Decode header to check algorithm
+            unverified_header = jwt.get_unverified_header(token)
+            algorithm = unverified_header.get("alg", "HS256")
             
-            # Extract user information from Supabase JWT structure
-            user_id = payload.get("sub")
-            email = payload.get("email")
-            role = payload.get("role", "authenticated")
+            # Choose verification method based on algorithm
+            if algorithm == "ES256":
+                # For ES256 tokens, use Supabase's getUser() API to verify the token
+                # This is more reliable than JWKS as Supabase handles key rotation internally
+                try:
+                    from supabase import create_client
+                    supabase_client = create_client(
+                        settings.supabase.url,
+                        settings.supabase.anon_key
+                    )
+                    # Verify token via Supabase's auth.getUser()
+                    user_response = supabase_client.auth.get_user(token)
+                    
+                    if user_response and user_response.user:
+                        user = user_response.user
+                        # Return UserContext directly since Supabase verified the token
+                        return UserContext(
+                            user_id=user.id,
+                            email=user.email,
+                            role=user.role or "authenticated",
+                            exp=None,  # Supabase manages expiration
+                            raw_token=token,
+                            claims={"sub": user.id, "email": user.email},
+                        )
+                    else:
+                        raise InvalidTokenError(
+                            message="Invalid authentication token",
+                            details={"error": "Token verification failed"}
+                        )
+                except InvalidTokenError:
+                    raise
+                except Exception as e:
+                    logger.warning(f"Supabase token verification failed: {e}")
+                    raise InvalidTokenError(
+                        message="Token verification failed",
+                        details={"error": str(e)}
+                    )
+            else:
+                # Use shared secret for HS256 tokens (legacy)
+                key = self.jwt_secret
             
-            # Parse expiration
-            exp_timestamp = payload.get("exp")
-            exp = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc) if exp_timestamp else None
-            
-            return UserContext(
-                user_id=user_id,
-                email=email,
-                role=role,
-                exp=exp,
-                raw_token=token,
-                claims=payload,
-            )
+                # Decode and validate the token
+                payload = jwt.decode(
+                    token,
+                    key,
+                    algorithms=[algorithm],
+                    options={
+                        "verify_signature": True,
+                        "verify_exp": True,
+                        "verify_iat": True,
+                        "verify_aud": False,  # Skip audience verification
+                        "require": ["sub", "exp"],
+                    }
+                )
+                
+                # Extract user information from Supabase JWT structure
+                user_id = payload.get("sub")
+                email = payload.get("email")
+                role = payload.get("role", "authenticated")
+                
+                # Parse expiration
+                exp_timestamp = payload.get("exp")
+                exp = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc) if exp_timestamp else None
+                
+                return UserContext(
+                    user_id=user_id,
+                    email=email,
+                    role=role,
+                    exp=exp,
+                    raw_token=token,
+                    claims=payload,
+                )
         
         except jwt.ExpiredSignatureError:
             raise ExpiredTokenError(

@@ -295,9 +295,13 @@ def get_cors_origins() -> List[str]:
     # Always include localhost variants in development
     if settings.is_development:
         dev_origins = [
-            "http://localhost:5173",  # Vite dev server
+            "http://localhost:5173",  # Vite dev server (default)
+            "http://localhost:5174",  # Vite dev server (fallback port)
+            "http://localhost:5175",  # Vite dev server (fallback port)
             "http://localhost:3000",  # Alternative dev server
             "http://127.0.0.1:5173",
+            "http://127.0.0.1:5174",
+            "http://127.0.0.1:5175",
             "http://127.0.0.1:3000",
         ]
         for origin in dev_origins:

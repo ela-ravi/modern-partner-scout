@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# E2E test credentials and session files
+e2e/.env
+/tmp/partner-scout-e2e-session.json
