@@ -511,3 +511,36 @@ http://localhost:8000
 ```
 http://localhost:8000/docs
 ```
+
+---
+
+## LLM Provider Configuration
+
+Set in `backend/.env`:
+
+```bash
+# Choose one LLM provider
+LLM_PROVIDER=huggingface  # Options: openai, gemini, ollama, openrouter, huggingface
+
+# Choose one embedding provider  
+EMBEDDING_PROVIDER=huggingface  # Options: openai, gemini, huggingface
+```
+
+### Provider API Keys
+
+| Provider | Env Variable | Get Key At |
+|----------|-------------|------------|
+| OpenAI | `OPENAI_API_KEY` | platform.openai.com |
+| Gemini | `GEMINI_API_KEY` | ai.google.dev |
+| OpenRouter | `OPENROUTER_API_KEY` | openrouter.ai/keys |
+| HuggingFace | `HUGGINGFACE_API_KEY` | huggingface.co/settings/tokens |
+
+### Recommended: HuggingFace (Free)
+
+```bash
+LLM_PROVIDER=huggingface
+HUGGINGFACE_API_KEY=hf_xxx
+HUGGINGFACE_MODEL=mistralai/Mistral-7B-Instruct-v0.2
+EMBEDDING_PROVIDER=huggingface
+```
+
