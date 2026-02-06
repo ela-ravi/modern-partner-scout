@@ -56,6 +56,48 @@ class CreateJobRequest(BaseModel):
         description="Maximum number of profiles to discover"
     )
     
+    # Enhancement fields (Item 5)
+    keywords: List[str] = Field(
+        default_factory=list,
+        description="Target keywords for discovery (optional, AI will extract if empty)"
+    )
+    hashtags: List[str] = Field(
+        default_factory=list,
+        description="Target hashtags for discovery (optional, AI will extract if empty)"
+    )
+    min_score_threshold: int = Field(
+        default=Defaults.DEFAULT_MIN_SCORE_THRESHOLD,
+        ge=0,
+        le=100,
+        description="Minimum score threshold for profile filtering"
+    )
+    
+    @field_validator("keywords", mode="before")
+    @classmethod
+    def validate_keywords(cls, v: List[str]) -> List[str]:
+        """Clean and validate keywords - normalize to lowercase."""
+        if not v:
+            return []
+        return [kw.strip().lower() for kw in v if kw and kw.strip()]
+    
+    @field_validator("hashtags", mode="before")
+    @classmethod
+    def validate_hashtags(cls, v: List[str]) -> List[str]:
+        """Clean and normalize hashtags (ensure # prefix)."""
+        if not v:
+            return []
+        normalized = []
+        for tag in v:
+            if not tag:
+                continue
+            tag = tag.strip().lower()
+            if not tag:
+                continue
+            if not tag.startswith("#"):
+                tag = f"#{tag}"
+            normalized.append(tag)
+        return normalized
+    
     @field_validator("reference_profiles", mode="before")
     @classmethod
     def validate_reference_profiles(cls, v: List[str]) -> List[str]:
@@ -128,6 +170,11 @@ class JobBase(BaseModel):
     follower_range_min: int
     follower_range_max: int
     discovery_limit: int
+    # Enhancement fields (Item 5)
+    keywords: List[str] = Field(default_factory=list)
+    hashtags: List[str] = Field(default_factory=list)
+    min_score_threshold: int = Field(default=Defaults.DEFAULT_MIN_SCORE_THRESHOLD)
+    # Status fields
     status: JobStatus
     profiles_discovered: int = 0
     profiles_scored: int = 0
@@ -149,6 +196,11 @@ class JobSummary(BaseModel):
     id: UUID
     name: Optional[str] = None
     brand_description: str
+    # Enhancement fields (Item 5)
+    keywords: List[str] = Field(default_factory=list)
+    hashtags: List[str] = Field(default_factory=list)
+    min_score_threshold: int = Field(default=Defaults.DEFAULT_MIN_SCORE_THRESHOLD)
+    # Status fields
     status: JobStatus
     profiles_discovered: int = 0
     profiles_scored: int = 0
@@ -208,3 +260,12 @@ class JobDeleteResponse(BaseModel):
     
     deleted: bool = True
     job_id: UUID
+
+
+class JobCancelResponse(BaseModel):
+    """Response model for cancelling a job."""
+    
+    status: str = "cancelled"
+    job_id: UUID
+    cancelled_at: datetime
+    message: str = "Discovery job cancelled successfully"

@@ -154,6 +154,9 @@ class TestCreateJob:
             follower_range_min=10000,
             follower_range_max=100000,
             discovery_limit=25,
+            keywords=[],
+            hashtags=[],
+            min_score_threshold=50,
         )
     
     def test_create_job_daily_limit_exceeded(self, job_service, mock_job_repo):

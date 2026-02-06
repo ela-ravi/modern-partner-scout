@@ -39,6 +39,7 @@ from app.models.job import (
     CreateJobRequest,
     Job,
     JobAnalytics,
+    JobCancelResponse,
     JobDeleteResponse,
     JobListResponse,
     JobStartResponse,
@@ -118,6 +119,10 @@ async def create_job(
             follower_range_min=request.follower_range_min,
             follower_range_max=request.follower_range_max,
             discovery_limit=request.discovery_limit,
+            # Enhancement fields (Item 5)
+            keywords=request.keywords,
+            hashtags=request.hashtags,
+            min_score_threshold=request.min_score_threshold,
         )
         
         logger.info(f"Created job {job_data['id']} for user {user.user_id}")
@@ -438,6 +443,59 @@ async def start_job(
             detail=e.to_dict()
         )
     except N8NError as e:
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=e.to_dict()
+        )
+
+
+@router.post(
+    "/jobs/{job_id}/cancel",
+    response_model=JobCancelResponse,
+    summary="Cancel a running job",
+    description="Cancel a pending or running discovery job.",
+    responses={
+        200: {"description": "Job cancelled successfully"},
+        401: {"description": "Authentication required"},
+        403: {"description": "Access denied - not the owner"},
+        404: {"description": "Job not found"},
+        400: {"description": "Job cannot be cancelled from current status"},
+    }
+)
+async def cancel_job(
+    job_id: str = Path(..., description="The job UUID"),
+    user: UserContext = Depends(get_current_user),
+    job_service: JobService = Depends(get_job_service),
+    job: dict = Depends(verify_job_owner_user_only),  # Verifies ownership
+) -> JobCancelResponse:
+    """
+    Cancel a discovery job.
+    
+    Cancels a job that is pending or currently running (analyzing, discovering, scoring).
+    Jobs that are already completed, failed, or cancelled cannot be cancelled.
+    
+    This will stop any ongoing processing and mark the job as cancelled.
+    """
+    try:
+        result = job_service.cancel_job(
+            job_id=job_id,
+            user_id=user.user_id,
+        )
+        
+        logger.info(f"Cancelled job {job_id} for user {user.user_id}")
+        return JobCancelResponse(
+            status=result["status"],
+            job_id=UUID(job_id),
+            cancelled_at=result["cancelled_at"],
+            message=result["message"],
+        )
+        
+    except JobNotFoundError as e:
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=e.to_dict()
+        )
+    except BusinessError as e:
         raise HTTPException(
             status_code=e.status_code,
             detail=e.to_dict()

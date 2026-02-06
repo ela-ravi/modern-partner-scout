@@ -31,13 +31,16 @@ class JobRepository(BaseRepository[Dict[str, Any]]):
     
     def create(
         self,
-        user_id: str,
+        user_id: Optional[str],
         brand_description: str,
         reference_profiles: List[str],
         name: Optional[str] = None,
         follower_range_min: int = 10000,
         follower_range_max: int = 500000,
-        discovery_limit: int = 50
+        discovery_limit: int = 50,
+        keywords: Optional[List[str]] = None,
+        hashtags: Optional[List[str]] = None,
+        min_score_threshold: int = 50,
     ) -> Dict[str, Any]:
         """
         Create a new discovery job.
@@ -50,19 +53,28 @@ class JobRepository(BaseRepository[Dict[str, Any]]):
             follower_range_min: Minimum followers for discovery
             follower_range_max: Maximum followers for discovery
             discovery_limit: Maximum profiles to discover
+            keywords: Optional target keywords for discovery
+            hashtags: Optional target hashtags for discovery
+            min_score_threshold: Minimum score filter (0-100)
             
         Returns:
             Created job data with generated ID
         """
         job_data = {
-            "user_id": user_id,
             "brand_description": brand_description,
             "reference_profiles": reference_profiles,
             "follower_range_min": follower_range_min,
             "follower_range_max": follower_range_max,
             "discovery_limit": discovery_limit,
+            "keywords": keywords or [],
+            "hashtags": hashtags or [],
+            "min_score_threshold": min_score_threshold,
             "status": JobStatus.PENDING.value,
         }
+        
+        # Only include user_id if provided (allows anonymous demo jobs)
+        if user_id:
+            job_data["user_id"] = user_id
         
         if name:
             job_data["name"] = name

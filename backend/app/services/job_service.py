@@ -73,6 +73,9 @@ class JobService:
         follower_range_min: int = 5000,
         follower_range_max: int = 500000,
         discovery_limit: int = 50,
+        keywords: Optional[List[str]] = None,
+        hashtags: Optional[List[str]] = None,
+        min_score_threshold: int = 50,
     ) -> Dict[str, Any]:
         """
         Create a new discovery job with daily limit enforcement.
@@ -85,6 +88,9 @@ class JobService:
             follower_range_min: Minimum followers for discovery
             follower_range_max: Maximum followers for discovery
             discovery_limit: Maximum profiles to discover
+            keywords: Optional target keywords for discovery
+            hashtags: Optional target hashtags for discovery
+            min_score_threshold: Minimum score filter (0-100)
             
         Returns:
             Created job data
@@ -121,6 +127,9 @@ class JobService:
                 follower_range_min=follower_range_min,
                 follower_range_max=follower_range_max,
                 discovery_limit=discovery_limit,
+                keywords=keywords or [],
+                hashtags=hashtags or [],
+                min_score_threshold=min_score_threshold,
             )
             
             logger.info(f"Created job {job['id']} for user {user_id}")
@@ -495,6 +504,55 @@ class JobService:
                 message=f"Failed to trigger discovery workflow: {str(e)}",
                 details={"job_id": job_id, "error": str(e)}
             )
+    
+    def cancel_job(self, job_id: str, user_id: str) -> Dict[str, Any]:
+        """
+        Cancel a running or pending job.
+        
+        Args:
+            job_id: Job UUID to cancel
+            user_id: User ID (for logging/verification)
+            
+        Returns:
+            Cancellation confirmation with status, job_id, cancelled_at, message
+            
+        Raises:
+            JobNotFoundError: If job is not found
+            BusinessError: If job cannot be cancelled from current status
+        """
+        from datetime import datetime, timezone
+        
+        # Get current job
+        job = self.job_repo.get_by_id(job_id)
+        current_status = JobStatus(job["status"])
+        
+        # Check if job can be cancelled (pending or active statuses)
+        cancellable_statuses = JobStatus.active_statuses() | {JobStatus.PENDING}
+        if current_status not in cancellable_statuses:
+            raise BusinessError(
+                message=f"Job cannot be cancelled from status '{current_status.value}'",
+                details={
+                    "job_id": job_id,
+                    "current_status": current_status.value,
+                    "cancellable_statuses": [s.value for s in cancellable_statuses],
+                }
+            )
+        
+        # Update status to cancelled
+        self.update_status(
+            job_id=job_id,
+            new_status=JobStatus.CANCELLED,
+            validate_transition=True,
+        )
+        
+        logger.info(f"Cancelled job {job_id} (was {current_status.value})")
+        
+        return {
+            "status": "cancelled",
+            "job_id": job_id,
+            "cancelled_at": datetime.now(timezone.utc).isoformat(),
+            "message": "Discovery job cancelled successfully",
+        }
     
     def retry_job(self, job_id: str, user_id: str) -> Dict[str, Any]:
         """

@@ -27,6 +27,7 @@ from app.api.routes import jobs
 from app.api.routes import status
 from app.api.routes import email
 from app.api.routes import agents
+from app.api.routes import demo
 from app.core.config import settings
 from app.core.exceptions import PartnerScoutError
 from app.core.constants import HttpStatus
@@ -364,6 +365,13 @@ app.include_router(
     agents.router,
     prefix="/api",
     tags=["Agents"]
+)
+
+# Demo routes (Item 8)
+app.include_router(
+    demo.router,
+    prefix="/api",
+    tags=["Demo"]
 )
 
 
