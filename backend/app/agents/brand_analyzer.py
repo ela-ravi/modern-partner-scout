@@ -569,6 +569,15 @@ Profile {i}: @{username}
                 model="models/embedding-001"
             )
         
+        elif provider == "huggingface":
+            if not settings.huggingface.api_key:
+                logger.warning("HuggingFace API key not configured for embeddings")
+                return None
+            from langchain_huggingface import HuggingFaceEmbeddings
+            return HuggingFaceEmbeddings(
+                model_name="sentence-transformers/all-MiniLM-L6-v2"
+            )
+        
         else:
             logger.warning(f"Unknown embedding provider: {provider}")
             return None

@@ -56,3 +56,4 @@ mypy>=1.8.0
 # Utilities
 tenacity>=8.2.0
 numpy>=1.26.0
+langchain-huggingface>=0.0.1

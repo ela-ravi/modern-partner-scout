@@ -176,7 +176,7 @@ class Settings(BaseSettings):
     # Embedding Provider Selection
     embedding_provider: str = Field(
         default="openai",
-        description="Embedding provider to use (openai, gemini)"
+        description="Embedding provider to use (openai, gemini, huggingface)"
     )
     
     # Rate Limits and Quotas
@@ -212,7 +212,7 @@ class Settings(BaseSettings):
     @classmethod
     def validate_embedding_provider(cls, v: str) -> str:
         """Validate that embedding provider is one of the supported options."""
-        valid_providers = {"openai", "gemini"}
+        valid_providers = {"openai", "gemini", "huggingface"}
         if v.lower() not in valid_providers:
             raise ValueError(f"Embedding provider must be one of: {valid_providers}")
         return v.lower()
