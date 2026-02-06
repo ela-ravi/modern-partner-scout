@@ -246,7 +246,8 @@ CREATE TYPE discovery_job_status AS ENUM (
     'discovering',
     'scoring',
     'completed',
-    'failed'
+    'failed',
+    'cancelled'  -- Added for job cancellation feature
 );
 
 CREATE TYPE profile_status AS ENUM (
@@ -263,9 +264,18 @@ CREATE TABLE discovery_jobs (
     name TEXT,
     brand_description TEXT NOT NULL,
     reference_profiles TEXT[] NOT NULL DEFAULT '{}',
+    follower_range_min INTEGER DEFAULT 5000,
+    follower_range_max INTEGER DEFAULT 500000,
+    discovery_limit INTEGER DEFAULT 50,
+    -- Enhancement fields (added Feb 2026)
+    keywords TEXT[] NOT NULL DEFAULT '{}',
+    hashtags TEXT[] NOT NULL DEFAULT '{}',
+    min_score_threshold INTEGER NOT NULL DEFAULT 50,
+    -- Status and counts
     status discovery_job_status NOT NULL DEFAULT 'pending',
     profiles_discovered INTEGER NOT NULL DEFAULT 0,
     profiles_scored INTEGER NOT NULL DEFAULT 0,
+    error_message TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

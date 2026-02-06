@@ -144,7 +144,10 @@ All Jobs API endpoints require **BearerAuth** (JWT token).
   "name": "Sustainable Fashion Discovery",
   "follower_range_min": 5000,
   "follower_range_max": 500000,
-  "discovery_limit": 50
+  "discovery_limit": 50,
+  "keywords": ["sustainable", "ethical", "minimalist"],
+  "hashtags": ["sustainablefashion", "ethicalfashion"],
+  "min_score_threshold": 60
 }
 ```
 
@@ -184,9 +187,12 @@ curl -X POST http://localhost:8000/api/jobs \
 - `brand_description`: Required, 10-5000 characters
 - `reference_profiles`: Required, 2-10 valid Instagram URLs
 - `name`: Optional, max 100 characters
-- `follower_range_min`: Optional, default 1000
-- `follower_range_max`: Optional, default 1000000
+- `follower_range_min`: Optional, default 5000
+- `follower_range_max`: Optional, default 500000
 - `discovery_limit`: Optional, default 50, max 100
+- `keywords`: Optional, array of strings (auto-normalized to lowercase)
+- `hashtags`: Optional, array of strings (auto-prefixed with #)
+- `min_score_threshold`: Optional, 0-100 (default 50)
 
 ---
 
@@ -386,6 +392,72 @@ Check remaining daily job creation quota.
 curl -X GET "http://localhost:8000/api/jobs/quota" \
   -H "Authorization: Bearer $TOKEN"
 ```
+
+---
+
+### 3.8 Cancel Job
+
+**Endpoint:** `POST /api/jobs/{job_id}/cancel`
+
+Cancel a running discovery job mid-execution.
+
+**Swagger Steps:**
+1. Navigate to `POST /api/jobs/{job_id}/cancel` section
+2. Click "Try it out"
+3. Enter the `job_id` of a pending/running job
+4. Click "Execute"
+
+**Expected Response (200 OK):**
+```json
+{
+  "status": "cancelled",
+  "job_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "cancelled_at": "2026-02-06T10:00:00Z",
+  "message": "Discovery job cancelled successfully"
+}
+```
+
+**curl Command:**
+```bash
+curl -X POST "http://localhost:8000/api/jobs/$JOB_ID/cancel" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Cancellable States:** `pending`, `analyzing`, `discovering`, `scoring`
+
+**Non-Cancellable States:** `completed`, `cancelled`, `failed`
+
+---
+
+### 3.9 Demo Mode (No Auth Required)
+
+**Endpoint:** `POST /api/demo/start`
+
+Create a demo job with 10 pre-seeded, pre-scored profiles. Works without authentication.
+
+**Swagger Steps:**
+1. Navigate to `POST /api/demo/start` section
+2. Click "Try it out"
+3. Click "Execute" (no auth needed)
+
+**Expected Response (201 Created):**
+```json
+{
+  "job_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "status": "completed",
+  "message": "Demo job created with 10 sample profiles",
+  "profiles_count": 10,
+  "redirect_url": "/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "is_demo": true
+}
+```
+
+**curl Command:**
+```bash
+curl -X POST "http://localhost:8000/api/demo/start"
+```
+
+> **Note**: Demo jobs are immediately in `completed` status with 10 sample sustainable lifestyle profiles, each with scores and recommendations.
 
 ---
 

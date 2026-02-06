@@ -926,6 +926,7 @@ class Routes:
     AGENTS = "/api/agent"
     EMAIL = "/api/email"
     STATUS = "/api"
+    DEMO = "/api/demo"  # Demo mode endpoints
 
 
 # =============================================================================
@@ -1954,7 +1955,49 @@ Get pre-calculated analytics for a session.
 }
 ```
 
-### 8.3 Agent Endpoints
+#### POST /api/jobs/{job_id}/cancel - Cancel Job
+
+Cancel a running discovery job mid-execution.
+
+**Request:** None (job_id in path)
+
+**Response:**
+```json
+{
+  "status": "cancelled",
+  "job_id": "11111111-1111-1111-1111-111111111111",
+  "cancelled_at": "2026-02-06T10:00:00Z",
+  "message": "Discovery job cancelled successfully"
+}
+```
+
+**Cancellable States:** `pending`, `analyzing`, `discovering`, `scoring`
+
+---
+
+### 8.3 Demo Endpoints
+
+#### POST /api/demo/start - Start Demo
+
+Create a demo job with 10 pre-seeded, pre-scored profiles. Works without authentication.
+
+**Request:** None
+
+**Response:**
+```json
+{
+  "job_id": "11111111-1111-1111-1111-111111111111",
+  "status": "completed",
+  "message": "Demo job created with 10 sample profiles",
+  "profiles_count": 10,
+  "redirect_url": "/jobs/11111111-1111-1111-1111-111111111111",
+  "is_demo": true
+}
+```
+
+---
+
+### 8.4 Agent Endpoints
 
 #### POST /api/agent/analyze-brand
 
@@ -2077,7 +2120,7 @@ Get pre-calculated analytics for a session.
 }
 ```
 
-### 8.4 Email Endpoints
+### 8.5 Email Endpoints
 
 #### POST /api/email/generate - Generate Outreach Email
 
@@ -2145,7 +2188,7 @@ Mock endpoint for demo purposes. Does not actually send email.
 
 ---
 
-### 8.5 Status Update Endpoints
+### 8.6 Status Update Endpoints
 
 #### PATCH /api/jobs/{job_id}/status
 
