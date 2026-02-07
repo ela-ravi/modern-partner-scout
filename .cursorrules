@@ -1,3 +1,47 @@
+# ============================================================
+# CURRENT PROJECT STATE - READ THIS FIRST
+# ============================================================
+
+## Development Progress
+| EPIC | Description | Status |
+|------|-------------|--------|
+| EPIC-1 | Project Foundation & Infrastructure | ✅ COMPLETED |
+| EPIC-2 | Backend Core Services & API Layer | ✅ COMPLETED |
+| EPIC-3 | AI Agents & LLM Integration | ✅ COMPLETED |
+| EPIC-4 | Workflow Orchestration (n8n + Python) | 🔄 IN PROGRESS |
+| EPIC-5 | Frontend Application Development | ⏳ PENDING |
+| EPIC-6 | Comprehensive Testing & QA | ⏳ PENDING |
+| EPIC-7 | Deployment & Production Readiness | ⏳ PENDING |
+
+## Current Configuration
+- Backend Port: **8001** (not 8000)
+- Database: Supabase project `sojwzibebggyezzsxpgv`
+- LLM Provider: Gemini (`gemini-2.5-flash-lite`)
+- n8n URL: `https://n8n.srv824552.hstgr.cloud`
+
+## Critical Rules
+1. **DO NOT** modify EPIC 1-3 code unless fixing bugs
+2. **ALWAYS** read `PROJECT_CONTEXT.md` first
+3. **ALWAYS** read relevant docs in `docs/` before implementing
+4. **ALWAYS** follow `docs/PartnerScout_AI_Agile_Development_Plan.md` task structure
+5. **TEST** each change using Swagger: http://localhost:8001/docs
+
+## Quick Commands
+```bash
+# Start backend (from project root)
+cd backend && venv\Scripts\activate && uvicorn app.main:app --reload --port 8001
+
+# Start frontend (from project root)
+cd frontend && npm run dev
+
+# Health check
+curl http://localhost:8001/api/health
+```
+
+# ============================================================
+# ORIGINAL PROJECT RULES (Below)
+# ============================================================
+
 # PartnerScout AI - Cursor Rules
 
 ## Project Overview

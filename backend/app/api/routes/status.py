@@ -267,7 +267,7 @@ async def update_profile_status(
             previous_status=ProfileStatus(current_status),
             updated_at=datetime.fromisoformat(
                 updated_profile["updated_at"].replace("Z", "+00:00")
-            ) if isinstance(updated_profile["updated_at"], str) else updated_profile["updated_at"],
+            ) if isinstance(updated_profile.get("updated_at"), str) else updated_profile.get("updated_at", datetime.now(timezone.utc)),
         )
         
     except ProfileNotFoundError as e:
@@ -394,7 +394,7 @@ async def batch_update_profile_statuses(
                 previous_status=ProfileStatus(current_status),
                 updated_at=datetime.fromisoformat(
                     updated_profile["updated_at"].replace("Z", "+00:00")
-                ) if isinstance(updated_profile["updated_at"], str) else updated_profile["updated_at"],
+                ) if isinstance(updated_profile.get("updated_at"), str) else updated_profile.get("updated_at", datetime.now(timezone.utc)),
             ))
             
         except ProfileNotFoundError:
