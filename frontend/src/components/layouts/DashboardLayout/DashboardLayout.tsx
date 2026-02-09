@@ -1,17 +1,9 @@
 import { Outlet } from 'react-router-dom'
 import { SkipLink } from '@/components/ui/SkipLink'
 import { UserMenu } from '@/components/composite/UserMenu'
-import { cn } from '@/lib/utils'
-import ListAltIcon from '@mui/icons-material/ListAlt'
-import { Link, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 
 export function DashboardLayout() {
-  const location = useLocation()
-
-  const navItems = [
-    { path: '/sessions', label: 'Sessions', icon: <ListAltIcon /> },
-  ]
-
   return (
     <div className="min-h-screen bg-apple-bg flex flex-col">
       <SkipLink />
@@ -44,27 +36,6 @@ export function DashboardLayout() {
               </svg>
               <span className="hidden sm:inline">PartnerScout</span>
             </Link>
-
-            {/* Navigation Links */}
-            <div className="flex items-center gap-1">
-              {navItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={cn(
-                    'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors',
-                    location.pathname === item.path
-                      ? 'bg-apple-blue/10 text-apple-blue'
-                      : 'text-apple-text-secondary hover:bg-apple-gray'
-                  )}
-                >
-                  <span className="text-xl" aria-hidden="true">
-                    {item.icon}
-                  </span>
-                  <span className="hidden sm:inline">{item.label}</span>
-                </Link>
-              ))}
-            </div>
 
             {/* User Menu */}
             <UserMenu />
