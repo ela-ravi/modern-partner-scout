@@ -1,6 +1,7 @@
 import React from 'react';
 import type { JobAnalytics } from '../../types';
 import { Users, CheckCircle, Mail, BarChart2 } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 interface StatsGridProps {
     analytics: JobAnalytics;
@@ -8,53 +9,61 @@ interface StatsGridProps {
 
 export const StatsGrid: React.FC<StatsGridProps> = ({ analytics }) => {
     return (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10 animate-slide-up" style={{ animationDelay: '0.1s' }}>
-            <div className="bg-white rounded-[16px] border border-[rgba(0,0,0,0.04)] p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-                <div className="flex items-center justify-between mb-2">
-                    <p className="text-[#86868b] text-sm font-medium">Total Discovered</p>
-                    <Users className="w-5 h-5 text-[#0071e3]" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-12 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+            {/* Total Discovered */}
+            <div className="card p-6 border-brand-blue/5 hover:border-brand-blue/10 transition-all">
+                <div className="flex items-center justify-between mb-4">
+                    <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-widest">Total Discovered</p>
+                    <div className="w-10 h-10 rounded-xl bg-brand-blue/10 flex items-center justify-center text-brand-blue">
+                        <Users className="w-5 h-5" />
+                    </div>
                 </div>
-                <p className="text-3xl font-semibold tracking-tight text-[#1d1d1f]">{analytics.total_profiles}</p>
-                <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[12px] font-medium text-[#34c759] bg-[#34c759]/10 px-2 py-0.5 rounded-full">
-                        {analytics.new_profiles} new
+                <p className="text-4xl font-bold tracking-tight text-brand-text mb-2">{analytics.total_profiles}</p>
+                <div className="flex items-center gap-2">
+                    <span className="text-[12px] font-bold text-brand-success bg-brand-success/10 px-2.5 py-0.5 rounded-full">
+                        +{analytics.new_profiles} new
                     </span>
                 </div>
             </div>
 
-            <div className="bg-white rounded-[16px] border border-[rgba(0,0,0,0.04)] p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-                <div className="flex items-center justify-between mb-2">
-                    <p className="text-[#86868b] text-sm font-medium">High Match</p>
-                    <CheckCircle className="w-5 h-5 text-[#34c759]" />
+            {/* Evaluated */}
+            <div className="card p-6 border-brand-success/5 hover:border-brand-success/10 transition-all">
+                <div className="flex items-center justify-between mb-4">
+                    <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-widest">Evaluated</p>
+                    <div className="w-10 h-10 rounded-xl bg-brand-success/10 flex items-center justify-center text-brand-success">
+                        <CheckCircle className="w-5 h-5" />
+                    </div>
                 </div>
-                {/* Assuming High Match is > 80. Backend doesn't give this count directly in analytics, using Max Score logic or placeholder for now. 
-                    Actually, let's use Done profiles as proxy for now or if we had score distribution we'd use that.
-                    Use 'done_profiles' for now as 'Evaluated'.
-                 */}
-                <p className="text-3xl font-semibold tracking-tight text-[#1d1d1f]">{analytics.done_profiles}</p>
-                <p className="text-[#86868b] text-xs font-medium mt-1">Evaluated Profiles</p>
+                <p className="text-4xl font-bold tracking-tight text-brand-text mb-2">{analytics.done_profiles}</p>
+                <p className="text-brand-secondary text-xs font-bold uppercase tracking-wider">High precision</p>
             </div>
 
-            <div className="bg-white rounded-[16px] border border-[rgba(0,0,0,0.04)] p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-                <div className="flex items-center justify-between mb-2">
-                    <p className="text-[#86868b] text-sm font-medium">Emails Found</p>
-                    <Mail className="w-5 h-5 text-[#ff9500]" />
+            {/* Emails Found */}
+            <div className="card p-6 border-brand-warning/5 hover:border-brand-warning/10 transition-all">
+                <div className="flex items-center justify-between mb-4">
+                    <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-widest">Emails Found</p>
+                    <div className="w-10 h-10 rounded-xl bg-brand-warning/10 flex items-center justify-center text-brand-warning">
+                        <Mail className="w-5 h-5" />
+                    </div>
                 </div>
-                <p className="text-3xl font-semibold tracking-tight text-[#1d1d1f]">{analytics.profiles_with_email}</p>
-                <p className="text-[#86868b] text-xs font-medium mt-1">
+                <p className="text-4xl font-bold tracking-tight text-brand-text mb-2">{analytics.profiles_with_email}</p>
+                <p className="text-brand-secondary text-xs font-bold uppercase tracking-wider">
                     {analytics.total_profiles > 0 ? Math.round((analytics.profiles_with_email / analytics.total_profiles) * 100) : 0}% extraction
                 </p>
             </div>
 
-            <div className="bg-white rounded-[16px] border border-[rgba(0,0,0,0.04)] p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-                <div className="flex items-center justify-between mb-2">
-                    <p className="text-[#86868b] text-sm font-medium">Avg Score</p>
-                    <BarChart2 className="w-5 h-5 text-[#af52de]" />
+            {/* Avg Score */}
+            <div className="card p-6 bg-brand-text text-white hover:bg-black transition-all">
+                <div className="flex items-center justify-between mb-4">
+                    <p className="text-[10px] font-bold opacity-60 uppercase tracking-widest">Avg Score</p>
+                    <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white">
+                        <BarChart2 className="w-5 h-5" />
+                    </div>
                 </div>
-                <p className="text-3xl font-semibold tracking-tight text-[#1d1d1f]">
+                <p className="text-4xl font-bold tracking-tight mb-2">
                     {analytics.avg_score ? Math.round(analytics.avg_score) : 0}%
                 </p>
-                <p className="text-[#86868b] text-xs font-medium mt-1">
+                <p className="text-white/60 text-xs font-bold uppercase tracking-wider">
                     Max: {analytics.max_score ? Math.round(analytics.max_score) : 0}%
                 </p>
             </div>

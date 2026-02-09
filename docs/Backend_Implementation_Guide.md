@@ -1835,12 +1835,27 @@ class JobRepository(BaseRepository[Job]):
       "full_name": "The Sustainable Closet",
       "profile_picture_url": "https://instagram.com/...",
       "bio": "Curating ethical fashion | Slow fashion advocate",
-      "followers": 45200,
-      "following": 1250,
+      "followers_count": 45200,
+      "following_count": 1250,
       "posts_count": 847,
       "engagement_rate": 3.2,
       "is_verified": false,
       "is_business": true,
+      "external_url": "https://sustainablecloset.com",
+      "business_email": "hello@sustainablecloset.com",
+      "business_category": "Clothing Store",
+      "following_ratio": 0.03,
+      "cover_image_url": "https://instagram.com/p/abc/assets/cover.jpg",
+      "recent_posts": [
+        {
+          "url": "https://instagram.com/p/abc/",
+          "thumbnail": "https://instagram.com/p/abc/thumb.jpg",
+          "caption": "Minimalist vibes...",
+          "likes": 1200,
+          "comments": 45,
+          "timestamp": "2026-02-01T12:00:00Z"
+        }
+      ],
       "status": "done",
       "score": {
         "score": 92,
@@ -2019,8 +2034,8 @@ Get pre-calculated analytics for a session.
       "full_name": "The Sustainable Closet",
       "profile_picture_url": "https://instagram.com/...",
       "bio": "Curating ethical fashion | Slow fashion advocate",
-      "followers": 45200,
-      "following": 1250,
+      "followers_count": 45200,
+      "following_count": 1250,
       "posts_count": 847,
       "engagement_rate": 3.2,
       "is_verified": false,
@@ -2032,13 +2047,24 @@ Get pre-calculated analytics for a session.
       "username": "eco.boutique",
       "full_name": "Eco Boutique",
       "profile_picture_url": "https://instagram.com/...",
+      "cover_image_url": "https://instagram.com/p/def/cover.jpg",
       "bio": "Sustainable living | Eco-friendly products",
-      "followers": 28500,
-      "following": 890,
+      "followers_count": 28500,
+      "following_count": 890,
       "posts_count": 432,
       "engagement_rate": 4.1,
       "is_verified": false,
-      "is_business": true
+      "is_business": true,
+      "recent_posts": [
+        {
+          "url": "https://instagram.com/p/def/",
+          "thumbnail": "https://instagram.com/p/def/thumb.jpg",
+          "caption": "Eco-friendly finds!",
+          "likes": 850,
+          "comments": 30,
+          "timestamp": "2026-01-28T10:00:00Z"
+        }
+      ]
     }
   ],
   "total_discovered": 2,
@@ -2261,8 +2287,8 @@ Mock endpoint for demo purposes. Does not actually send email.
 | `full_name` | TEXT | nullable | `NULL` |
 | `profile_picture_url` | TEXT | nullable | `NULL` |
 | `bio` | TEXT | nullable | `NULL` |
-| `followers` | INTEGER | NOT NULL | `0` |
-| `following` | INTEGER | nullable | `NULL` |
+| `followers_count` | INTEGER | NOT NULL | `0` |
+| `following_count` | INTEGER | nullable | `NULL` |
 | `posts_count` | INTEGER | nullable | `NULL` |
 | `engagement_rate` | DECIMAL(5,2) | nullable | `NULL` |
 | `is_verified` | BOOLEAN | NOT NULL | `false` |
@@ -2271,6 +2297,8 @@ Mock endpoint for demo purposes. Does not actually send email.
 | `business_email` | TEXT | nullable | `NULL` |
 | `business_category` | TEXT | nullable | `NULL` |
 | `following_ratio` | DECIMAL(5,2) | nullable | `NULL` |
+| `cover_image_url` | TEXT | nullable | `NULL` |
+| `recent_posts` | JSONB | nullable | `'[]'::jsonb` |
 | `status` | profile_status | NOT NULL | `'new'` |
 | `created_at` | TIMESTAMPTZ | NOT NULL | `NOW()` |
 
@@ -2567,8 +2595,8 @@ class AgentError(BusinessError):
   "full_name": "The Sustainable Closet",
   "profile_picture_url": "https://instagram.com/p/abc123/media",
   "bio": "Curating ethical fashion | Slow fashion advocate | hello@sustainablecloset.com",
-  "followers": 45200,
-  "following": 1250,
+  "followers_count": 45200,
+  "following_count": 1250,
   "posts_count": 847,
   "engagement_rate": 3.2,
   "is_verified": false,

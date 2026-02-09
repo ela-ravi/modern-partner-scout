@@ -615,6 +615,23 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
                 # Build Instagram URL
                 instagram_url = f"https://instagram.com/{username}"
                 
+                # Extract recent posts mapping
+                raw_posts = profile.get("recentPosts") or profile.get("latestPosts") or []
+                recent_posts = []
+                for p in raw_posts[:10]: # Store up to 10
+                    recent_posts.append({
+                        "image_url": p.get("displayUrl") or p.get("thumbnailUrl"),
+                        "caption": p.get("caption"),
+                        "likes": p.get("likesCount"),
+                        "comments": p.get("commentsCount"),
+                        "timestamp": p.get("timestamp")
+                    })
+                
+                # Use first post image as cover image if not provided
+                cover_image_url = None
+                if recent_posts:
+                    cover_image_url = recent_posts[0]["image_url"]
+
                 # Create profile in database
                 stored_profile = self._profile_repo.create(
                     job_id=job_id,
@@ -662,7 +679,9 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
                     business_category=(
                         profile.get("businessCategoryName") or
                         profile.get("business_category")
-                    )
+                    ),
+                    cover_image_url=cover_image_url,
+                    recent_posts=recent_posts
                 )
                 
                 stored_profiles.append(stored_profile)

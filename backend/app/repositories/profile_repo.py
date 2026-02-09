@@ -44,7 +44,9 @@ class ProfileRepository(BaseRepository[Dict[str, Any]]):
         is_business_account: Optional[bool] = None,
         external_url: Optional[str] = None,
         business_email: Optional[str] = None,
-        business_category: Optional[str] = None
+        business_category: Optional[str] = None,
+        cover_image_url: Optional[str] = None,
+        recent_posts: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """
         Create a new discovered profile.
@@ -65,6 +67,8 @@ class ProfileRepository(BaseRepository[Dict[str, Any]]):
             external_url: External website link
             business_email: Business email if available
             business_category: Business category
+            cover_image_url: Profile header image
+            recent_posts: List of recent post data
             
         Returns:
             Created profile data
@@ -96,6 +100,8 @@ class ProfileRepository(BaseRepository[Dict[str, Any]]):
             "external_url": external_url,
             "business_email": business_email,
             "business_category": business_category,
+            "cover_image_url": cover_image_url,
+            "recent_posts": recent_posts
         }
         
         for key, value in optional_fields.items():

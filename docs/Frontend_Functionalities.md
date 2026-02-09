@@ -118,6 +118,7 @@
 | 44 | **PROCESSING tab** - Display profiles currently being scored |
 | 45 | **DONE tab** - Display final ranked profiles with scores |
 | 46 | Profile cards with profile_picture_url, username, full_name, follower count |
+| 46a | Display `cover_image_url` as profile card background |
 | 47 | Score badge/indicator on profile cards |
 | 48 | Authenticity indicator on profile cards (Genuine/Suspicious/Fake) |
 | 49 | Email availability indicator on profile cards |
@@ -148,6 +149,7 @@
 | 65b | Display engagement rate |
 | 65c | Display verification and business account badges |
 | 65d | Display external_url (website) and business_category |
+| 65e | Display `recent_posts` carousel (thumbnails, captions, engagement metrics) |
 | 65e | Display authenticity badge (Genuine/Suspicious/Fake based on follower_quality)
 
 ---

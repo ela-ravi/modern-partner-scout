@@ -113,8 +113,8 @@ From your Supabase project dashboard, note these values:
 │ embedding_vector │  │ full_name          │
 │ created_at       │  │ profile_picture_url│
 └──────────────────┘  │ bio                │
-                      │ followers          │
-                      │ following          │
+                      │ followers_count    │
+                      │ following_count    │
                       │ posts_count        │
                       │ engagement_rate    │
                       │ is_verified        │
@@ -152,11 +152,11 @@ All profile data is stored in the database at discovery time for consistent fron
 
 | Field | Storage | Source |
 |-------|---------|--------|
-| `instagram_url`, `username`, `followers` | `discovered_profiles` table | Stored at discovery |
+| `instagram_url`, `username`, `followers_count` | `discovered_profiles` table | Stored at discovery |
 | `full_name`, `profile_picture_url`, `bio` | `discovered_profiles` table | Stored at discovery |
-| `following`, `posts_count`, `engagement_rate` | `discovered_profiles` table | Stored at discovery |
+| `cover_image_url`, `recent_posts` | `discovered_profiles` table | Stored at scoring |
+| `following_count`, `posts_count`, `engagement_rate` | `discovered_profiles` table | Stored at discovery |
 | `is_verified`, `is_business` | `discovered_profiles` table | Stored at discovery |
-| `recent_posts` | Not stored | Fetched via Apify at scoring time only |
 
 **Why store profile data?**
 - Consistent frontend display without additional API calls
@@ -164,15 +164,15 @@ All profile data is stored in the database at discovery time for consistent fron
 - Real-time updates via Supabase Realtime
 - Reduces Apify API costs (fetch once, not on every view)
 
-**Note:** `recent_posts` are fetched fresh at scoring time for accurate engagement analysis.
+**Note:** `recent_posts` and `cover_image_url` are fetched fresh and stored at scoring time for accurate display and engagement analysis.
 
 **Apify Instagram Profile Scraper** field mapping:
 - `username` → `username`
 - `fullName` → `full_name`
 - `profilePicUrl` → `profile_picture_url`
 - `biography` → `bio`
-- `followersCount` → `followers`
-- `followsCount` → `following`
+- `followersCount` → `followers_count`
+- `followsCount` → `following_count`
 - `postsCount` → `posts_count`
 - `isVerified` → `is_verified`
 - `isBusinessAccount` → `is_business`
@@ -290,16 +290,18 @@ CREATE TABLE discovered_profiles (
     full_name TEXT,
     profile_picture_url TEXT,
     bio TEXT,
-    followers INTEGER NOT NULL DEFAULT 0,
-    following INTEGER,
+    followers_count INTEGER NOT NULL DEFAULT 0,
+    following_count INTEGER,
     posts_count INTEGER,
     engagement_rate DECIMAL(5,2),
     is_verified BOOLEAN NOT NULL DEFAULT false,
     is_business BOOLEAN,
     external_url TEXT,                    -- Website link from bio
     business_email TEXT,                  -- Email from business account
-    business_category TEXT,               -- Business category name
-    following_ratio DECIMAL(5,2),         -- Calculated: following / followers
+    business_category TEXT,               -- Business category (luxury, fashion, etc.)
+    following_ratio DECIMAL(8,4),         -- Pre-calculated following/followers ratio
+    cover_image_url TEXT,                 -- Profile cover image for dashboard
+    recent_posts JSONB DEFAULT '[]'::jsonb, -- Scored recent posts (thumbnails, captions)
     status profile_status NOT NULL DEFAULT 'new',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT unique_profile_per_job UNIQUE (job_id, instagram_url)
@@ -348,7 +350,7 @@ CREATE INDEX idx_profile_contacts_profile_id ON profile_contacts(profile_id);
 
 -- Query-specific indexes
 CREATE INDEX idx_discovered_profiles_status ON discovered_profiles(status);
-CREATE INDEX idx_discovered_profiles_followers ON discovered_profiles(followers DESC);
+CREATE INDEX idx_discovered_profiles_followers_count ON discovered_profiles(followers_count DESC);
 CREATE INDEX idx_profile_scores_score ON profile_scores(score DESC);
 CREATE INDEX idx_profile_contacts_email ON profile_contacts(email) WHERE email IS NOT NULL;
 ```
@@ -433,8 +435,8 @@ SELECT
     dp.full_name,
     dp.profile_picture_url,
     dp.bio,
-    dp.followers,
-    dp.following,
+    dp.followers_count,
+    dp.following_count,
     dp.posts_count,
     dp.engagement_rate,
     dp.is_verified,
@@ -443,6 +445,8 @@ SELECT
     dp.business_email,
     dp.business_category,
     dp.following_ratio,
+    dp.cover_image_url,
+    dp.recent_posts,
     dp.status,
     dp.created_at,
     ps.score,
@@ -560,14 +564,14 @@ For existing databases, run this migration to add the new profile columns:
 ALTER TABLE discovered_profiles ADD COLUMN IF NOT EXISTS full_name TEXT;
 ALTER TABLE discovered_profiles ADD COLUMN IF NOT EXISTS profile_picture_url TEXT;
 ALTER TABLE discovered_profiles ADD COLUMN IF NOT EXISTS bio TEXT;
-ALTER TABLE discovered_profiles ADD COLUMN IF NOT EXISTS following INTEGER;
+ALTER TABLE discovered_profiles ADD COLUMN IF NOT EXISTS following_count INTEGER;
 ALTER TABLE discovered_profiles ADD COLUMN IF NOT EXISTS posts_count INTEGER;
 ALTER TABLE discovered_profiles ADD COLUMN IF NOT EXISTS engagement_rate DECIMAL(5,2);
 ALTER TABLE discovered_profiles ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE discovered_profiles ADD COLUMN IF NOT EXISTS is_business BOOLEAN;
 
 -- Add index for followers (for sorting)
-CREATE INDEX IF NOT EXISTS idx_discovered_profiles_followers ON discovered_profiles(followers DESC);
+CREATE INDEX IF NOT EXISTS idx_discovered_profiles_followers_count ON discovered_profiles(followers_count DESC);
 
 -- Update the view to include new columns
 DROP VIEW IF EXISTS v_complete_profiles;
@@ -580,8 +584,8 @@ SELECT
     dp.full_name,
     dp.profile_picture_url,
     dp.bio,
-    dp.followers,
-    dp.following,
+    dp.followers_count,
+    dp.following_count,
     dp.posts_count,
     dp.engagement_rate,
     dp.is_verified,
@@ -590,6 +594,8 @@ SELECT
     dp.business_email,
     dp.business_category,
     dp.following_ratio,
+    dp.cover_image_url,
+    dp.recent_posts,
     dp.status,
     dp.created_at,
     ps.score,
@@ -719,7 +725,7 @@ VALUES (
 
 INSERT INTO discovered_profiles (
     id, job_id, instagram_url, username, full_name, profile_picture_url, bio,
-    followers, following, posts_count, engagement_rate, is_verified, is_business,
+    followers_count, following_count, posts_count, engagement_rate, is_verified, is_business,
     external_url, business_email, business_category, following_ratio, status
 )
 VALUES (

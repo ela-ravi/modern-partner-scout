@@ -321,11 +321,12 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
                 reasoning=analysis.reasoning,
                 is_fake_suspected=is_fake_suspected,
                 fake_indicators=fake_indicators,
-                contact=contact
+                contact=contact,
+                profile_data=profile_data
             )
             
             # Update profile status
-            await self._update_profile_status(profile_id, ProfileStatus.SCORED)
+            await self._update_profile_status(profile_id, ProfileStatus.DONE)
             
             # Calculate duration
             duration = time.time() - start_time
@@ -1002,7 +1003,8 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
         reasoning: Dict[str, str],
         is_fake_suspected: bool,
         fake_indicators: List[str],
-        contact: ExtractedContact
+        contact: ExtractedContact,
+        profile_data: Optional[Dict[str, Any]] = None
     ) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
         """
         Store scoring results in the database.
@@ -1076,7 +1078,38 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
             )
             logger.debug(f"Stored contact info for profile: {profile_id}")
         
+        # Update profile visual assets if provided
+        if profile_data:
+            visual_assets = self._extract_visual_assets(profile_data)
+            if visual_assets:
+                self._profile_repo.update(profile_id, visual_assets)
+                logger.debug(f"Updated visual assets for profile: {profile_id}")
+        
         return score_record, contact_record
+
+    def _extract_visual_assets(self, profile: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract cover image and recent posts from raw profile data."""
+        assets = {}
+        
+        # 1. Extract recent posts if available
+        raw_posts = profile.get("recentPosts") or profile.get("latestPosts") or []
+        if raw_posts:
+            recent_posts = []
+            for p in raw_posts[:10]:
+                recent_posts.append({
+                    "image_url": p.get("displayUrl") or p.get("thumbnailUrl"),
+                    "caption": p.get("caption"),
+                    "likes": p.get("likesCount"),
+                    "comments": p.get("commentsCount"),
+                    "timestamp": p.get("timestamp")
+                })
+            assets["recent_posts"] = recent_posts
+            
+            # 2. Use first post image as cover image if not explicitly present
+            if not assets.get("cover_image_url") and recent_posts:
+                assets["cover_image_url"] = recent_posts[0]["image_url"]
+                
+        return assets
     
     async def _update_profile_status(
         self,

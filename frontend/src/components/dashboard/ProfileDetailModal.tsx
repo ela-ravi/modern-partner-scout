@@ -51,7 +51,7 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({ profile,
 
                                 <div className="grid grid-cols-2 gap-4 mb-6">
                                     <div className="bg-[#f5f5f7] rounded-xl p-3 text-center">
-                                        <p className="text-[#1d1d1f] font-semibold">{formatNumber(profile.followers)}</p>
+                                        <p className="text-[#1d1d1f] font-semibold">{formatNumber(profile.followers_count)}</p>
                                         <p className="text-[#86868b] text-xs">Followers</p>
                                     </div>
                                     <div className="bg-[#f5f5f7] rounded-xl p-3 text-center">
@@ -119,6 +119,34 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({ profile,
                                             {profile.reasoning?.summary || profile.reasoning?.text || "No AI reasoning available for this profile yet."}
                                         </p>
                                     </section>
+
+                                    {/* Recent Posts */}
+                                    {profile.recent_posts && profile.recent_posts.length > 0 && (
+                                        <section>
+                                            <h4 className="text-sm font-semibold text-[#86868b] uppercase tracking-wider mb-4">Recent Content</h4>
+                                            <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
+                                                {profile.recent_posts.map((post, i) => (
+                                                    <div key={i} className="flex-shrink-0 w-32 group/post">
+                                                        <div className="aspect-square rounded-xl overflow-hidden bg-gray-100 border border-[rgba(0,0,0,0.04)] shadow-sm">
+                                                            <img
+                                                                src={post.image_url}
+                                                                className="w-full h-full object-cover transition-transform duration-300 group-hover/post:scale-110"
+                                                                alt=""
+                                                                onError={(e) => {
+                                                                    (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150?text=No+Image';
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        {post.likes !== undefined && (
+                                                            <p className="text-[10px] text-[#86868b] mt-1.5 flex items-center gap-1">
+                                                                <span className="font-semibold text-[#1d1d1f]">{post.likes.toLocaleString()}</span> likes
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </section>
+                                    )}
 
                                     {/* Keywords/Themes */}
                                     {profile.reasoning?.keywords && profile.reasoning.keywords.length > 0 && (

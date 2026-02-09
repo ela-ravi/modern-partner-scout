@@ -294,7 +294,7 @@ class JobService:
             "profiles_scored": len(scores),
             "new_profiles": status_counts.get(ProfileStatus.NEW.value, 0),
             "processing_profiles": status_counts.get(ProfileStatus.PROCESSING.value, 0),
-            "done_profiles": status_counts.get(ProfileStatus.SCORED.value, 0),
+            "done_profiles": status_counts.get(ProfileStatus.DONE.value, 0),
             "skipped_profiles": status_counts.get(ProfileStatus.SKIPPED.value, 0),
             "average_score": round(sum(scores) / len(scores), 1) if scores else None,
             "max_score": max(scores) if scores else None,

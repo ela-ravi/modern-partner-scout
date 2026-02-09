@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { DashboardLayout } from '../layouts/DashboardLayout';
 import { StatsGrid } from '../components/dashboard/StatsGrid';
 import { ProfileCard } from '../components/dashboard/ProfileCard';
 import { ProfileDetailModal } from '../components/dashboard/ProfileDetailModal';
@@ -9,6 +8,7 @@ import type { DiscoveryJob, JobAnalytics, CompleteProfile } from '../types';
 import { api } from '../lib/api';
 import { useToast } from '../hooks/useToast';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
+import { cn } from '../lib/utils';
 
 const DashboardPage: React.FC = () => {
     const { jobId } = useParams<{ jobId: string }>();
@@ -81,106 +81,109 @@ const DashboardPage: React.FC = () => {
 
     if (loading && !job) {
         return (
-            <DashboardLayout>
-                <div className="max-w-6xl mx-auto px-6 py-10 space-y-8">
-                    <div className="h-20 bg-gray-100 rounded-xl animate-pulse"></div>
-                    <div className="grid grid-cols-4 gap-4">
-                        {[1, 2, 3, 4].map(i => <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse"></div>)}
-                    </div>
-                    <div className="grid grid-cols-3 gap-5">
-                        {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="h-96 bg-gray-100 rounded-xl animate-pulse"></div>)}
-                    </div>
+            <div className="max-w-6xl mx-auto px-6 py-10 space-y-8">
+                <div className="h-20 card animate-pulse"></div>
+                <div className="grid grid-cols-4 gap-4">
+                    {[1, 2, 3, 4].map(i => <div key={i} className="h-32 card animate-pulse"></div>)}
                 </div>
-            </DashboardLayout>
+                <div className="grid grid-cols-3 gap-5">
+                    {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="h-96 card animate-pulse"></div>)}
+                </div>
+            </div>
         );
     }
 
     if (!job) {
         return (
-            <DashboardLayout>
-                <div className="flex flex-col items-center justify-center min-h-[50vh]">
-                    <p className="text-lg text-gray-500">Job not found.</p>
-                    <Link to="/sessions"><Button className="mt-4">Back to Sessions</Button></Link>
+            <div className="flex flex-col items-center justify-center min-h-[50vh] animate-fade-in">
+                <div className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center mb-6">
+                    <ArrowLeft className="w-8 h-8 text-brand-secondary" />
                 </div>
-            </DashboardLayout>
+                <h3 className="text-xl font-bold mb-3 text-brand-text">Session not found</h3>
+                <p className="text-brand-secondary mb-8 leading-relaxed font-medium">The discovery session you're looking for doesn't exist.</p>
+                <Link to="/sessions"><Button>Back to Sessions</Button></Link>
+            </div>
         );
     }
 
     return (
-        <DashboardLayout>
-            <div className="max-w-6xl w-full mx-auto px-6 py-10">
-                {/* Page Header */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 animate-fade-in">
-                    <div>
-                        <div className="flex items-center gap-2 mb-2">
-                            <Link to="/sessions" className="text-[#86868b] hover:text-[#1d1d1f] transition-colors">
-                                <ArrowLeft className="w-5 h-5" />
-                            </Link>
-                            <h1 className="text-3xl font-semibold tracking-tight text-[#1d1d1f]">{job.name}</h1>
-                        </div>
-                        <p className="text-[#86868b] text-lg">
-                            {analytics?.total_profiles || profiles.length} partners discovered • {analytics?.done_profiles || 0} evaluated
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <div className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${getStatusColor(job.status)}`}>
-                            {job.status}
-                        </div>
-                        <Button variant="outline" size="sm" onClick={fetchDashboardData}>
-                            <RefreshCw className="w-4 h-4 mr-2" />
-                            Refresh
-                        </Button>
-                        <Link to="/sessions/new">
-                            <Button size="sm">New Discovery</Button>
+        <div className="max-w-6xl w-full mx-auto px-6 py-10">
+            {/* Page Header */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 animate-fade-in">
+                <div>
+                    <div className="flex items-center gap-3 mb-3">
+                        <Link to="/sessions" className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-brand-secondary hover:text-brand-text hover:bg-gray-100 transition-all">
+                            <ArrowLeft className="w-5 h-5" />
                         </Link>
+                        <h1 className="text-4xl font-bold tracking-tight text-brand-text">{job.name}</h1>
                     </div>
+                    <p className="text-brand-secondary text-lg font-medium ml-13">
+                        {analytics?.total_profiles || profiles.length} partners discovered • {analytics?.done_profiles || 0} evaluated
+                    </p>
                 </div>
-
-                {/* Stats */}
-                {analytics && <StatsGrid analytics={analytics} />}
-
-                {/* Tabs & Filters */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                    <div className="inline-flex gap-1 p-1 bg-[#f5f5f7] rounded-xl self-start">
-                        {(['all', 'new', 'processing', 'done'] as const).map((tab) => (
-                            <button
-                                key={tab}
-                                onClick={() => setActiveTab(tab)}
-                                className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === tab
-                                    ? 'bg-white shadow-sm text-[#1d1d1f]'
-                                    : 'text-[#86868b] hover:text-[#1d1d1f]'
-                                    }`}
-                            >
-                                {tab.charAt(0).toUpperCase() + tab.slice(1)} ({getTabCount(profiles, tab)})
-                            </button>
-                        ))}
+                <div className="flex items-center gap-3">
+                    <div className={cn("px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest shadow-sm border", getStatusColor(job.status))}>
+                        {job.status}
                     </div>
-
-                    <div className="flex items-center gap-3">
-                        <span className="text-sm text-[#86868b]">Sort by:</span>
-                        <button className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-[rgba(0,0,0,0.1)] rounded-xl text-sm font-medium hover:bg-[#f5f5f7] transition-colors">
-                            Score (High to Low)
-                        </button>
-                    </div>
+                    <Button variant="outline" size="sm" onClick={fetchDashboardData} className="h-10 rounded-full font-bold">
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Refresh
+                    </Button>
+                    <Link to="/sessions/new">
+                        <Button size="sm" className="h-10 rounded-full font-bold shadow-soft">New Discovery</Button>
+                    </Link>
                 </div>
-
-                {/* Grid */}
-                {sortedProfiles.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 animate-slide-up" style={{ animationDelay: '0.3s' }}>
-                        {sortedProfiles.map((profile) => (
-                            <ProfileCard
-                                key={profile.id}
-                                profile={profile}
-                                onClick={() => openProfileModal(profile)}
-                            />
-                        ))}
-                    </div>
-                ) : (
-                    <div className="py-20 text-center bg-white rounded-2xl border border-dashed border-gray-200">
-                        <p className="text-gray-500">No profiles found in this category.</p>
-                    </div>
-                )}
             </div>
+
+            {/* Stats */}
+            {analytics && <StatsGrid analytics={analytics} />}
+
+            {/* Tabs & Filters */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+                <div className="inline-flex gap-1 p-1 bg-gray-100 rounded-full self-start">
+                    {(['all', 'new', 'processing', 'done'] as const).map((tab) => (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            className={cn(
+                                "px-6 py-2.5 rounded-full text-sm font-bold transition-all",
+                                activeTab === tab
+                                    ? "bg-white shadow-soft text-brand-blue"
+                                    : "text-brand-secondary hover:text-brand-text"
+                            )}
+                        >
+                            {tab.charAt(0).toUpperCase() + tab.slice(1)} <span className="opacity-40 ml-1">{getTabCount(profiles, tab)}</span>
+                        </button>
+                    ))}
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-brand-secondary uppercase tracking-widest">Sort by:</span>
+                    <button className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-100 rounded-full text-sm font-bold hover:bg-gray-50 transition-all shadow-sm">
+                        Score (High to Low)
+                    </button>
+                </div>
+            </div>
+
+            {/* Grid */}
+            {sortedProfiles.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-slide-up" style={{ animationDelay: '0.3s' }}>
+                    {sortedProfiles.map((profile) => (
+                        <ProfileCard
+                            key={profile.id}
+                            profile={profile}
+                            onClick={() => openProfileModal(profile)}
+                        />
+                    ))}
+                </div>
+            ) : (
+                <div className="py-24 text-center bg-white rounded-3xl border border-dashed border-gray-200 animate-scale-in">
+                    <div className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center mx-auto mb-6">
+                        <RefreshCw className="w-8 h-8 text-brand-secondary opacity-20" />
+                    </div>
+                    <p className="text-brand-secondary font-bold text-lg">No profiles found in this category.</p>
+                </div>
+            )}
 
             {/* Profile Detail Modal */}
             <ProfileDetailModal
@@ -188,17 +191,17 @@ const DashboardPage: React.FC = () => {
                 onClose={() => setIsModalOpen(false)}
                 profile={selectedProfile}
             />
-        </DashboardLayout>
+        </div>
     );
 };
 
 const getStatusColor = (status: string) => {
     switch (status) {
-        case 'completed': return 'bg-green-100 text-green-700';
-        case 'discovering': return 'bg-blue-100 text-blue-700';
-        case 'scoring': return 'bg-orange-100 text-orange-700';
-        case 'failed': return 'bg-red-100 text-red-700';
-        default: return 'bg-gray-100 text-gray-700';
+        case 'completed': return 'bg-brand-success/10 text-brand-success border-brand-success/20';
+        case 'discovering': return 'bg-brand-blue/10 text-brand-blue border-brand-blue/20';
+        case 'scoring': return 'bg-brand-warning/10 text-brand-warning border-brand-warning/20';
+        case 'failed': return 'bg-brand-error/10 text-brand-error border-brand-error/20';
+        default: return 'bg-gray-100 text-gray-500 border-gray-200';
     }
 };
 

@@ -1,42 +1,37 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 /* Custom theme configuration */
 @theme {
   /* Apple-inspired color palette */
-  --color-primary-50: #f0f9ff;
-  --color-primary-100: #e0f2fe;
-  --color-primary-200: #bae6fd;
-  --color-primary-300: #7dd3fc;
-  --color-primary-400: #38bdf8;
-  --color-primary-500: #0ea5e9;
-  --color-primary-600: #0284c7;
-  --color-primary-700: #0369a1;
-  --color-primary-800: #075985;
-  --color-primary-900: #0c4a6e;
-  --color-primary-950: #082f49;
+  --color-brand-blue: #0071e3;
+  --color-brand-background: #fbfbfd;
+  --color-brand-text: #1d1d1f;
+  --color-brand-secondary: #86868b;
+  --color-brand-success: #34c759;
+  --color-brand-warning: #ff9500;
+  --color-brand-error: #ff3b30;
+  --color-brand-surface: #ffffff;
 
-  --color-success-50: #f0fdf4;
-  --color-success-500: #22c55e;
-  --color-success-600: #16a34a;
+  /* Overriding Tailwind defaults to match brand */
+  --color-primary-500: var(--color-brand-blue);
+  --color-primary-600: #0077ed;
+  
+  --color-success-500: var(--color-brand-success);
+  --color-warning-500: var(--color-brand-warning);
+  --color-error-500: var(--color-brand-error);
 
-  --color-warning-50: #fffbeb;
-  --color-warning-500: #f59e0b;
-  --color-warning-600: #d97706;
-
-  --color-error-50: #fef2f2;
-  --color-error-500: #ef4444;
-  --color-error-600: #dc2626;
-
-  /* Custom shadows */
-  --shadow-soft: 0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04);
-  --shadow-medium: 0 4px 20px -2px rgba(0, 0, 0, 0.1), 0 12px 25px -5px rgba(0, 0, 0, 0.05);
-  --shadow-large: 0 10px 40px -10px rgba(0, 0, 0, 0.15), 0 20px 50px -15px rgba(0, 0, 0, 0.1);
+  /* Custom shadows - more refined Apple-style */
+  --shadow-soft: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-medium: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-large: 0 16px 48px rgba(0, 0, 0, 0.12);
 
   /* Custom animations */
-  --animate-fade-in: fade-in 0.3s ease-out;
-  --animate-slide-up: slide-up 0.3s ease-out;
-  --animate-slide-down: slide-down 0.3s ease-out;
-  --animate-scale-in: scale-in 0.2s ease-out;
+  --animate-fade-in: fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-slide-up: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-slide-down: slide-down 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-scale-in: scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-shimmer: shimmer 2s infinite linear;
 }
 
 @keyframes fade-in {
@@ -45,101 +40,110 @@
 }
 
 @keyframes slide-up {
-  0% { transform: translateY(10px); opacity: 0; }
+  0% { transform: translateY(16px); opacity: 0; }
   100% { transform: translateY(0); opacity: 1; }
 }
 
 @keyframes slide-down {
-  0% { transform: translateY(-10px); opacity: 0; }
+  0% { transform: translateY(-16px); opacity: 0; }
   100% { transform: translateY(0); opacity: 1; }
 }
 
 @keyframes scale-in {
-  0% { transform: scale(0.95); opacity: 0; }
+  0% { transform: scale(0.96); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 /* Base styles */
 html {
   scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  @apply bg-gray-50 text-gray-900 antialiased;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  @apply bg-brand-background text-brand-text;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  letter-spacing: -0.011em;
 }
 
-/* Button styles - defined as regular CSS classes */
+/* Smooth transitions for all interactive elements */
+a, button, input, select, textarea {
+  @apply transition-all duration-200 ease-in-out;
+}
+
+/* Button styles */
 .btn-primary {
-  @apply inline-flex items-center justify-center px-4 py-2 font-medium rounded-xl 
-         transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2
-         bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+  @apply inline-flex items-center justify-center px-5 py-2.5 font-semibold rounded-full
+         bg-brand-blue text-white hover:bg-[#0077ed] active:scale-[0.98]
+         disabled:opacity-50 disabled:pointer-events-none;
 }
 
 .btn-secondary {
-  @apply inline-flex items-center justify-center px-4 py-2 font-medium rounded-xl 
-         transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2
-         bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-gray-500;
+  @apply inline-flex items-center justify-center px-5 py-2.5 font-semibold rounded-full
+         bg-gray-100 text-brand-text hover:bg-gray-200 active:scale-[0.98]
+         disabled:opacity-50 disabled:pointer-events-none;
 }
 
 .btn-ghost {
-  @apply inline-flex items-center justify-center px-4 py-2 font-medium rounded-xl 
-         transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2
-         bg-transparent text-gray-600 hover:bg-gray-100 focus:ring-gray-500;
+  @apply inline-flex items-center justify-center px-5 py-2.5 font-semibold rounded-full
+         bg-transparent text-brand-text hover:bg-gray-100 active:scale-[0.98];
 }
 
 /* Card styles */
 .card {
-  @apply bg-white rounded-2xl p-6;
+  @apply bg-brand-surface rounded-[20px] p-6 border border-gray-100/50;
   box-shadow: var(--shadow-soft);
 }
 
 .card-hover {
-  @apply bg-white rounded-2xl p-6 transition-all duration-200 hover:-translate-y-0.5;
+  @apply bg-brand-surface rounded-[20px] p-6 border border-gray-100/50
+         transition-all duration-300 hover:shadow-medium hover:-translate-y-1;
   box-shadow: var(--shadow-soft);
-}
-
-.card-hover:hover {
-  box-shadow: var(--shadow-medium);
 }
 
 /* Input styles */
 .input {
-  @apply w-full px-4 py-3 rounded-xl border border-gray-200 
-         focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
-         transition-all duration-200;
+  @apply w-full px-4 py-3 rounded-xl border border-gray-200 bg-white/50
+         placeholder:text-gray-400
+         focus:outline-none focus:ring-[3px] focus:ring-brand-blue/20 focus:border-brand-blue
+         disabled:opacity-50 disabled:bg-gray-50;
 }
 
 /* Badge styles */
 .badge {
-  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  @apply inline-flex items-center px-3 py-1 rounded-full text-[13px] font-semibold;
 }
 
 .badge-success {
-  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-         bg-success-50 text-success-600;
+  @apply bg-brand-success/10 text-brand-success;
 }
 
 .badge-warning {
-  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-         bg-warning-50 text-warning-600;
+  @apply bg-brand-warning/10 text-brand-warning;
 }
 
 .badge-error {
-  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-         bg-error-50 text-error-600;
+  @apply bg-brand-error/10 text-brand-error;
 }
 
-.badge-primary {
-  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-         bg-primary-50 text-primary-600;
+.badge-info {
+  @apply bg-brand-blue/10 text-brand-blue;
 }
 
-/* Utility classes */
-.text-gradient {
-  @apply bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent;
-}
-
+/* Glassmorphism */
 .glass {
-  @apply bg-white/80 backdrop-blur-lg;
+  @apply bg-white/70 backdrop-blur-xl border border-white/20;
+}
+
+/* Skeleton Loading */
+.skeleton {
+  @apply bg-gray-200 animate-shimmer;
+  background-image: linear-gradient(90deg, #f0f0f0 25%, #f8f8f8 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
 }

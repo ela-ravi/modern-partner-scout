@@ -175,6 +175,8 @@ class ProfileBase(BaseModel):
     external_url: Optional[str] = None
     business_email: Optional[str] = None
     business_category: Optional[str] = None
+    cover_image_url: Optional[str] = Field(default=None, description="Instagram profile cover/header image URL")
+    recent_posts: List[Dict[str, Any]] = Field(default_factory=list, description="List of recent posts (image_url, caption, engagement)")
 
 
 class Profile(ProfileBase):
@@ -229,6 +231,10 @@ class CompleteProfile(Profile):
     email_source: Optional[str] = None
     contact_phone: Optional[str] = None
     contact_website: Optional[str] = None
+    
+    # UI visual assets
+    cover_image_url: Optional[str] = None
+    recent_posts: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 # =============================================================================

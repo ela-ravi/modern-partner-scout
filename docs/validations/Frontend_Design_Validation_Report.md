@@ -76,7 +76,7 @@
 | 22 | Filter by follower count | ✅ | `discovery-engine-step1.html` - slider 10K-500K |
 | 23 | Deduplicate profiles | ⏭️ | Backend implementation |
 | 24 | Set discovery limit | ✅ | `discovery-engine-step1.html` - Discovery limit (50 profiles) |
-| 25 | Display discovered profiles | ✅ | `main-discovery-dashboard.html` - profile cards with username, followers, URL |
+| 25 | Display discovered profiles | ✅ | `main-discovery-dashboard.html` - profile cards with username, followers_count, URL |
 
 ---
 

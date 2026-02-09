@@ -148,7 +148,7 @@ PartnerScout AI automates partner discovery by:
 **Outputs:**
 
 * Instagram profile URLs
-* Basic metadata (username, followers)
+* Basic metadata (username, followers_count)
 
 ---
 
@@ -501,12 +501,12 @@ POST /api/agent/discover
       "full_name": "Example Account",
       "profile_picture_url": "https://...",
       "bio": "Account bio text",
-      "followers": 45000,
-      "following": 1200,
+      "followers_count": 45000,
+      "following_count": 1200,
       "posts_count": 500,
       "engagement_rate": 3.5,
       "is_verified": false,
-      "is_business": true,
+      "is_business_account": true,
       "external_url": "https://example.com",
       "business_email": "hello@example.com",
       "business_category": "Clothing Store",
@@ -733,12 +733,12 @@ Stores candidate profiles found during discovery.
 | `full_name` | text | Display name |
 | `profile_picture_url` | text | Avatar URL |
 | `bio` | text | Profile bio/description |
-| `followers` | integer | Follower count |
-| `following` | integer | Following count |
+| `followers_count` | integer | Follower count |
+| `following_count` | integer | Following count |
 | `posts_count` | integer | Total posts |
 | `engagement_rate` | decimal(5,2) | Calculated engagement rate |
 | `is_verified` | boolean | Blue checkmark status |
-| `is_business` | boolean | Business account flag |
+| `is_business_account` | boolean | Business account flag |
 | `external_url` | text | Website link from bio |
 | `business_email` | text | Email for business accounts |
 | `business_category` | text | Business category name |

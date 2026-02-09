@@ -55,6 +55,7 @@ Both orchestrators use the **same APIs** for consistency:
 
 - **Status Update APIs** (Section 2) - Update job/profile status
 - **Agent APIs** - Call Brand Analyzer, Discovery, Scorer (see `docs/Agents_Documentation.md`)
+- **Data Persistence** - The Scorer Agent is responsible for saving `recent_posts` and `cover_image_url` to the database; the orchestrator's role is to ensure the job status transitions to `completed` only after all profiles are scored and saved.
 
 This ensures identical behavior regardless of which orchestrator runs the workflow.
 
@@ -976,12 +977,12 @@ flowchart TB
       "full_name": "The Sustainable Closet",
       "profile_picture_url": "https://instagram.com/...",
       "bio": "Curating ethical fashion | Slow fashion advocate",
-      "followers": 45200,
-      "following": 1250,
+      "followers_count": 45200,
+      "following_count": 1250,
       "posts_count": 847,
       "engagement_rate": 3.2,
       "is_verified": false,
-      "is_business": true,
+      "is_business_account": true,
       "external_url": "https://sustainablecloset.com",
       "business_email": "hello@sustainablecloset.com",
       "business_category": "Clothing Store",
@@ -994,12 +995,12 @@ flowchart TB
       "full_name": "Eco Boutique",
       "profile_picture_url": "https://instagram.com/...",
       "bio": "Sustainable living | Eco-friendly products",
-      "followers": 28500,
-      "following": 890,
+      "followers_count": 28500,
+      "following_count": 890,
       "posts_count": 432,
       "engagement_rate": 4.1,
       "is_verified": false,
-      "is_business": true,
+      "is_business_account": true,
       "external_url": "https://ecoboutique.co",
       "business_email": "contact@ecoboutique.co",
       "business_category": "Home Goods Store",
@@ -1888,8 +1889,8 @@ async def call_discovery_agent(
     
     Returns:
         {"profiles": [{"id": "...", "instagram_url": "...", "username": "...", "full_name": "...", 
-         "profile_picture_url": "...", "bio": "...", "followers": ..., "following": ..., 
-         "posts_count": ..., "engagement_rate": ..., "is_verified": ..., "is_business": ...,
+         "profile_picture_url": "...", "bio": "...", "followers_count": ..., "following": ..., 
+         "posts_count": ..., "engagement_rate": ..., "is_verified": ..., "is_business_account": ...,
          "external_url": "...", "business_email": "...", "business_category": "...", "following_ratio": ...}],
          "total_discovered": ..., "deduplicated": ...}
     """

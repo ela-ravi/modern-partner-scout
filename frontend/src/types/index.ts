@@ -40,16 +40,24 @@ export interface DiscoveredProfile {
   full_name?: string;
   profile_picture_url?: string;
   bio?: string;
-  followers: number; // Changed from followers_count to match DB view
-  following?: number; // Changed from following_count
+  followers_count: number;
+  following_count?: number;
   posts_count?: number;
   engagement_rate?: number;
   following_ratio?: number;
   is_verified: boolean;
-  is_business?: boolean; // Changed from is_business_account
+  is_business_account?: boolean;
   external_url?: string;
   business_email?: string;
   business_category?: string;
+  cover_image_url?: string;
+  recent_posts?: {
+    image_url: string;
+    caption?: string;
+    likes?: number;
+    comments?: number;
+    timestamp?: string;
+  }[];
   status: ProfileStatus;
   created_at: string;
 }
@@ -93,6 +101,8 @@ export interface CompleteProfile extends DiscoveredProfile {
   reasoning?: Record<string, any>;
   email?: string;
   email_source?: string;
+  contact_phone?: string;
+  contact_website?: string;
 }
 
 export interface JobWithProfiles {

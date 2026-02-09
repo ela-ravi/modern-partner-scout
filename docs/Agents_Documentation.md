@@ -112,12 +112,12 @@ POST /api/agent/discover
       "full_name": "The Sustainable Closet",
       "profile_picture_url": "https://instagram.com/...",
       "bio": "Curating ethical fashion | Slow fashion advocate",
-      "followers": 45200,
-      "following": 1250,
+      "followers_count": 45200,
+      "following_count": 1250,
       "posts_count": 847,
       "engagement_rate": 3.2,
       "is_verified": false,
-      "is_business": true,
+      "is_business_account": true,
       "external_url": "https://sustainablecloset.com",
       "business_email": "hello@sustainablecloset.com",
       "business_category": "Clothing Store",
@@ -130,12 +130,12 @@ POST /api/agent/discover
       "full_name": "Eco Boutique",
       "profile_picture_url": "https://instagram.com/...",
       "bio": "Sustainable living | Eco-friendly products",
-      "followers": 28500,
-      "following": 890,
+      "followers_count": 28500,
+      "following_count": 890,
       "posts_count": 432,
       "engagement_rate": 4.1,
       "is_verified": false,
-      "is_business": true,
+      "is_business_account": true,
       "external_url": "https://ecoboutique.co",
       "business_email": "contact@ecoboutique.co",
       "business_category": "Home Goods Store",
@@ -148,12 +148,12 @@ POST /api/agent/discover
       "full_name": "Mindful Threads",
       "profile_picture_url": "https://instagram.com/...",
       "bio": "Conscious fashion choices | Ethical style",
-      "followers": 67800,
-      "following": 2100,
+      "followers_count": 67800,
+      "following_count": 2100,
       "posts_count": 1203,
       "engagement_rate": 2.8,
       "is_verified": true,
-      "is_business": true,
+      "is_business_account": true,
       "external_url": "https://mindfulthreads.com",
       "business_email": "hello@mindfulthreads.com",
       "business_category": "Fashion Designer",
@@ -180,8 +180,8 @@ POST /api/agent/discover
 
 **Data Stored at Discovery:**
 - `username`, `full_name`, `profile_picture_url`, `bio`
-- `followers`, `following`, `posts_count`, `engagement_rate`
-- `is_verified`, `is_business`
+- `followers_count`, `following_count`, `posts_count`, `engagement_rate`
+- `is_verified`, `is_business_account`
 - `external_url`, `business_email`, `business_category` (business indicators)
 - `following_ratio` (calculated for fake detection)
 
@@ -296,16 +296,18 @@ The orchestrators use a simplified request with just IDs. The backend fetches `b
 ### What It Does
 
 1. Fetches detailed profile data via Apify (including business indicators)
-2. Calculates embedding similarity with brand DNA
-3. Analyzes aesthetic consistency using vision models
-4. Evaluates engagement quality and follower authenticity
-5. Detects fake/bot accounts using following ratio and post count heuristics
-6. Scores business presence (account type, email, website)
-7. Evaluates activity recency from post timestamps
-8. Extracts email from bio, business info, or linked content
-9. Stores score in `profile_scores` table
-10. Stores contact in `profile_contacts` table
-11. Updates profile status to `done`
+2. Extracts `cover_image_url` and `recent_posts` from Apify profile/post results
+3. Calculates embedding similarity with brand DNA
+4. Analyzes aesthetic consistency using vision models
+5. Evaluates engagement quality and follower authenticity
+6. Detects fake/bot accounts using following ratio and post count heuristics
+7. Scores business presence (account type, email, website)
+8. Evaluates activity recency from post timestamps
+9. Extracts email from bio, business info, or linked content
+10. Stores score in `profile_scores` table
+11. Stores contact in `profile_contacts` table
+12. Updates `discovered_profiles` with `cover_image_url` and `recent_posts` (jsonb)
+13. Updates profile status to `done`
 
 ### Apify Data Mapping
 
@@ -316,20 +318,21 @@ The Discovery Agent stores profile data at discovery time. The Scorer Agent uses
 | `username` | `username` | Discovery | Profile handle |
 | `fullName` | `full_name` | Discovery | Display name |
 | `profilePicUrl` | `profile_picture_url` | Discovery | Avatar URL |
+| `latestPosts[0].displayUrl` | `cover_image_url` | **Scoring** | First post used as cover |
+| `latestPosts` | `recent_posts` | **Scoring** | Scored recent posts (jsonb) |
 | `biography` | `bio` | Discovery | Profile description text |
-| `followersCount` | `followers` | Discovery | Current follower count |
-| `followsCount` | `following` | Discovery | Following count |
+| `followersCount` | `followers_count` | Discovery | Current follower count |
+| `followsCount` | `following_count` | Discovery | Following count |
 | `postsCount` | `posts_count` | Discovery | Total number of posts |
 | `isVerified` | `is_verified` | Discovery | Blue checkmark |
-| `isBusinessAccount` | `is_business` | Discovery | Business account flag |
+| `isBusinessAccount` | `is_business_account` | Discovery | Business account flag |
 | `externalUrl` | `external_url` | Discovery | Website link from bio |
 | `businessEmail` | `business_email` | Discovery | Email for business accounts |
 | `businessCategoryName` | `business_category` | Discovery | Business category |
 | Calculated | `engagement_rate` | Discovery | `(avg_likes + avg_comments) / followers * 100` |
 | Calculated | `following_ratio` | Discovery | `following / followers` |
-| `latestPosts` | — | Not stored | Fetched fresh at scoring time (includes timestamps) |
 
-**Note:** All profile metadata is stored at discovery time for consistent frontend display. Only `recent_posts` is fetched fresh at scoring time for accurate engagement analysis and activity recency calculation.
+**Note:** Basic profile metadata is stored at discovery. Critical visual assets (`cover_image_url`, `recent_posts`) are stored at scoring time to maximize currency and minimize discovery overhead.
 
 ### Fake vs Genuine Profile Detection
 
@@ -1772,7 +1775,7 @@ class DiscoverRequest(BaseModel):
 class DiscoveredProfile(BaseModel):
     instagram_url: str
     username: str
-    followers: int
+    followers_count: int
 
 class DiscoverResponse(BaseModel):
     profiles: list[DiscoveredProfile]
@@ -1781,7 +1784,7 @@ class ProfileData(BaseModel):
     username: str
     instagram_url: str
     bio: str
-    followers: int
+    followers_count: int
     posts_count: int
     engagement_rate: float
     recent_posts: list[dict]
