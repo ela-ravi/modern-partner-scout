@@ -117,8 +117,12 @@ class DemoService:
                     external_url=profile_data.get("external_url"),
                 )
                 
-                # Update profile status to scored (since create defaults to NEW)
-                self.profile_repo.update_status(profile["id"], ProfileStatus.SCORED)
+                # Update profile status to done (DB enum uses 'done' for scored)
+                try:
+                    self.profile_repo.update_status(profile["id"], ProfileStatus.SCORED)
+                except Exception:
+                    # Fallback: DB enum might use 'done' instead of 'scored'
+                    self.profile_repo.update_status(profile["id"], "done")
                 
                 profile_id = profile["id"]
                 profiles_created += 1

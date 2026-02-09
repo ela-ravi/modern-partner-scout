@@ -14,6 +14,7 @@ Features:
 
 import asyncio
 import logging
+import time as _time
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from functools import lru_cache
@@ -222,6 +223,58 @@ class RateLimiter:
 
 
 # =============================================================================
+# Profile Cache (avoids re-scraping same profiles across jobs)
+# =============================================================================
+
+class ProfileCache:
+    """
+    Simple TTL cache for scraped profile data.
+
+    Prevents redundant Apify API calls for profiles that were
+    recently scraped, saving compute units on the free tier.
+    """
+
+    def __init__(self, ttl_seconds: int = 3600, max_size: int = 500):
+        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._timestamps: Dict[str, float] = {}
+        self._ttl = ttl_seconds
+        self._max_size = max_size
+
+    def get(self, username: str) -> Optional[Dict[str, Any]]:
+        """Get cached profile data if still valid."""
+        username = username.lower()
+        if username in self._cache:
+            if _time.time() - self._timestamps[username] < self._ttl:
+                logger.debug(f"Cache HIT for @{username} (saved 1 Apify call)")
+                return self._cache[username]
+            else:
+                del self._cache[username]
+                del self._timestamps[username]
+        return None
+
+    def put(self, username: str, data: Dict[str, Any]) -> None:
+        """Cache profile data."""
+        username = username.lower()
+        if len(self._cache) >= self._max_size:
+            oldest = min(self._timestamps, key=self._timestamps.get)
+            del self._cache[oldest]
+            del self._timestamps[oldest]
+        self._cache[username] = data
+        self._timestamps[username] = _time.time()
+
+    def put_many(self, profiles: List[Dict[str, Any]]) -> None:
+        """Cache multiple profile results."""
+        for profile in profiles:
+            username = profile.get("username", "")
+            if username:
+                self.put(username, profile)
+
+    @property
+    def size(self) -> int:
+        return len(self._cache)
+
+
+# =============================================================================
 # Apify Service Class
 # =============================================================================
 
@@ -270,7 +323,10 @@ class ApifyService:
         self._profile_scraper_id = profile_scraper_id or settings.apify.instagram_scraper_id
         self._hashtag_scraper_id = hashtag_scraper_id or settings.apify.hashtag_scraper_id
         self._rate_limiter = rate_limiter or RateLimiter()
-        
+
+        # Profile cache to avoid redundant scrapes (1 hour TTL)
+        self._profile_cache = ProfileCache(ttl_seconds=3600, max_size=500)
+
         # Lazy-initialized client
         self._client: Optional[ApifyClient] = None
     
@@ -317,7 +373,7 @@ class ApifyService:
     async def scrape_profile(
         self,
         username: str,
-        results_limit: int = 30,
+        results_limit: int = 5,
         timeout: int = DEFAULT_MAX_WAIT_TIME,
     ) -> Dict[str, Any]:
         """
@@ -356,7 +412,7 @@ class ApifyService:
     async def scrape_profiles(
         self,
         usernames: List[str],
-        results_limit: int = 30,
+        results_limit: int = 5,
         timeout: int = DEFAULT_MAX_WAIT_TIME,
     ) -> List[Dict[str, Any]]:
         """
@@ -374,45 +430,69 @@ class ApifyService:
             ApifyError: If scraping fails
             TimeoutError: If run exceeds timeout
         """
-        # Acquire rate limit token
-        await self._rate_limiter.acquire()
-        
         # Clean usernames (remove @ if present)
         clean_usernames = [u.lstrip("@").strip() for u in usernames]
-        
-        logger.info(f"Scraping {len(clean_usernames)} profiles: {clean_usernames}")
-        
+
+        # Check cache first - only scrape profiles we don't already have
+        cached_results = []
+        uncached_usernames = []
+        for username in clean_usernames:
+            cached = self._profile_cache.get(username)
+            if cached is not None:
+                cached_results.append(cached)
+            else:
+                uncached_usernames.append(username)
+
+        if cached_results:
+            logger.info(
+                f"Cache: {len(cached_results)} cached, "
+                f"{len(uncached_usernames)} need scraping"
+            )
+
+        # If all profiles are cached, return immediately (no Apify call!)
+        if not uncached_usernames:
+            logger.info(f"All {len(clean_usernames)} profiles served from cache")
+            return cached_results
+
+        # Acquire rate limit token
+        await self._rate_limiter.acquire()
+
+        logger.info(f"Scraping {len(uncached_usernames)} profiles: {uncached_usernames}")
+
         # Prepare input for the actor
         run_input = {
-            "usernames": clean_usernames,
+            "usernames": uncached_usernames,
             "resultsLimit": results_limit,
         }
-        
+
         try:
             # Start the actor run
             run = self.client.actor(self._profile_scraper_id).call(
                 run_input=run_input,
                 timeout_secs=timeout,
             )
-            
+
             # Get results from the default dataset
             items = list(self.client.dataset(run["defaultDatasetId"]).iterate_items())
-            
+
+            # Cache the new results
+            self._profile_cache.put_many(items)
+
             logger.info(f"Successfully scraped {len(items)} profiles")
-            return items
-            
+            return cached_results + items
+
         except Exception as e:
             logger.error(f"Profile scraping failed: {e}")
             raise ApifyError(
                 message=f"Failed to scrape profiles: {str(e)}",
                 actor_id=self._profile_scraper_id,
-                details={"usernames": clean_usernames, "error": str(e)}
+                details={"usernames": uncached_usernames, "error": str(e)}
             )
     
     async def scrape_profile_parsed(
         self,
         username: str,
-        results_limit: int = 30,
+        results_limit: int = 5,
         timeout: int = DEFAULT_MAX_WAIT_TIME,
     ) -> InstagramProfile:
         """
@@ -432,7 +512,7 @@ class ApifyService:
     def scrape_profile_sync(
         self,
         username: str,
-        results_limit: int = 30,
+        results_limit: int = 5,
         timeout: int = DEFAULT_MAX_WAIT_TIME,
     ) -> Dict[str, Any]:
         """
@@ -459,7 +539,7 @@ class ApifyService:
     def scrape_profiles_sync(
         self,
         usernames: List[str],
-        results_limit: int = 30,
+        results_limit: int = 5,
         timeout: int = DEFAULT_MAX_WAIT_TIME,
     ) -> List[Dict[str, Any]]:
         """
@@ -473,36 +553,53 @@ class ApifyService:
         Returns:
             List of profile data dicts
         """
-        # Acquire rate limit token
-        self._rate_limiter.acquire_sync()
-        
         # Clean usernames
         clean_usernames = [u.lstrip("@").strip() for u in usernames]
-        
-        logger.info(f"Scraping {len(clean_usernames)} profiles (sync): {clean_usernames}")
-        
+
+        # Check cache first
+        cached_results = []
+        uncached_usernames = []
+        for username in clean_usernames:
+            cached = self._profile_cache.get(username)
+            if cached is not None:
+                cached_results.append(cached)
+            else:
+                uncached_usernames.append(username)
+
+        if not uncached_usernames:
+            logger.info(f"All {len(clean_usernames)} profiles served from cache (sync)")
+            return cached_results
+
+        # Acquire rate limit token
+        self._rate_limiter.acquire_sync()
+
+        logger.info(f"Scraping {len(uncached_usernames)} profiles (sync): {uncached_usernames}")
+
         run_input = {
-            "usernames": clean_usernames,
+            "usernames": uncached_usernames,
             "resultsLimit": results_limit,
         }
-        
+
         try:
             run = self.client.actor(self._profile_scraper_id).call(
                 run_input=run_input,
                 timeout_secs=timeout,
             )
-            
+
             items = list(self.client.dataset(run["defaultDatasetId"]).iterate_items())
-            
+
+            # Cache the new results
+            self._profile_cache.put_many(items)
+
             logger.info(f"Successfully scraped {len(items)} profiles (sync)")
-            return items
-            
+            return cached_results + items
+
         except Exception as e:
             logger.error(f"Profile scraping failed (sync): {e}")
             raise ApifyError(
                 message=f"Failed to scrape profiles: {str(e)}",
                 actor_id=self._profile_scraper_id,
-                details={"usernames": clean_usernames, "error": str(e)}
+                details={"usernames": uncached_usernames, "error": str(e)}
             )
     
     # =========================================================================
@@ -519,7 +616,7 @@ class ApifyService:
     async def search_hashtag(
         self,
         hashtag: str,
-        limit: int = 50,
+        limit: int = 20,
         timeout: int = DEFAULT_MAX_WAIT_TIME,
     ) -> List[Dict[str, Any]]:
         """
@@ -549,7 +646,7 @@ class ApifyService:
     async def search_hashtags(
         self,
         hashtags: List[str],
-        limit_per_hashtag: int = 50,
+        limit_per_hashtag: int = 20,
         timeout: int = DEFAULT_MAX_WAIT_TIME,
     ) -> Dict[str, List[Dict[str, Any]]]:
         """
@@ -615,7 +712,7 @@ class ApifyService:
     def search_hashtag_sync(
         self,
         hashtag: str,
-        limit: int = 50,
+        limit: int = 20,
         timeout: int = DEFAULT_MAX_WAIT_TIME,
     ) -> List[Dict[str, Any]]:
         """
@@ -635,7 +732,7 @@ class ApifyService:
     def search_hashtags_sync(
         self,
         hashtags: List[str],
-        limit_per_hashtag: int = 50,
+        limit_per_hashtag: int = 20,
         timeout: int = DEFAULT_MAX_WAIT_TIME,
     ) -> Dict[str, List[Dict[str, Any]]]:
         """
@@ -699,7 +796,7 @@ class ApifyService:
     async def discover_profiles_by_hashtags(
         self,
         hashtags: List[str],
-        limit_per_hashtag: int = 50,
+        limit_per_hashtag: int = 20,
         min_followers: int = Defaults.DEFAULT_MIN_FOLLOWERS,
         max_followers: int = Defaults.DEFAULT_MAX_FOLLOWERS,
         timeout: int = DEFAULT_MAX_WAIT_TIME,

@@ -260,7 +260,7 @@ class BrandAnalyzerAgent(BaseAgent[BrandAnalyzerRequest, BrandAnalyzerResponse])
     async def _fetch_profiles(
         self,
         profile_urls: List[str],
-        max_posts: int = 20
+        max_posts: int = 12
     ) -> tuple[List[Dict[str, Any]], int, int]:
         """
         Fetch Instagram profile data via Apify.

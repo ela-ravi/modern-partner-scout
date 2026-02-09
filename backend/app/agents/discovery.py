@@ -190,9 +190,10 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
             job = await self._fetch_job(job_id)
             
             # Step 2: Search hashtags via Apify (SUB-3.3.3.1.2)
+            # Cost-optimized: fetch just enough posts to find unique profiles
             raw_posts = await self._search_hashtags(
                 input_data.hashtags,
-                limit_per_hashtag=max(20, input_data.limit // len(input_data.hashtags))
+                limit_per_hashtag=max(10, input_data.limit // len(input_data.hashtags))
             )
             
             # Step 3: Extract unique usernames from posts
@@ -212,8 +213,8 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
             )
             
             # Step 6: Fetch detailed profile data for new usernames
-            # Limit the number of profiles to fetch based on discovery limit
-            usernames_to_fetch = new_usernames[:min(len(new_usernames), input_data.limit * 2)]
+            # Cost-optimized: 1.3x multiplier instead of 2x to reduce Apify calls
+            usernames_to_fetch = new_usernames[:min(len(new_usernames), int(input_data.limit * 1.3))]
             
             profiles_data = await self._fetch_profiles(usernames_to_fetch)
             

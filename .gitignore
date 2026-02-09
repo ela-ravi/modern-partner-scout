@@ -108,6 +108,12 @@ build/
 *.sw?
 *~
 
+# Cursor IDE
+.cursor/
+
+# Claude Code
+.claude/
+
 # Sublime Text
 *.sublime-workspace
 *.sublime-project

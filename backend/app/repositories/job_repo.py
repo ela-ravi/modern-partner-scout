@@ -66,20 +66,29 @@ class JobRepository(BaseRepository[Dict[str, Any]]):
             "follower_range_min": follower_range_min,
             "follower_range_max": follower_range_max,
             "discovery_limit": discovery_limit,
-            "keywords": keywords or [],
-            "hashtags": hashtags or [],
-            "min_score_threshold": min_score_threshold,
             "status": JobStatus.PENDING.value,
         }
-        
+
         # Only include user_id if provided (allows anonymous demo jobs)
         if user_id:
             job_data["user_id"] = user_id
-        
+
         if name:
             job_data["name"] = name
-        
-        return self.insert(job_data)
+
+        # Try inserting with enhanced columns (migration 004)
+        # Fall back gracefully if columns don't exist yet
+        enhanced_data = {
+            **job_data,
+            "keywords": keywords or [],
+            "hashtags": hashtags or [],
+            "min_score_threshold": min_score_threshold,
+        }
+        try:
+            return self.insert(enhanced_data)
+        except Exception:
+            # Columns don't exist yet - insert with base schema only
+            return self.insert(job_data)
     
     # =========================================================================
     # Read Operations

@@ -313,7 +313,7 @@ class Defaults:
     API_REQUEST_TIMEOUT = 30
     
     # Retry Configuration
-    MAX_RETRIES = 3
+    MAX_RETRIES = 1
     RETRY_DELAY_SECONDS = 2
     
     # Email Tones

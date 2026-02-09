@@ -133,13 +133,13 @@ agents:
 apify:
   instagram_profile_scraper:
     actor_id: "apify/instagram-profile-scraper"
-    timeout_seconds: 120
+    timeout_seconds: 60
     memory_mbytes: 1024
-    max_retries: 2
-    
+    max_retries: 1
+
   instagram_hashtag_scraper:
     actor_id: "apify/instagram-hashtag-scraper"
-    timeout_seconds: 180
-    memory_mbytes: 2048
-    max_retries: 2
-    results_limit: 100
+    timeout_seconds: 90
+    memory_mbytes: 1024
+    max_retries: 1
+    results_limit: 20

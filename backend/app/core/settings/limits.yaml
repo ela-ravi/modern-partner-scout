@@ -35,9 +35,9 @@ timeouts:
   llm_streaming: 120
   
   # Scraping timeouts
-  profile_scraping: 120
-  hashtag_scraping: 180
-  batch_scraping: 300
+  profile_scraping: 60
+  hashtag_scraping: 90
+  batch_scraping: 180
   
   # Agent operation timeouts
   brand_analysis: 60
@@ -75,7 +75,7 @@ retry:
   
   # Scraping-specific retry settings
   scraping:
-    max_retries: 2
+    max_retries: 1
     initial_delay_seconds: 5
     max_delay_seconds: 30
     exponential_base: 2
