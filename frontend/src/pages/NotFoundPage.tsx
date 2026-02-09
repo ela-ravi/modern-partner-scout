@@ -16,8 +16,8 @@ export default function NotFoundPage() {
           The page you're looking for doesn't exist or has been moved.
         </p>
 
-        <Link to="/dashboard">
-          <Button leftIcon={<HomeIcon />}>Back to Dashboard</Button>
+        <Link to="/sessions">
+          <Button leftIcon={<HomeIcon />}>Back to Sessions</Button>
         </Link>
       </div>
     </div>

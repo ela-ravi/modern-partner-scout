@@ -206,12 +206,14 @@ CREATE TRIGGER trigger_update_profiles_discovered
 CREATE OR REPLACE FUNCTION update_profiles_scored()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.status = 'done' AND (OLD.status IS NULL OR OLD.status != 'done') THEN
-        UPDATE discovery_jobs 
+    -- Increment when status changes to 'scored'
+    IF NEW.status = 'scored' AND (OLD.status IS NULL OR OLD.status != 'scored') THEN
+        UPDATE discovery_jobs
         SET profiles_scored = profiles_scored + 1
         WHERE id = NEW.job_id;
-    ELSIF OLD.status = 'done' AND NEW.status != 'done' THEN
-        UPDATE discovery_jobs 
+    -- Decrement if status changes away from 'scored'
+    ELSIF OLD.status = 'scored' AND NEW.status != 'scored' THEN
+        UPDATE discovery_jobs
         SET profiles_scored = profiles_scored - 1
         WHERE id = NEW.job_id;
     END IF;

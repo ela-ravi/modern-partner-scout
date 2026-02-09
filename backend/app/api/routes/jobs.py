@@ -594,6 +594,7 @@ async def get_job_analytics(
             max_score=analytics.get("max_score"),
             min_score=analytics.get("min_score"),
             profiles_with_email=analytics.get("profiles_with_email", 0),
+            high_score_count=analytics.get("high_score_count", 0),
         )
         
     except JobNotFoundError as e:

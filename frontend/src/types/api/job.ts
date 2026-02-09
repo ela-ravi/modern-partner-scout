@@ -48,3 +48,10 @@ export interface DemoStartResponse {
   job_id: string
   message: string
 }
+
+export interface JobListResponse {
+  jobs: Job[]
+  total: number
+  limit: number
+  offset: number
+}

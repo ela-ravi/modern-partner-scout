@@ -28,6 +28,7 @@ from app.api.routes import status
 from app.api.routes import email
 from app.api.routes import agents
 from app.api.routes import demo
+from app.api.routes import profiles
 from app.core.config import settings
 from app.core.exceptions import PartnerScoutError
 from app.core.constants import HttpStatus
@@ -378,6 +379,13 @@ app.include_router(
     tags=["Demo"]
 )
 
+# Profile routes
+app.include_router(
+    profiles.router,
+    prefix="/api",
+    tags=["Profiles"]
+)
+
 
 # =============================================================================
 # Root Endpoint
@@ -462,6 +470,9 @@ def log_registered_routes():
         "Agents": [
             "/api/agent/analyze-brand", "/api/agent/discover",
             "/api/agent/score", "/api/agent/status"
+        ],
+        "Profiles": [
+            "/api/jobs/{job_id}/profiles", "/api/jobs/{job_id}/profiles/{profile_id}"
         ],
     }
     

@@ -8,6 +8,9 @@ STORY-2.3.1: Implement Job Service
 """
 
 import logging
+import subprocess
+import sys
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 import httpx
@@ -500,6 +503,59 @@ class JobService:
                 
         except httpx.RequestError as e:
             logger.error(f"Failed to call N8N webhook for job {job_id}: {e}")
+            logger.info(f"Falling back to Python orchestrator for job {job_id}")
+            
+            # Fallback to Python orchestrator
+            return self._trigger_python_orchestrator(job_id, user_id)
+    
+    def _trigger_python_orchestrator(self, job_id: str, user_id: str) -> Dict[str, Any]:
+        """
+        Trigger the Python orchestrator as a fallback when N8N is unavailable.
+        
+        Runs the orchestrator as a background subprocess.
+        
+        Args:
+            job_id: Job UUID to process
+            user_id: User ID for context
+            
+        Returns:
+            Response indicating orchestrator was started
+        """
+        try:
+            # Find the orchestrator script
+            backend_dir = Path(__file__).parent.parent.parent
+            orchestrator_script = backend_dir / "scripts" / "run_discovery.py"
+            
+            if not orchestrator_script.exists():
+                logger.error(f"Python orchestrator not found at {orchestrator_script}")
+                raise N8NError(
+                    message="Python orchestrator not found and N8N is unavailable",
+                    details={"job_id": job_id}
+                )
+            
+            # Run orchestrator as background process with full workflow
+            process = subprocess.Popen(
+                [sys.executable, str(orchestrator_script), job_id, "--phase", "full"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=str(backend_dir),
+                start_new_session=True,  # Detach from parent process
+            )
+            
+            logger.info(
+                f"Started Python orchestrator for job {job_id} (PID: {process.pid})"
+            )
+            
+            return {
+                "status": "accepted",
+                "job_id": job_id,
+                "message": "Discovery workflow initiated via Python orchestrator",
+                "orchestrator": "python",
+                "pid": process.pid,
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to start Python orchestrator for job {job_id}: {e}")
             raise N8NError(
                 message=f"Failed to trigger discovery workflow: {str(e)}",
                 details={"job_id": job_id, "error": str(e)}

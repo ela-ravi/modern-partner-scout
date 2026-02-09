@@ -9,13 +9,15 @@ import { StatsGrid } from '@/components/composite/StatsGrid'
 import { ProfileGrid } from '@/components/features/ProfileGrid'
 import { ProfileDetail } from '@/components/features/ProfileDetail'
 import { EmailComposer } from '@/components/features/EmailComposer'
-import { useJob } from '@/hooks/jobs'
+import { useJob, useRetryJob, useStartJob } from '@/hooks/jobs'
 import { useProfiles, useJobAnalytics, useToggleBookmark, useSkipProfile } from '@/hooks/profiles'
 import { useRealtimeProfiles } from '@/hooks/realtime'
 import { useToast } from '@/components/ui/Toast'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'
 import CheckIcon from '@mui/icons-material/Check'
+import TimelineIcon from '@mui/icons-material/Timeline'
+import RefreshIcon from '@mui/icons-material/Refresh'
 import type { Profile, ProfileStatus, ProfileSort } from '@/types/api/profile'
 import type { JobStatus } from '@/types/api/job'
 import type { EmailComposerData } from '@/types/api/email'
@@ -24,7 +26,7 @@ const STATUS_TABS = [
   { value: 'all', label: 'All' },
   { value: 'new', label: 'New' },
   { value: 'processing', label: 'Processing' },
-  { value: 'done', label: 'Scored' },
+  { value: 'scored', label: 'Scored' },
 ] as const
 
 const SORT_OPTIONS = [
@@ -55,6 +57,11 @@ function getJobStatusBadge(status: JobStatus) {
   }
 }
 
+// Check if job is currently running (not in terminal state)
+function isJobRunning(status: JobStatus): boolean {
+  return ['pending', 'analyzing', 'discovering', 'scoring'].includes(status)
+}
+
 function parseSort(value: string): ProfileSort {
   const [field, direction] = value.split('-') as [ProfileSort['field'], ProfileSort['direction']]
   return { field, direction }
@@ -66,6 +73,8 @@ export default function DashboardPage() {
   const toast = useToast()
   const toggleBookmark = useToggleBookmark()
   const skipProfile = useSkipProfile()
+  const retryJob = useRetryJob()
+  const startJob = useStartJob()
 
   const [activeTab, setActiveTab] = useState<string>('all')
   const [sortValue, setSortValue] = useState<string>('score-desc')
@@ -147,6 +156,21 @@ export default function DashboardPage() {
     setEmailProfile(null)
   }
 
+  const handleRestartJob = async () => {
+    if (!jobId) return
+    try {
+      // Reset job to pending
+      await retryJob.mutateAsync(jobId)
+      // Start the job
+      await startJob.mutateAsync(jobId)
+      toast.success('Discovery restarted!')
+      // Navigate to processing page
+      navigate(`/jobs/${jobId}/processing`)
+    } catch {
+      toast.error('Failed to restart discovery')
+    }
+  }
+
   const handleBookmarkProfile = async (profile: Profile) => {
     if (!jobId) return
     try {
@@ -175,10 +199,36 @@ export default function DashboardPage() {
   if (jobLoading) {
     return (
       <div className="animate-pulse space-y-6">
-        <div className="h-8 w-64 bg-gray-200 rounded" />
-        <div className="grid grid-cols-4 gap-4">
+        {/* Header skeleton */}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-gray-200 rounded-lg" />
+          <div className="space-y-2">
+            <div className="h-7 w-72 bg-gray-200 rounded" />
+            <div className="h-4 w-48 bg-gray-200 rounded" />
+          </div>
+        </div>
+
+        {/* Stats grid skeleton */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-20 bg-gray-200 rounded-xl" />
+            <div key={i} className="h-24 bg-gray-200 rounded-2xl" />
+          ))}
+        </div>
+
+        {/* Tabs skeleton */}
+        <div className="flex items-center justify-between">
+          <div className="flex gap-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-10 w-24 bg-gray-200 rounded-lg" />
+            ))}
+          </div>
+          <div className="h-10 w-44 bg-gray-200 rounded-lg" />
+        </div>
+
+        {/* Profile cards skeleton - reserve full viewport height */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="bg-gray-200 rounded-2xl h-80" />
           ))}
         </div>
       </div>
@@ -218,6 +268,30 @@ export default function DashboardPage() {
               {job.profiles_discovered} profiles discovered • {job.profiles_scored} scored
             </p>
           </div>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          {/* Restart button for failed/cancelled jobs */}
+          {(job.status === 'failed' || job.status === 'cancelled') && (
+            <Button
+              variant="secondary"
+              leftIcon={<RefreshIcon className="w-4 h-4" />}
+              onClick={handleRestartJob}
+              loading={retryJob.isPending || startJob.isPending}
+              className="text-apple-orange hover:text-apple-orange"
+            >
+              Restart
+            </Button>
+          )}
+
+          {/* View Pipeline button - always show for navigation */}
+          <Button
+            variant="ghost"
+            leftIcon={<TimelineIcon className="w-4 h-4" />}
+            onClick={() => navigate(`/jobs/${jobId}/processing`)}
+          >
+            {isJobRunning(job.status) ? 'View Progress' : 'View Pipeline'}
+          </Button>
         </div>
       </div>
 
@@ -269,7 +343,8 @@ export default function DashboardPage() {
               <Select.Content
                 className={cn(
                   'overflow-hidden bg-white rounded-lg shadow-lg border border-apple-border',
-                  'animate-in fade-in-0 zoom-in-95'
+                  'animate-in fade-in-0 zoom-in-95',
+                  'z-50'
                 )}
                 position="popper"
                 sideOffset={4}

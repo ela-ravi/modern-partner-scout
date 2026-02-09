@@ -9,13 +9,17 @@ import type {
   CreateJobRequest,
   CreateJobResponse,
   JobActionResponse,
+  JobListResponse,
 } from '@/types/api/job'
 
 export const jobsService = {
   /**
    * List all jobs for the current user
    */
-  list: () => api.get<Job[]>('/api/jobs'),
+  list: async (): Promise<Job[]> => {
+    const response = await api.get<JobListResponse>('/api/jobs')
+    return response.jobs
+  },
 
   /**
    * Get a specific job by ID

@@ -11,7 +11,7 @@ import { Slider } from '@/components/ui/Slider'
 import { Card } from '@/components/ui/Card'
 import { Stepper, type Step } from '@/components/ui/Stepper'
 import { FollowerPresets, getActivePreset } from '@/components/composite/FollowerPresets'
-import { useCreateJob } from '@/hooks/jobs'
+import { useCreateJob, useStartJob } from '@/hooks/jobs'
 import { useToast } from '@/components/ui/Toast'
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
@@ -54,6 +54,7 @@ export default function DiscoveryConfigPage() {
   const navigate = useNavigate()
   const toast = useToast()
   const createJob = useCreateJob()
+  const startJob = useStartJob()
   const [step, setStep] = useState<'config' | 'review'>('config')
   const [profileInput, setProfileInput] = useState('')
 
@@ -92,18 +93,52 @@ export default function DiscoveryConfigPage() {
 
   // Handle adding reference profile
   const handleAddProfile = () => {
-    const trimmed = profileInput.trim()
+    let trimmed = profileInput.trim()
     if (!trimmed) return
 
-    // Basic URL validation
+    // #region agent log
+    fetch('http://127.0.0.1:7247/ingest/a4834e21-fce4-4031-b8aa-7e6c09773ae1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DiscoveryConfigPage.tsx:handleAddProfile',message:'Input received',data:{originalInput:trimmed},hypothesisId:'H3-url-validation',timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+
+    // Normalize Instagram URLs - accept various formats
+    // Patterns: @username, instagram.com/username, https://instagram.com/username, raw username
+    if (trimmed.startsWith('@')) {
+      // Convert @username to full URL
+      trimmed = `https://instagram.com/${trimmed.slice(1)}`
+    } else if (trimmed.includes('instagram.com') && !trimmed.startsWith('http')) {
+      // URL without protocol (e.g., instagram.com/username)
+      trimmed = `https://${trimmed}`
+    } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      // Already a full URL, leave as-is
+    } else if (trimmed.match(/^[a-zA-Z0-9._]+$/)) {
+      // Looks like a username (alphanumeric, dots, underscores only, no slashes/colons)
+      // Instagram usernames CAN have dots (e.g., thehouseoffragrance.kg)
+      trimmed = `https://instagram.com/${trimmed}`
+    }
+
+    // Validate as URL
     try {
-      new URL(trimmed)
+      const url = new URL(trimmed)
+      
+      // Check if it's an Instagram URL
+      if (!url.hostname.includes('instagram.com')) {
+        toast.error('Please enter a valid Instagram URL')
+        return
+      }
+
       const current = getValues('referenceProfiles')
       if (current.length < 10 && !current.includes(trimmed)) {
         setValue('referenceProfiles', [...current, trimmed], { shouldValidate: true })
         setProfileInput('')
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7247/ingest/a4834e21-fce4-4031-b8aa-7e6c09773ae1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DiscoveryConfigPage.tsx:handleAddProfile',message:'Profile added successfully',data:{normalizedUrl:trimmed,totalProfiles:current.length+1},hypothesisId:'H3-url-validation',timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
       }
     } catch {
+      // #region agent log
+      fetch('http://127.0.0.1:7247/ingest/a4834e21-fce4-4031-b8aa-7e6c09773ae1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DiscoveryConfigPage.tsx:handleAddProfile',message:'URL validation failed',data:{attemptedUrl:trimmed},hypothesisId:'H3-url-validation',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       toast.error('Please enter a valid URL')
     }
   }
@@ -119,6 +154,7 @@ export default function DiscoveryConfigPage() {
 
   const handleLaunch = async (data: DiscoveryConfigFormData) => {
     try {
+      // Step 1: Create the job
       const result = await createJob.mutateAsync({
         name: data.name,
         reference_profiles: data.referenceProfiles,
@@ -126,8 +162,19 @@ export default function DiscoveryConfigPage() {
         min_followers: data.minFollowers,
         max_followers: data.maxFollowers,
       })
-      toast.success('Discovery session created!')
-      navigate(`/jobs/${result.id}`)
+
+      // Step 2: Start the discovery workflow (triggers orchestrator)
+      try {
+        await startJob.mutateAsync(result.id)
+        toast.success('Discovery started!')
+      } catch (startError) {
+        // Job created but start failed - still navigate to let user manually start
+        console.warn('Failed to auto-start job:', startError)
+        toast.warning('Session created but auto-start failed. Click "Start" on the processing page.')
+      }
+
+      // Navigate to processing page to see real-time progress
+      navigate(`/jobs/${result.id}/processing`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to create session')
     }

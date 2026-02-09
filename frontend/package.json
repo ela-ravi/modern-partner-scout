@@ -12,7 +12,15 @@
     "test:watch": "vitest --watch",
     "test:coverage": "vitest --coverage",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\""
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
+    "e2e": "node e2e/run-all-tests.cjs",
+    "e2e:headed": "node e2e/run-all-tests.cjs --headed",
+    "e2e:orchestration": "node e2e/run-all-tests.cjs --orchestration --headed",
+    "e2e:orchestration:headless": "node e2e/run-all-tests.cjs --orchestration",
+    "e2e:fixes": "npx playwright test --config=playwright.config.cjs e2e/frontend-fixes-validation.spec.cjs --headed",
+    "e2e:fixes:headless": "npx playwright test --config=playwright.config.cjs e2e/frontend-fixes-validation.spec.cjs",
+    "playwright": "npx playwright test --config=playwright.config.cjs",
+    "playwright:ui": "npx playwright test --config=playwright.config.cjs --ui"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -51,6 +59,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
     "autoprefixer": "^10.4.24",
+    "dotenv": "^17.2.4",
     "eslint": "^9.39.1",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react-hooks": "^7.0.1",

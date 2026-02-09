@@ -3,20 +3,22 @@
  * Shows real-time AI pipeline processing status
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
 import { PipelineProgress, type PipelineStage } from '@/components/features/PipelineProgress'
 import { ActivityLog, type LogEntry } from '@/components/composite/ActivityLog'
-import { useJob, useCancelJob } from '@/hooks/jobs'
+import { useJob, useCancelJob, useStartJob, useRetryJob } from '@/hooks/jobs'
 import { useJobAnalytics } from '@/hooks/profiles'
+import { useRealtimeJobStatus } from '@/hooks/realtime'
 import { useToast } from '@/components/ui/Toast'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import StopCircleIcon from '@mui/icons-material/StopCircle'
 import DashboardIcon from '@mui/icons-material/Dashboard'
 import RefreshIcon from '@mui/icons-material/Refresh'
+import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import type { JobStatus } from '@/types/api/job'
 
 // Map job status to pipeline stages
@@ -78,20 +80,28 @@ function getStagesFromJobStatus(status: JobStatus, analytics?: {
       stages[3].progress = 20
       break
     case 'failed':
-      // Find the stage that failed
-      const failedIndex = stages.findIndex((s) => s.status === 'active')
-      if (failedIndex >= 0) {
-        stages[failedIndex].status = 'failed'
-        stages[failedIndex].error = 'Processing failed'
-      } else {
-        stages[0].status = 'failed'
-        stages[0].error = 'Processing failed'
-      }
-      break
     case 'cancelled':
-      stages.forEach((s) => {
-        if (s.status === 'active') s.status = 'pending'
-      })
+      // Determine which stages completed before failure/cancellation based on analytics
+      // If we have discovered profiles, Brand Analyzer and Discovery completed
+      if (analytics?.total_discovered && analytics.total_discovered > 0) {
+        stages[0].status = 'completed' // Brand Analyzer
+        stages[1].status = 'completed' // Discovery Engine
+        
+        // If we have scored profiles, Scoring was in progress
+        if (analytics?.total_scored && analytics.total_scored > 0) {
+          stages[2].status = status === 'failed' ? 'failed' : 'cancelled'
+          stages[2].error = status === 'failed' ? 'Processing failed' : 'Cancelled by user'
+          stages[3].status = status === 'failed' ? 'failed' : 'cancelled'
+        } else {
+          // Scoring hadn't started yet
+          stages[2].status = status === 'failed' ? 'failed' : 'cancelled'
+          stages[2].error = status === 'failed' ? 'Processing failed' : 'Cancelled by user'
+        }
+      } else {
+        // Failed/cancelled during Brand Analysis or Discovery
+        stages[0].status = status === 'failed' ? 'failed' : 'cancelled'
+        stages[0].error = status === 'failed' ? 'Processing failed' : 'Cancelled by user'
+      }
       break
   }
 
@@ -120,43 +130,149 @@ export default function ProcessingPage() {
   const navigate = useNavigate()
   const toast = useToast()
   const cancelJob = useCancelJob()
+  const startJob = useStartJob()
+  const retryJob = useRetryJob()
 
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [activityLog, setActivityLog] = useState<LogEntry[]>([])
 
-  // Fetch job details
-  const { data: job, isLoading: jobLoading } = useJob(jobId)
+  // Determine if job is in a running state (for real-time subscription)
+  // We compute this before useJob to enable polling
+  const [isRunning, setIsRunning] = useState(true) // Initially assume running
+
+  // Fetch job details with polling fallback when running
+  const { data: job, isLoading: jobLoading } = useJob(jobId, { 
+    enablePolling: isRunning,
+    pollingInterval: 3000, // Poll every 3 seconds
+  })
   const { data: analytics } = useJobAnalytics(jobId)
 
-  // Simulate activity log updates (in real app, this would come from WebSocket or polling)
-  useEffect(() => {
-    if (!job || job.status === 'completed' || job.status === 'failed') return
-
-    const addLogEntry = () => {
-      const types: LogEntry['type'][] = ['info', 'success', 'success', 'info']
-      const messages = [
-        'Discovered @mindful_living',
-        'Scored @cleaneatingamy',
-        'Email found for @wellnessbysarah',
-        'Processing @yogawithjames',
-      ]
-
+  // Subscribe to real-time job status updates
+  useRealtimeJobStatus({
+    jobId: jobId!,
+    enabled: isRunning && !!jobId,
+    onStatusChange: (newStatus, previousStatus) => {
+      // Add log entry when status changes
       const now = new Date()
       const timestamp = now.toTimeString().slice(0, 8)
-      const entry: LogEntry = {
-        id: `${Date.now()}`,
-        timestamp,
-        type: types[Math.floor(Math.random() * types.length)],
-        message: messages[Math.floor(Math.random() * messages.length)],
-        score: Math.random() > 0.5 ? Math.floor(Math.random() * 30) + 70 : undefined,
+      const statusMessages: Record<string, string> = {
+        analyzing: 'Brand Analyzer started',
+        discovering: 'Discovery Engine started',
+        scoring: 'Scoring Agent started',
+        completed: 'All agents completed successfully!',
+        failed: 'Pipeline encountered an error',
+        cancelled: 'Discovery was cancelled',
       }
+      
+      const message = statusMessages[newStatus] || `Status changed to ${newStatus}`
+      const type = newStatus === 'completed' ? 'success' : 
+                   newStatus === 'failed' ? 'error' : 
+                   newStatus === 'cancelled' ? 'warning' : 'info'
+      
+      setActivityLog((prev) => [...prev.slice(-49), {
+        id: `status-${Date.now()}`,
+        timestamp,
+        type,
+        message,
+      }])
+      
+      // Show toast for important status changes
+      if (newStatus === 'completed') {
+        toast.success('Discovery completed successfully!')
+      } else if (newStatus === 'failed') {
+        toast.error('Discovery failed. Check the activity log for details.')
+      }
+    },
+  })
 
-      setActivityLog((prev) => [...prev.slice(-49), entry])
+  // Update isRunning state when job data changes
+  // Note: 'pending' is NOT considered running - it means not yet started
+  useEffect(() => {
+    if (job) {
+      const running = ['analyzing', 'discovering', 'scoring'].includes(job.status)
+      setIsRunning(running)
+    }
+  }, [job?.status])
+
+  // Populate initial activity log based on current job status
+  // This ensures we show past events even if page was opened after they happened
+  useEffect(() => {
+    if (!job || activityLog.length > 0) return // Only populate once, on initial load
+
+    const initialEntries: LogEntry[] = []
+    const timestamp = new Date(job.created_at).toTimeString().slice(0, 8)
+
+    // Add entries for completed stages based on current status
+    const statusOrder = ['pending', 'analyzing', 'discovering', 'scoring', 'completed', 'failed', 'cancelled']
+    const currentIndex = statusOrder.indexOf(job.status)
+
+    if (currentIndex >= 1) {
+      initialEntries.push({
+        id: 'init-analyzing',
+        timestamp,
+        type: 'info',
+        message: 'Brand Analyzer started',
+      })
     }
 
-    const interval = setInterval(addLogEntry, 2000)
-    return () => clearInterval(interval)
-  }, [job])
+    if (currentIndex >= 2) {
+      initialEntries.push({
+        id: 'init-analyzing-done',
+        timestamp,
+        type: 'success',
+        message: 'Brand DNA extracted successfully',
+      })
+      initialEntries.push({
+        id: 'init-discovering',
+        timestamp,
+        type: 'info',
+        message: 'Discovery Engine started',
+      })
+    }
+
+    if (currentIndex >= 3) {
+      initialEntries.push({
+        id: 'init-discovering-done',
+        timestamp,
+        type: 'success',
+        message: `Discovered ${job.profiles_discovered || 0} profiles`,
+      })
+      initialEntries.push({
+        id: 'init-scoring',
+        timestamp,
+        type: 'info',
+        message: 'Scoring Agent started',
+      })
+    }
+
+    if (job.status === 'completed') {
+      initialEntries.push({
+        id: 'init-completed',
+        timestamp: new Date().toTimeString().slice(0, 8),
+        type: 'success',
+        message: 'All agents completed successfully!',
+      })
+    } else if (job.status === 'failed') {
+      initialEntries.push({
+        id: 'init-failed',
+        timestamp: new Date().toTimeString().slice(0, 8),
+        type: 'error',
+        message: job.error_message || 'Pipeline encountered an error',
+      })
+    } else if (job.status === 'cancelled') {
+      initialEntries.push({
+        id: 'init-cancelled',
+        timestamp: new Date().toTimeString().slice(0, 8),
+        type: 'warning',
+        message: 'Discovery was cancelled',
+      })
+    }
+
+    if (initialEntries.length > 0) {
+      setActivityLog(initialEntries)
+    }
+  }, [job, activityLog.length])
+
 
   const handleCancel = async () => {
     if (!jobId) return
@@ -166,6 +282,29 @@ export default function ProcessingPage() {
       setShowCancelModal(false)
     } catch {
       toast.error('Failed to cancel job')
+    }
+  }
+
+  const handleStartJob = async () => {
+    if (!jobId) return
+    try {
+      await startJob.mutateAsync(jobId)
+      toast.success('Discovery started!')
+    } catch {
+      toast.error('Failed to start discovery')
+    }
+  }
+
+  const handleRetryJob = async () => {
+    if (!jobId) return
+    try {
+      // First reset the job to pending
+      await retryJob.mutateAsync(jobId)
+      // Then start it
+      await startJob.mutateAsync(jobId)
+      toast.success('Discovery restarted!')
+    } catch {
+      toast.error('Failed to restart discovery')
     }
   }
 
@@ -201,7 +340,6 @@ export default function ProcessingPage() {
     )
   }
 
-  const isRunning = ['pending', 'analyzing', 'discovering', 'scoring'].includes(job.status)
   const stages = getStagesFromJobStatus(job.status, analytics)
   const progress = getOverallProgress(job.status, analytics)
 
@@ -227,6 +365,26 @@ export default function ProcessingPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Pending indicator */}
+          {job.status === 'pending' && (
+            <Badge variant="new">Ready to Start</Badge>
+          )}
+
+          {/* Cancelled indicator */}
+          {job.status === 'cancelled' && (
+            <Badge variant="cancelled">Cancelled</Badge>
+          )}
+
+          {/* Failed indicator */}
+          {job.status === 'failed' && (
+            <Badge variant="failed">Failed</Badge>
+          )}
+
+          {/* Completed indicator */}
+          {job.status === 'completed' && (
+            <Badge variant="done">Completed</Badge>
+          )}
+
           {/* Running indicator */}
           {isRunning && (
             <Badge variant="processing" className="gap-2">
@@ -246,25 +404,38 @@ export default function ProcessingPage() {
             </Button>
           )}
 
-          {/* Retry button (shown when failed) */}
-          {job.status === 'failed' && (
+          {/* Restart button (shown when failed or cancelled) */}
+          {(job.status === 'failed' || job.status === 'cancelled') && (
             <Button
               variant="secondary"
               leftIcon={<RefreshIcon />}
-              onClick={() => toast.info('Retry not implemented yet')}
+              onClick={handleRetryJob}
+              loading={retryJob.isPending || startJob.isPending}
               className="text-apple-orange hover:text-apple-orange"
             >
-              Retry
+              Restart
             </Button>
           )}
 
-          {/* View Dashboard button */}
+          {/* Start button (shown when pending) */}
+          {job.status === 'pending' && (
+            <Button
+              variant="primary"
+              leftIcon={<PlayArrowIcon />}
+              onClick={handleStartJob}
+              loading={startJob.isPending}
+            >
+              Start Discovery
+            </Button>
+          )}
+
+          {/* View Profiles button */}
           <Button
             variant="primary"
             leftIcon={<DashboardIcon />}
             onClick={handleViewDashboard}
           >
-            View Dashboard
+            View Profiles
           </Button>
         </div>
       </div>

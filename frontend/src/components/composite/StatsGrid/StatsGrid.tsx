@@ -91,7 +91,7 @@ export function StatsGrid({ analytics, isLoading, className }: StatsGridProps) {
       />
       <StatCard
         label="Avg Score"
-        value={`${Math.round(analytics.average_score)}%`}
+        value={`${Math.round(analytics.average_score || 0)}%`}
         icon={<ScoreIcon className="w-5 h-5 text-white" />}
         color="bg-amber-500"
       />

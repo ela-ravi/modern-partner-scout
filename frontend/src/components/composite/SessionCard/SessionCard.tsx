@@ -60,8 +60,18 @@ function getStatusLabel(status: JobStatus): string {
   }
 }
 
+// Check if job is in a running state
+function isRunningJob(status: JobStatus): boolean {
+  return ['pending', 'analyzing', 'discovering', 'scoring'].includes(status)
+}
+
 export function SessionCard({ job, onDelete, className }: SessionCardProps) {
   const formattedDate = format(new Date(job.created_at), 'MMM d, yyyy')
+  
+  // Navigate to processing page for running jobs, dashboard for completed ones
+  const linkTo = isRunningJob(job.status) 
+    ? `/jobs/${job.id}/processing` 
+    : `/jobs/${job.id}`
 
   return (
     <Card
@@ -69,7 +79,7 @@ export function SessionCard({ job, onDelete, className }: SessionCardProps) {
       className={cn('relative group', className)}
     >
       <Link
-        to={`/jobs/${job.id}`}
+        to={linkTo}
         className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-apple-blue focus-visible:ring-offset-2 rounded-lg -m-6 p-6"
       >
         {/* Header */}
@@ -104,9 +114,9 @@ export function SessionCard({ job, onDelete, className }: SessionCardProps) {
         </div>
       </Link>
 
-      {/* Delete button - visible on hover */}
+      {/* Delete button - visible on hover, bottom right */}
       {onDelete && (
-        <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button
             variant="ghost"
             size="sm"

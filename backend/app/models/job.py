@@ -236,6 +236,7 @@ class JobAnalytics(BaseModel):
     max_score: Optional[int] = None
     min_score: Optional[int] = None
     profiles_with_email: int = 0
+    high_score_count: int = 0
 
 
 class JobListResponse(BaseModel):

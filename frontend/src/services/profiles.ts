@@ -11,6 +11,42 @@ import type {
   JobAnalytics,
 } from '@/types/api/profile'
 
+/**
+ * Backend analytics response shape (different from frontend JobAnalytics)
+ */
+interface BackendAnalyticsResponse {
+  job_id: string
+  total_profiles: number
+  new_profiles: number
+  processing_profiles: number
+  done_profiles: number
+  skipped_profiles: number
+  avg_score: number | null
+  max_score: number | null
+  min_score: number | null
+  profiles_with_email: number
+  high_score_count: number
+}
+
+/**
+ * Transform backend analytics response to frontend JobAnalytics format
+ */
+function transformAnalytics(backend: BackendAnalyticsResponse): JobAnalytics {
+  return {
+    total_discovered: backend.total_profiles,
+    total_scored: backend.done_profiles,
+    high_match_count: backend.high_score_count ?? 0,
+    emails_found: backend.profiles_with_email,
+    average_score: backend.avg_score ?? 0,
+    status_breakdown: {
+      new: backend.new_profiles,
+      processing: backend.processing_profiles,
+      done: backend.done_profiles,
+      skipped: backend.skipped_profiles,
+    },
+  }
+}
+
 export const profilesService = {
   /**
    * List profiles for a job with optional filtering and pagination
@@ -60,6 +96,21 @@ export const profilesService = {
 
   /**
    * Get analytics summary for a job
+   * Transforms backend response to match frontend JobAnalytics type
    */
-  getAnalytics: (jobId: string) => api.get<JobAnalytics>(`/api/jobs/${jobId}/analytics`),
+  getAnalytics: async (jobId: string): Promise<JobAnalytics> => {
+    const rawResponse = await api.get<BackendAnalyticsResponse>(`/api/jobs/${jobId}/analytics`)
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7247/ingest/a4834e21-fce4-4031-b8aa-7e6c09773ae1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'profiles.ts:getAnalytics',message:'Raw analytics API response',data:{jobId,rawResponse},hypothesisId:'H1-field-mismatch',timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    
+    const transformed = transformAnalytics(rawResponse)
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7247/ingest/a4834e21-fce4-4031-b8aa-7e6c09773ae1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'profiles.ts:getAnalytics',message:'Transformed analytics',data:{transformed},hypothesisId:'H1-field-mismatch',timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    
+    return transformed
+  },
 }

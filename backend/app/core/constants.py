@@ -128,7 +128,7 @@ class JobStatus(str, Enum):
     @classmethod
     def retryable_statuses(cls) -> FrozenSet["JobStatus"]:
         """Return statuses from which a job can be retried."""
-        return frozenset({cls.FAILED})
+        return frozenset({cls.FAILED, cls.CANCELLED})
     
     @classmethod
     def startable_statuses(cls) -> FrozenSet["JobStatus"]:
@@ -176,7 +176,7 @@ VALID_JOB_TRANSITIONS: Dict[JobStatus, FrozenSet[JobStatus]] = {
     JobStatus.SCORING: frozenset({JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED}),
     JobStatus.COMPLETED: frozenset(),  # Terminal state
     JobStatus.FAILED: frozenset({JobStatus.PENDING}),  # Can retry -> goes back to pending
-    JobStatus.CANCELLED: frozenset(),  # Terminal state
+    JobStatus.CANCELLED: frozenset({JobStatus.PENDING}),  # Can restart -> goes back to pending
 }
 
 VALID_PROFILE_TRANSITIONS: Dict[ProfileStatus, FrozenSet[ProfileStatus]] = {

@@ -2,7 +2,6 @@ import { Outlet } from 'react-router-dom'
 import { SkipLink } from '@/components/ui/SkipLink'
 import { UserMenu } from '@/components/composite/UserMenu'
 import { cn } from '@/lib/utils'
-import DashboardIcon from '@mui/icons-material/Dashboard'
 import ListAltIcon from '@mui/icons-material/ListAlt'
 import { Link, useLocation } from 'react-router-dom'
 
@@ -10,12 +9,11 @@ export function DashboardLayout() {
   const location = useLocation()
 
   const navItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
     { path: '/sessions', label: 'Sessions', icon: <ListAltIcon /> },
   ]
 
   return (
-    <div className="min-h-screen bg-apple-bg">
+    <div className="min-h-screen bg-apple-bg flex flex-col">
       <SkipLink />
 
       {/* Header */}
@@ -27,7 +25,7 @@ export function DashboardLayout() {
           <div className="flex h-16 items-center justify-between">
             {/* Logo */}
             <Link
-              to="/dashboard"
+              to="/sessions"
               className="flex items-center gap-2 text-apple-text font-semibold text-lg"
               aria-label="PartnerScout home"
             >
@@ -74,8 +72,8 @@ export function DashboardLayout() {
         </nav>
       </header>
 
-      {/* Main Content */}
-      <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Main Content - flex-1 ensures footer stays at bottom */}
+      <main id="main-content" className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <Outlet />
       </main>
 
