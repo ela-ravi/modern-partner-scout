@@ -403,10 +403,12 @@ class TestConfigurationIntegration:
         """Test that all providers are available."""
         providers = get_available_providers()
         
-        assert len(providers) == 3
+        assert len(providers) == 5
         assert LLMProvider.OPENAI in providers
         assert LLMProvider.GEMINI in providers
         assert LLMProvider.OLLAMA in providers
+        assert LLMProvider.OPENROUTER in providers
+        assert LLMProvider.HUGGINGFACE in providers
     
     def test_configured_providers(self, full_mock_settings):
         """Test provider configuration status."""

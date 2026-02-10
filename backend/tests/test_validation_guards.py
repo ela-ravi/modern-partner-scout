@@ -187,19 +187,19 @@ class TestStatusTransitionGuard:
         )
         assert result == ProfileStatus.SCORED
     
-    def test_validate_profile_transition_processing_to_failed(self, status_guard):
-        """Test valid transition from processing to failed."""
+    def test_validate_profile_transition_processing_to_new(self, status_guard):
+        """Test valid retry transition from processing to new."""
         result = status_guard.validate_profile_transition(
-            ProfileStatus.PROCESSING, ProfileStatus.FAILED
+            ProfileStatus.PROCESSING, ProfileStatus.NEW
         )
-        assert result == ProfileStatus.FAILED
-    
-    def test_validate_profile_transition_failed_to_processing(self, status_guard):
-        """Test valid retry transition from failed to processing."""
+        assert result == ProfileStatus.NEW
+
+    def test_validate_profile_transition_processing_to_skipped(self, status_guard):
+        """Test valid transition from processing to skipped."""
         result = status_guard.validate_profile_transition(
-            ProfileStatus.FAILED, ProfileStatus.PROCESSING
+            ProfileStatus.PROCESSING, ProfileStatus.SKIPPED
         )
-        assert result == ProfileStatus.PROCESSING
+        assert result == ProfileStatus.SKIPPED
     
     def test_validate_profile_transition_string_input(self, status_guard):
         """Test transition validation with string inputs."""

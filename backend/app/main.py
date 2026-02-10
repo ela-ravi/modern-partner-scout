@@ -217,17 +217,32 @@ async def general_exception_handler(
 ) -> JSONResponse:
     """
     Handle all unhandled exceptions.
-    
+
     Logs the error and returns a generic error response.
     In production, sensitive error details are not exposed.
     Response format: {"detail": {"error": {...}}}
+
+    Includes CORS headers explicitly to prevent browser CORS errors
+    when the server returns 500 during concurrent connection exhaustion.
     """
     logger.exception(f"Unhandled exception: {exc}")
-    
+
+    # Build CORS headers from request origin
+    origin = request.headers.get("origin", "")
+    cors_headers: dict[str, str] = {}
+    if origin:
+        allowed = get_cors_origins()
+        if origin in allowed:
+            cors_headers = {
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Credentials": "true",
+            }
+
     # In development, include more details
     if settings.is_development and settings.debug:
         return JSONResponse(
             status_code=HttpStatus.INTERNAL_SERVER_ERROR,
+            headers=cors_headers,
             content={
                 "detail": {
                     "error": {
@@ -238,9 +253,10 @@ async def general_exception_handler(
                 }
             }
         )
-    
+
     return JSONResponse(
         status_code=HttpStatus.INTERNAL_SERVER_ERROR,
+        headers=cors_headers,
         content={
             "detail": {
                 "error": {

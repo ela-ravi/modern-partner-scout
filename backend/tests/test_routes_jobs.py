@@ -672,17 +672,15 @@ class TestGetJobAnalytics:
         """Test successful analytics retrieval."""
         mock_job_service.get_analytics.return_value = {
             "job_id": sample_job_id,
-            "profiles_discovered": 50,
-            "profiles_scored": 45,
+            "total_profiles": 50,
             "new_profiles": 2,
             "processing_profiles": 3,
             "done_profiles": 45,
             "skipped_profiles": 0,
-            "average_score": 72.5,
+            "avg_score": 72.5,
             "max_score": 95,
             "min_score": 45,
             "profiles_with_email": 30,
-            "high_score_count": 12,
         }
         
         response = client.get(

@@ -62,6 +62,8 @@ function getStatusLabel(status: JobStatus): string {
 
 export function SessionCard({ job, onDelete, className }: SessionCardProps) {
   const formattedDate = format(new Date(job.created_at), 'MMM d, yyyy')
+  const isInProgress = ['pending', 'analyzing', 'discovering', 'scoring'].includes(job.status)
+  const linkTarget = isInProgress ? `/jobs/${job.id}/processing` : `/jobs/${job.id}`
 
   return (
     <Card
@@ -69,8 +71,8 @@ export function SessionCard({ job, onDelete, className }: SessionCardProps) {
       className={cn('relative group', className)}
     >
       <Link
-        to={`/jobs/${job.id}`}
-        className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-apple-blue focus-visible:ring-offset-2 rounded-lg -m-6 p-6"
+        to={linkTarget}
+        className="block cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-apple-blue focus-visible:ring-offset-2 rounded-lg -m-6 p-6"
       >
         {/* Header */}
         <div className="flex items-start justify-between mb-4">

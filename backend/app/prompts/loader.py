@@ -59,6 +59,10 @@ REGISTERED_AGENTS = {
         "system": "email_composer/system.txt",
         "user": "email_composer/user.txt",
     },
+    "contact_enricher": {
+        "system": "contact_enricher/system.txt",
+        "user": "contact_enricher/user.txt",
+    },
 }
 
 

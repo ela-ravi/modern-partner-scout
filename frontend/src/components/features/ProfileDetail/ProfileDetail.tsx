@@ -16,6 +16,9 @@ import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder'
 import BlockIcon from '@mui/icons-material/Block'
 import StarIcon from '@mui/icons-material/Star'
 import ThumbUpIcon from '@mui/icons-material/ThumbUp'
+import PhoneIcon from '@mui/icons-material/Phone'
+import LocationOnIcon from '@mui/icons-material/LocationOn'
+import LanguageIcon from '@mui/icons-material/Language'
 import type { Profile } from '@/types/api/profile'
 
 export interface ProfileDetailProps {
@@ -216,7 +219,9 @@ export function ProfileDetail({
                       AI Analysis
                     </h3>
                     <p className="text-apple-text-secondary text-sm leading-relaxed">
-                      {profile.score.reasoning}
+                      {typeof profile.score.reasoning === 'string'
+                        ? profile.score.reasoning
+                        : 'AI analysis completed.'}
                     </p>
                   </div>
                 )}
@@ -266,26 +271,67 @@ export function ProfileDetail({
                 )}
 
                 {/* Contact Info */}
-                {profile.email && (
+                {(profile.email || profile.phone || profile.address || profile.website) && (
                   <div className="bg-apple-gray rounded-2xl p-5">
                     <h3 className="font-medium text-apple-text-secondary text-xs uppercase tracking-wider mb-3">
                       Contact
                     </h3>
-                    <div className="flex items-center gap-3 p-3 bg-white rounded-xl">
-                      <EmailIcon className="text-apple-orange" />
-                      <div className="flex-1 min-w-0">
-                        <span className="text-sm truncate block">{profile.email}</span>
-                        <Badge variant="info" size="sm" className="mt-1">
-                          from bio
-                        </Badge>
-                      </div>
-                      <button
-                        onClick={handleCopyEmail}
-                        className="text-apple-text-tertiary hover:text-apple-blue transition-colors flex-shrink-0"
-                        aria-label="Copy email address"
-                      >
-                        <ContentCopyIcon className="w-5 h-5" />
-                      </button>
+                    <div className="space-y-2">
+                      {profile.email && (
+                        <div className="flex items-center gap-3 p-3 bg-white rounded-xl">
+                          <EmailIcon className="text-apple-orange flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm truncate block">{profile.email}</span>
+                            {profile.email_source && (
+                              <Badge variant="info" size="sm" className="mt-1">
+                                {profile.email_source}
+                              </Badge>
+                            )}
+                          </div>
+                          <button
+                            onClick={handleCopyEmail}
+                            className="text-apple-text-tertiary hover:text-apple-blue transition-colors flex-shrink-0"
+                            aria-label="Copy email address"
+                          >
+                            <ContentCopyIcon className="w-5 h-5" />
+                          </button>
+                        </div>
+                      )}
+                      {profile.phone && (
+                        <div className="flex items-center gap-3 p-3 bg-white rounded-xl">
+                          <PhoneIcon className="text-apple-green flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm truncate block">{profile.phone}</span>
+                            <Badge variant="info" size="sm" className="mt-1">
+                              phone
+                            </Badge>
+                          </div>
+                        </div>
+                      )}
+                      {profile.address && (
+                        <div className="flex items-center gap-3 p-3 bg-white rounded-xl">
+                          <LocationOnIcon className="text-apple-red flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm block leading-snug">{profile.address}</span>
+                            <Badge variant="info" size="sm" className="mt-1">
+                              address
+                            </Badge>
+                          </div>
+                        </div>
+                      )}
+                      {profile.website && (
+                        <div className="flex items-center gap-3 p-3 bg-white rounded-xl">
+                          <LanguageIcon className="text-apple-blue flex-shrink-0" />
+                          <a
+                            href={profile.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 min-w-0 text-sm text-apple-blue hover:underline truncate block"
+                          >
+                            {profile.website.replace(/^https?:\/\//, '')}
+                          </a>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

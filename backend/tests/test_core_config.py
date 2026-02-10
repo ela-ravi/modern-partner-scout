@@ -136,8 +136,8 @@ class TestConstants:
         
         assert ProfileStatus.NEW == "new"
         assert ProfileStatus.PROCESSING == "processing"
-        assert ProfileStatus.SCORED == "scored"
-        assert ProfileStatus.FAILED == "failed"
+        assert ProfileStatus.SCORED == "done"
+        assert ProfileStatus.SKIPPED == "skipped"
     
     def test_valid_job_transitions(self):
         """Test valid job status transitions."""

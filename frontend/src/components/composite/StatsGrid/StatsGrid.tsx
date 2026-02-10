@@ -73,25 +73,25 @@ export function StatsGrid({ analytics, isLoading, className }: StatsGridProps) {
     <div className={cn('grid grid-cols-2 lg:grid-cols-4 gap-4', className)}>
       <StatCard
         label="Discovered"
-        value={analytics.total_discovered}
+        value={analytics.total_profiles}
         icon={<PeopleIcon className="w-5 h-5 text-white" />}
         color="bg-apple-blue"
       />
       <StatCard
-        label="High Match"
-        value={analytics.high_match_count}
+        label="Scored"
+        value={analytics.done_profiles}
         icon={<StarIcon className="w-5 h-5 text-white" />}
         color="bg-green-500"
       />
       <StatCard
         label="Emails Found"
-        value={analytics.emails_found}
+        value={analytics.profiles_with_email}
         icon={<EmailIcon className="w-5 h-5 text-white" />}
         color="bg-purple-500"
       />
       <StatCard
         label="Avg Score"
-        value={`${Math.round(analytics.average_score)}%`}
+        value={analytics.avg_score != null ? `${Math.round(analytics.avg_score)}%` : 'N/A'}
         icon={<ScoreIcon className="w-5 h-5 text-white" />}
         color="bg-amber-500"
       />

@@ -5,6 +5,8 @@ Provides a generic base class for all repositories with common
 CRUD operations and query utilities.
 """
 
+import logging
+import time
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
@@ -13,6 +15,8 @@ from uuid import UUID
 from app.db import get_admin_db, SupabaseClient
 from app.core.constants import Tables
 from app.core.exceptions import NotFoundError, SupabaseError
+
+logger = logging.getLogger(__name__)
 
 
 # Type variable for the entity type
@@ -51,16 +55,46 @@ class BaseRepository(ABC, Generic[T]):
         """Get a query builder for this repository's table."""
         return self._db.table(self.table_name)
     
+    @staticmethod
+    def _execute_with_retry(query, max_retries: int = 3, backoff_base: float = 0.5):
+        """
+        Execute a Supabase query with retry on transient connection errors.
+
+        Retries on httpx RemoteProtocolError / ConnectError which happen
+        when Supabase connections are exhausted under concurrent load.
+        """
+        for attempt in range(max_retries + 1):
+            try:
+                return query.execute()
+            except Exception as e:
+                err_name = type(e).__name__
+                is_transient = (
+                    "RemoteProtocolError" in err_name
+                    or "ConnectError" in err_name
+                    or "ReadTimeout" in err_name
+                    or "Server disconnected" in str(e)
+                    or "ConnectionReset" in err_name
+                )
+                if is_transient and attempt < max_retries:
+                    wait = backoff_base * (2 ** attempt)
+                    logger.warning(
+                        f"Transient DB error (attempt {attempt+1}/{max_retries+1}): "
+                        f"{err_name}: {e}. Retrying in {wait:.1f}s"
+                    )
+                    time.sleep(wait)
+                else:
+                    raise
+
     def _handle_response(self, response) -> List[Dict[str, Any]]:
         """
         Handle Supabase response and extract data.
-        
+
         Args:
             response: Supabase API response
-            
+
         Returns:
             List of data dictionaries
-            
+
         Raises:
             SupabaseError: If the response contains an error
         """
@@ -106,42 +140,42 @@ class BaseRepository(ABC, Generic[T]):
     def get_by_id(self, id: str | UUID, select: str = "*") -> Optional[Dict[str, Any]]:
         """
         Get a single entity by its ID.
-        
+
         Args:
             id: The UUID of the entity
             select: Columns to select (default "*")
-            
+
         Returns:
             Entity data dictionary or None if not found
-            
+
         Raises:
             NotFoundError: If entity is not found
         """
-        response = (
+        query = (
             self._table()
             .select(select)
             .eq("id", str(id))
-            .execute()
         )
+        response = self._execute_with_retry(query)
         return self._handle_single_response(response, entity_id=str(id))
     
     def get_by_id_optional(self, id: str | UUID, select: str = "*") -> Optional[Dict[str, Any]]:
         """
         Get a single entity by its ID, returning None if not found.
-        
+
         Args:
             id: The UUID of the entity
             select: Columns to select (default "*")
-            
+
         Returns:
             Entity data dictionary or None
         """
-        response = (
+        query = (
             self._table()
             .select(select)
             .eq("id", str(id))
-            .execute()
         )
+        response = self._execute_with_retry(query)
         return self._handle_single_response(response, raise_if_empty=False)
     
     def list_all(
@@ -165,13 +199,13 @@ class BaseRepository(ABC, Generic[T]):
         Returns:
             List of entity dictionaries
         """
-        response = (
+        query = (
             self._table()
             .select(select)
             .order(order_by, desc=not ascending)
             .range(offset, offset + limit - 1)
-            .execute()
         )
+        response = self._execute_with_retry(query)
         return self._handle_response(response)
     
     def count(self, filters: Optional[Dict[str, Any]] = None) -> int:
@@ -215,60 +249,54 @@ class BaseRepository(ABC, Generic[T]):
     def insert(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Insert a new entity.
-        
+
         Args:
             data: Entity data to insert
-            
+
         Returns:
             Inserted entity with generated fields (id, created_at, etc.)
         """
-        response = (
-            self._table()
-            .insert(data)
-            .execute()
-        )
+        query = self._table().insert(data)
+        response = self._execute_with_retry(query)
         return self._handle_single_response(response, raise_if_empty=False) or data
-    
+
     def insert_many(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Insert multiple entities.
-        
+
         Args:
             data: List of entity data to insert
-            
+
         Returns:
             List of inserted entities
         """
         if not data:
             return []
-        
-        response = (
-            self._table()
-            .insert(data)
-            .execute()
-        )
+
+        query = self._table().insert(data)
+        response = self._execute_with_retry(query)
         return self._handle_response(response)
     
     def update(self, id: str | UUID, data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Update an entity by ID.
-        
+
         Args:
             id: The UUID of the entity to update
             data: Fields to update
-            
+
         Returns:
             Updated entity data
-            
+
         Raises:
             NotFoundError: If entity is not found
         """
-        response = (
+        query = (
             self._table()
             .update(data)
             .eq("id", str(id))
-            .execute()
         )
+        response = self._execute_with_retry(query)
         return self._handle_single_response(response, entity_id=str(id))
     
     def update_where(
@@ -368,11 +396,11 @@ class BaseRepository(ABC, Generic[T]):
         
         if order_by:
             query = query.order(order_by, desc=not ascending)
-        
+
         if limit:
             query = query.limit(limit)
-        
-        response = query.execute()
+
+        response = self._execute_with_retry(query)
         return self._handle_response(response)
     
     def find_one_by(

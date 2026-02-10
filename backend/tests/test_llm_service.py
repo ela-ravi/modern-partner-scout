@@ -183,10 +183,12 @@ class TestLLMProviderEnum:
     def test_all_providers_exist(self):
         """Test all expected providers exist."""
         providers = list(LLMProvider)
-        assert len(providers) == 3
+        assert len(providers) == 5
         assert LLMProvider.OPENAI in providers
         assert LLMProvider.GEMINI in providers
         assert LLMProvider.OLLAMA in providers
+        assert LLMProvider.OPENROUTER in providers
+        assert LLMProvider.HUGGINGFACE in providers
 
 
 # =============================================================================
@@ -339,6 +341,7 @@ class TestGeminiFactory:
             temperature=0.8,
             max_output_tokens=DEFAULT_MAX_TOKENS,
             timeout=DEFAULT_TIMEOUT,
+            convert_system_message_to_human=True,
         )
         assert result == mock_instance
     
@@ -726,11 +729,13 @@ class TestUtilityFunctions:
     def test_get_available_providers(self):
         """Test get_available_providers returns all providers."""
         providers = get_available_providers()
-        
-        assert len(providers) == 3
+
+        assert len(providers) == 5
         assert LLMProvider.OPENAI in providers
         assert LLMProvider.GEMINI in providers
         assert LLMProvider.OLLAMA in providers
+        assert LLMProvider.OPENROUTER in providers
+        assert LLMProvider.HUGGINGFACE in providers
     
     def test_get_provider_info_openai_configured(self, mock_openai_settings):
         """Test get_provider_info for configured OpenAI."""

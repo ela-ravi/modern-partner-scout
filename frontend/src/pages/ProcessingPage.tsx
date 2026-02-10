@@ -3,7 +3,7 @@
  * Shows real-time AI pipeline processing status
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -11,20 +11,21 @@ import { Modal } from '@/components/ui/Modal'
 import { PipelineProgress, type PipelineStage } from '@/components/features/PipelineProgress'
 import { ActivityLog, type LogEntry } from '@/components/composite/ActivityLog'
 import { useJob, useCancelJob } from '@/hooks/jobs'
+import { jobsService } from '@/services/jobs'
 import { useJobAnalytics } from '@/hooks/profiles'
+import { useRealtime } from '@/hooks/realtime'
 import { useToast } from '@/components/ui/Toast'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import StopCircleIcon from '@mui/icons-material/StopCircle'
 import DashboardIcon from '@mui/icons-material/Dashboard'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import type { JobStatus } from '@/types/api/job'
+import type { JobAnalytics } from '@/types/api/profile'
+
+const TERMINAL_STATUSES: JobStatus[] = ['completed', 'failed', 'cancelled']
 
 // Map job status to pipeline stages
-function getStagesFromJobStatus(status: JobStatus, analytics?: {
-  total_discovered?: number
-  total_scored?: number
-  emails_found?: number
-}): PipelineStage[] {
+function getStagesFromJobStatus(status: JobStatus, analytics?: JobAnalytics): PipelineStage[] {
   const stages: PipelineStage[] = [
     {
       id: 'analyzer',
@@ -37,21 +38,21 @@ function getStagesFromJobStatus(status: JobStatus, analytics?: {
       name: 'Discovery Engine',
       status: 'pending',
       description: 'Scanning Instagram for matching profiles',
-      stats: analytics?.total_discovered ? { discovered: analytics.total_discovered } : undefined,
+      stats: analytics?.total_profiles ? { discovered: analytics.total_profiles } : undefined,
     },
     {
       id: 'scoring',
       name: 'Scoring Agent',
       status: 'pending',
       description: 'Analyzing profiles against brand DNA',
-      stats: analytics?.total_scored ? { scored: analytics.total_scored } : undefined,
+      stats: analytics?.done_profiles ? { scored: analytics.done_profiles } : undefined,
     },
     {
       id: 'email',
       name: 'Email Extractor',
       status: 'pending',
       description: 'Extracting contact emails from scored profiles',
-      stats: analytics?.emails_found ? { emails: analytics.emails_found } : undefined,
+      stats: analytics?.profiles_with_email ? { emails: analytics.profiles_with_email } : undefined,
     },
   ]
 
@@ -77,17 +78,17 @@ function getStagesFromJobStatus(status: JobStatus, analytics?: {
       stages[3].status = 'active'
       stages[3].progress = 20
       break
-    case 'failed':
-      // Find the stage that failed
-      const failedIndex = stages.findIndex((s) => s.status === 'active')
-      if (failedIndex >= 0) {
-        stages[failedIndex].status = 'failed'
-        stages[failedIndex].error = 'Processing failed'
+    case 'failed': {
+      const activeIndex = stages.findIndex((s) => s.status === 'active')
+      if (activeIndex >= 0) {
+        stages[activeIndex].status = 'failed'
+        stages[activeIndex].error = 'Processing failed'
       } else {
         stages[0].status = 'failed'
         stages[0].error = 'Processing failed'
       }
       break
+    }
     case 'cancelled':
       stages.forEach((s) => {
         if (s.status === 'active') s.status = 'pending'
@@ -98,20 +99,12 @@ function getStagesFromJobStatus(status: JobStatus, analytics?: {
   return stages
 }
 
-function getOverallProgress(status: JobStatus, analytics?: {
-  total_discovered?: number
-  total_scored?: number
-  profiles_target?: number
-}): number {
+function getOverallProgress(status: JobStatus): number {
   if (status === 'completed') return 100
   if (status === 'pending') return 0
   if (status === 'analyzing') return 15
-  if (status === 'discovering') return 35
-  if (status === 'scoring') {
-    const target = analytics?.profiles_target || 50
-    const scored = analytics?.total_scored || 0
-    return Math.min(50 + (scored / target) * 50, 99)
-  }
+  if (status === 'discovering') return 40
+  if (status === 'scoring') return 70
   return 0
 }
 
@@ -123,40 +116,87 @@ export default function ProcessingPage() {
 
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [activityLog, setActivityLog] = useState<LogEntry[]>([])
+  const [hasAutoNavigated, setHasAutoNavigated] = useState(false)
 
-  // Fetch job details
-  const { data: job, isLoading: jobLoading } = useJob(jobId)
+  // Fetch job details with polling every 3s while running
+  const { data: job, isLoading: jobLoading } = useJob(jobId, {
+    refetchInterval: 3000,
+  })
   const { data: analytics } = useJobAnalytics(jobId)
 
-  // Simulate activity log updates (in real app, this would come from WebSocket or polling)
-  useEffect(() => {
-    if (!job || job.status === 'completed' || job.status === 'failed') return
+  const isRunning = !!job && !TERMINAL_STATUSES.includes(job.status)
 
-    const addLogEntry = () => {
-      const types: LogEntry['type'][] = ['info', 'success', 'success', 'info']
-      const messages = [
-        'Discovered @mindful_living',
-        'Scored @cleaneatingamy',
-        'Email found for @wellnessbysarah',
-        'Processing @yogawithjames',
-      ]
-
-      const now = new Date()
-      const timestamp = now.toTimeString().slice(0, 8)
-      const entry: LogEntry = {
-        id: `${Date.now()}`,
-        timestamp,
-        type: types[Math.floor(Math.random() * types.length)],
-        message: messages[Math.floor(Math.random() * messages.length)],
-        score: Math.random() > 0.5 ? Math.floor(Math.random() * 30) + 70 : undefined,
-      }
-
-      setActivityLog((prev) => [...prev.slice(-49), entry])
+  // Add a log entry helper
+  const addLogEntry = useCallback((type: LogEntry['type'], message: string, score?: number) => {
+    const now = new Date()
+    const entry: LogEntry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      timestamp: now.toTimeString().slice(0, 8),
+      type,
+      message,
+      score,
     }
+    setActivityLog((prev) => [...prev.slice(-49), entry])
+  }, [])
 
-    const interval = setInterval(addLogEntry, 2000)
-    return () => clearInterval(interval)
-  }, [job])
+  // Subscribe to job status changes via Supabase Realtime
+  useRealtime<{ status: string; updated_at: string; error_message?: string }>({
+    table: 'discovery_jobs',
+    jobId: jobId,
+    enabled: !!jobId && isRunning,
+    onUpdate: (record) => {
+      const statusLabels: Record<string, string> = {
+        analyzing: 'Brand analysis started...',
+        discovering: 'Profile discovery started...',
+        scoring: 'Profile scoring started...',
+        completed: 'Pipeline completed successfully!',
+        failed: `Pipeline failed: ${record.error_message || 'Unknown error'}`,
+        cancelled: 'Pipeline cancelled.',
+      }
+      const label = statusLabels[record.status] || `Status: ${record.status}`
+      const type = record.status === 'failed' ? 'error' : record.status === 'completed' ? 'success' : 'info'
+      addLogEntry(type, label)
+    },
+  })
+
+  // Subscribe to new profile discoveries
+  useRealtime<{ id: string; username: string; followers_count: number }>({
+    table: 'discovered_profiles',
+    jobId: jobId,
+    enabled: !!jobId && isRunning,
+    onInsert: (profile) => {
+      const followers = profile.followers_count
+        ? ` (${(profile.followers_count / 1000).toFixed(1)}K followers)`
+        : ''
+      addLogEntry('success', `Discovered @${profile.username}${followers}`)
+    },
+  })
+
+  // Subscribe to profile score updates
+  useRealtime<{ profile_id: string; final_score: number }>({
+    table: 'profile_scores',
+    enabled: !!jobId && isRunning,
+    onInsert: (score) => {
+      addLogEntry('success', `Profile scored`, score.final_score)
+    },
+  })
+
+  // Add initial log entry
+  useEffect(() => {
+    if (job && activityLog.length === 0) {
+      addLogEntry('info', `Pipeline started for "${job.name}"`)
+    }
+  }, [job, activityLog.length, addLogEntry])
+
+  // Auto-navigate to dashboard when completed
+  useEffect(() => {
+    if (job?.status === 'completed' && !hasAutoNavigated) {
+      setHasAutoNavigated(true)
+      toast.success('Discovery completed! Redirecting to results...')
+      const timer = setTimeout(() => navigate(`/jobs/${jobId}`), 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [job?.status, hasAutoNavigated, jobId, navigate, toast])
 
   const handleCancel = async () => {
     if (!jobId) return
@@ -166,6 +206,18 @@ export default function ProcessingPage() {
       setShowCancelModal(false)
     } catch {
       toast.error('Failed to cancel job')
+    }
+  }
+
+  const handleRetry = async () => {
+    if (!jobId) return
+    try {
+      await jobsService.retry(jobId)
+      await jobsService.start(jobId)
+      toast.success('Job retrying...')
+      setActivityLog([])
+    } catch {
+      toast.error('Failed to retry job')
     }
   }
 
@@ -201,9 +253,8 @@ export default function ProcessingPage() {
     )
   }
 
-  const isRunning = ['pending', 'analyzing', 'discovering', 'scoring'].includes(job.status)
   const stages = getStagesFromJobStatus(job.status, analytics)
-  const progress = getOverallProgress(job.status, analytics)
+  const progress = getOverallProgress(job.status)
 
   return (
     <div className="space-y-6">
@@ -251,7 +302,7 @@ export default function ProcessingPage() {
             <Button
               variant="secondary"
               leftIcon={<RefreshIcon />}
-              onClick={() => toast.info('Retry not implemented yet')}
+              onClick={handleRetry}
               className="text-apple-orange hover:text-apple-orange"
             >
               Retry
@@ -276,9 +327,9 @@ export default function ProcessingPage() {
           <PipelineProgress
             stages={stages}
             overallProgress={progress}
-            totalProfiles={50}
+            totalProfiles={job.discovery_limit ?? 50}
             completedProfiles={job.profiles_scored}
-            estimatedTime={isRunning ? '2 minutes' : undefined}
+            estimatedTime={isRunning ? '2-5 minutes' : undefined}
           />
         </div>
 
@@ -287,6 +338,14 @@ export default function ProcessingPage() {
           <ActivityLog entries={activityLog} maxHeight="500px" />
         </div>
       </div>
+
+      {/* Error Message */}
+      {job.status === 'failed' && job.error_message && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+          <p className="text-sm text-red-700 font-medium">Error Details</p>
+          <p className="text-sm text-red-600 mt-1">{job.error_message}</p>
+        </div>
+      )}
 
       {/* Cancel Confirmation Modal */}
       <Modal

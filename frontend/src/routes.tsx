@@ -34,10 +34,10 @@ function withSuspense(
 }
 
 export const router = createBrowserRouter([
-  // Redirect root to dashboard
+  // Redirect root to sessions
   {
     path: '/',
-    element: <Navigate to="/dashboard" replace />,
+    element: <Navigate to="/sessions" replace />,
   },
 
   // Auth routes (public)
@@ -55,7 +55,7 @@ export const router = createBrowserRouter([
         children: [
           {
             path: '/dashboard',
-            element: withSuspense(DashboardPage),
+            element: <Navigate to="/sessions" replace />,
           },
           {
             path: '/sessions',

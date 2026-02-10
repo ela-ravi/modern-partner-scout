@@ -268,17 +268,15 @@ class JobService:
         if summary:
             return {
                 "job_id": job_id,
-                "profiles_discovered": summary.get("total_profiles", 0),
-                "profiles_scored": summary.get("scored_profiles", 0),
+                "total_profiles": summary.get("total_profiles", 0),
                 "new_profiles": summary.get("new_profiles", 0),
                 "processing_profiles": summary.get("processing_profiles", 0),
                 "done_profiles": summary.get("done_profiles", 0),
                 "skipped_profiles": summary.get("skipped_profiles", 0),
-                "average_score": summary.get("avg_score"),
+                "avg_score": summary.get("avg_score"),
                 "max_score": summary.get("max_score"),
                 "min_score": summary.get("min_score"),
                 "profiles_with_email": summary.get("profiles_with_email", 0),
-                "high_score_count": summary.get("high_score_count", 0),
             }
         
         # Fallback: Compute from profile counts if view not available
@@ -299,17 +297,15 @@ class JobService:
         
         return {
             "job_id": job_id,
-            "profiles_discovered": total,
-            "profiles_scored": len(scores),
+            "total_profiles": total,
             "new_profiles": status_counts.get(ProfileStatus.NEW.value, 0),
             "processing_profiles": status_counts.get(ProfileStatus.PROCESSING.value, 0),
             "done_profiles": status_counts.get(ProfileStatus.SCORED.value, 0),
             "skipped_profiles": status_counts.get(ProfileStatus.SKIPPED.value, 0),
-            "average_score": round(sum(scores) / len(scores), 1) if scores else None,
+            "avg_score": round(sum(scores) / len(scores), 1) if scores else None,
             "max_score": max(scores) if scores else None,
             "min_score": min(scores) if scores else None,
             "profiles_with_email": len(emails),
-            "high_score_count": len([s for s in scores if s >= settings.high_score_threshold]),
         }
     
     # =========================================================================
@@ -479,7 +475,7 @@ class JobService:
                     json=payload,
                     headers=headers,
                 )
-                
+
                 if response.status_code >= 400:
                     raise N8NError(
                         message=f"N8N webhook returned error: {response.status_code}",
@@ -488,22 +484,30 @@ class JobService:
                             "response": response.text[:500],
                         }
                     )
-                
+
                 logger.info(f"Triggered discovery workflow for job {job_id}")
-                
+
                 return {
                     "status": "accepted",
                     "job_id": job_id,
                     "message": "Discovery workflow initiated",
                     "webhook_response": response.json() if response.text else None,
                 }
-                
-        except httpx.RequestError as e:
-            logger.error(f"Failed to call N8N webhook for job {job_id}: {e}")
-            raise N8NError(
-                message=f"Failed to trigger discovery workflow: {str(e)}",
-                details={"job_id": job_id, "error": str(e)}
+
+        except (N8NError, httpx.RequestError) as e:
+            # N8N unavailable — fall back to internal orchestration
+            logger.warning(
+                f"N8N webhook failed for job {job_id}, falling back to internal orchestration: {e}"
             )
+
+            from app.services.orchestration_service import start_pipeline_background
+            start_pipeline_background(job_id, job)
+
+            return {
+                "status": "accepted",
+                "job_id": job_id,
+                "message": "Discovery workflow initiated (internal fallback)",
+            }
     
     def cancel_job(self, job_id: str, user_id: str) -> Dict[str, Any]:
         """

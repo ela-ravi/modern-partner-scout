@@ -142,8 +142,8 @@ class JobRepository(BaseRepository[Dict[str, Any]]):
         
         if status:
             query = query.eq("status", status)
-        
-        response = query.execute()
+
+        response = self._execute_with_retry(query)
         return self._handle_response(response)
     
     def list_by_status(
@@ -163,14 +163,14 @@ class JobRepository(BaseRepository[Dict[str, Any]]):
         """
         status_value = status.value if isinstance(status, JobStatus) else status
         
-        response = (
+        query = (
             self._table()
             .select("*")
             .eq("status", status_value)
             .order("created_at", desc=False)  # Oldest first for processing
             .limit(limit)
-            .execute()
         )
+        response = self._execute_with_retry(query)
         return self._handle_response(response)
     
     def count_user_jobs_today(self, user_id: str) -> int:
@@ -187,13 +187,13 @@ class JobRepository(BaseRepository[Dict[str, Any]]):
         yesterday = datetime.now(timezone.utc) - timedelta(days=1)
         yesterday_iso = yesterday.isoformat()
         
-        response = (
+        query = (
             self._table()
             .select("id", count="exact")
             .eq("user_id", user_id)
             .gte("created_at", yesterday_iso)
-            .execute()
         )
+        response = self._execute_with_retry(query)
         
         return response.count if hasattr(response, 'count') and response.count else len(response.data)
     
@@ -207,12 +207,12 @@ class JobRepository(BaseRepository[Dict[str, Any]]):
         Returns:
             Job data with brand_dna relation
         """
-        response = (
+        query = (
             self._table()
             .select("*, brand_dna(*)")
             .eq("id", str(id))
-            .execute()
         )
+        response = self._execute_with_retry(query)
         return self._handle_single_response(response, entity_id=str(id))
     
     def get_job_summary(self, id: str | UUID) -> Optional[Dict[str, Any]]:
@@ -225,12 +225,12 @@ class JobRepository(BaseRepository[Dict[str, Any]]):
         Returns:
             Job summary with statistics
         """
-        response = (
+        query = (
             self.db.table(Tables.V_JOB_SUMMARY)
             .select("*")
             .eq("job_id", str(id))
-            .execute()
         )
+        response = self._execute_with_retry(query)
         data = self._handle_response(response)
         return data[0] if data else None
     
@@ -348,13 +348,13 @@ class JobRepository(BaseRepository[Dict[str, Any]]):
         """
         active_statuses = [s.value for s in JobStatus.active_statuses()]
         
-        response = (
+        query = (
             self._table()
             .select("*")
             .eq("user_id", user_id)
             .in_("status", active_statuses)
-            .execute()
         )
+        response = self._execute_with_retry(query)
         return self._handle_response(response)
     
     def get_retryable_jobs(self, user_id: str) -> List[Dict[str, Any]]:
@@ -369,13 +369,13 @@ class JobRepository(BaseRepository[Dict[str, Any]]):
         """
         retryable_statuses = [s.value for s in JobStatus.retryable_statuses()]
         
-        response = (
+        query = (
             self._table()
             .select("*")
             .eq("user_id", user_id)
             .in_("status", retryable_statuses)
-            .execute()
         )
+        response = self._execute_with_retry(query)
         return self._handle_response(response)
     
     def get_pending_jobs(self, limit: int = 10) -> List[Dict[str, Any]]:

@@ -118,7 +118,17 @@ export function ProfileCard({
           </Badge>
           {hasEmail && (
             <Badge variant="info" size="sm" className="ml-1">
-              📧 Email
+              Email
+            </Badge>
+          )}
+          {profile.phone && (
+            <Badge variant="info" size="sm" className="ml-1">
+              Phone
+            </Badge>
+          )}
+          {profile.address && (
+            <Badge variant="info" size="sm" className="ml-1">
+              Address
             </Badge>
           )}
         </div>

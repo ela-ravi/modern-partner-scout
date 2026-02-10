@@ -27,7 +27,10 @@ export interface Profile {
   post_count: number
   engagement_rate: number
   email?: string
+  phone?: string
   website?: string
+  address?: string
+  email_source?: string
   status: ProfileStatus
   score?: ProfileScore
   is_bookmarked?: boolean
@@ -64,10 +67,14 @@ export interface GetProfilesParams {
 }
 
 export interface JobAnalytics {
-  total_discovered: number
-  total_scored: number
-  high_match_count: number
-  emails_found: number
-  average_score: number
-  status_breakdown: Record<ProfileStatus, number>
+  job_id: string
+  total_profiles: number
+  new_profiles: number
+  processing_profiles: number
+  done_profiles: number
+  skipped_profiles: number
+  avg_score: number | null
+  max_score: number | null
+  min_score: number | null
+  profiles_with_email: number
 }

@@ -343,39 +343,39 @@ class TestProfileStatusUpdateWorkflow:
             mock_repo.get_by_id.return_value = mock_profile_processing
             mock_repo.update_status.return_value = {
                 **mock_profile_processing,
-                "status": ProfileStatus.FAILED.value,
+                "status": ProfileStatus.NEW.value,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }
             mock_repo_class.return_value = mock_repo
-            
+
             response = client.patch(
                 f"/api/profiles/{valid_profile_id}/status",
-                json={"status": "failed"},
+                json={"status": "new"},
                 headers={"X-Service-Key": service_key},
             )
-        
+
         assert response.status_code == 200
-        assert response.json()["status"] == "failed"
-        
-        # Step 2: Retry processing
-        mock_profile_failed = {
+        assert response.json()["status"] == "new"
+
+        # Step 2: Re-process from new
+        mock_profile_new = {
             "id": valid_profile_id,
             "job_id": valid_job_id,
             "username": "testuser",
-            "status": ProfileStatus.FAILED.value,
+            "status": ProfileStatus.NEW.value,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
-        
+
         with patch("app.api.routes.status.ProfileRepository") as mock_repo_class:
             mock_repo = Mock()
-            mock_repo.get_by_id.return_value = mock_profile_failed
+            mock_repo.get_by_id.return_value = mock_profile_new
             mock_repo.update_status.return_value = {
-                **mock_profile_failed,
+                **mock_profile_new,
                 "status": ProfileStatus.PROCESSING.value,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }
             mock_repo_class.return_value = mock_repo
-            
+
             response = client.patch(
                 f"/api/profiles/{valid_profile_id}/status",
                 json={"status": "processing"},
@@ -668,10 +668,10 @@ class TestStatusErrorResponses:
             
             response = client.patch(
                 f"/api/profiles/{valid_profile_id}/status",
-                json={"status": "scored"},
+                json={"status": "done"},
                 headers={"X-Service-Key": service_key},
             )
-        
+
         assert response.status_code == HttpStatus.BAD_REQUEST
         data = response.json()
         assert data["detail"]["error"]["code"] == ErrorCodes.INVALID_TRANSITION

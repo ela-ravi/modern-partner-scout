@@ -2,16 +2,16 @@ import { Outlet } from 'react-router-dom'
 import { SkipLink } from '@/components/ui/SkipLink'
 import { UserMenu } from '@/components/composite/UserMenu'
 import { cn } from '@/lib/utils'
-import DashboardIcon from '@mui/icons-material/Dashboard'
 import ListAltIcon from '@mui/icons-material/ListAlt'
+import AddIcon from '@mui/icons-material/Add'
 import { Link, useLocation } from 'react-router-dom'
 
 export function DashboardLayout() {
   const location = useLocation()
 
   const navItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
     { path: '/sessions', label: 'Sessions', icon: <ListAltIcon /> },
+    { path: '/new-session', label: 'New Session', icon: <AddIcon /> },
   ]
 
   return (
@@ -27,7 +27,7 @@ export function DashboardLayout() {
           <div className="flex h-16 items-center justify-between">
             {/* Logo */}
             <Link
-              to="/dashboard"
+              to="/sessions"
               className="flex items-center gap-2 text-apple-text font-semibold text-lg"
               aria-label="PartnerScout home"
             >
@@ -55,7 +55,7 @@ export function DashboardLayout() {
                   to={item.path}
                   className={cn(
                     'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors',
-                    location.pathname === item.path
+                    location.pathname === item.path || location.pathname.startsWith(item.path + '/')
                       ? 'bg-apple-blue/10 text-apple-blue'
                       : 'text-apple-text-secondary hover:bg-apple-gray'
                   )}

@@ -585,12 +585,12 @@ async def get_job_analytics(
         
         return JobAnalytics(
             job_id=UUID(job_id),
-            total_profiles=analytics.get("profiles_discovered", 0),
+            total_profiles=analytics.get("total_profiles", 0),
             new_profiles=analytics.get("new_profiles", 0),
             processing_profiles=analytics.get("processing_profiles", 0),
             done_profiles=analytics.get("done_profiles", 0),
             skipped_profiles=analytics.get("skipped_profiles", 0),
-            avg_score=analytics.get("average_score"),
+            avg_score=analytics.get("avg_score"),
             max_score=analytics.get("max_score"),
             min_score=analytics.get("min_score"),
             profiles_with_email=analytics.get("profiles_with_email", 0),

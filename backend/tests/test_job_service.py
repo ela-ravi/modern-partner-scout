@@ -491,29 +491,28 @@ class TestTriggerDiscovery:
         mock_client_instance.__enter__.return_value = mock_client_instance
         mock_httpx_client.return_value = mock_client_instance
         
-        with pytest.raises(N8NError) as exc_info:
-            job_service.trigger_discovery(job_id=job_id, user_id="user-123")
-        
-        assert exc_info.value.code == "N8N_ERROR"
-    
+        result = job_service.trigger_discovery(job_id=job_id, user_id="user-123")
+
+        # N8N failure now falls back to internal orchestration instead of raising
+        assert result is not None
+
     @patch("app.services.job_service.httpx.Client")
     def test_trigger_discovery_network_error(
         self, mock_httpx_client, job_service, mock_job_repo, sample_job
     ):
-        """Test error when network request fails."""
+        """Test network error falls back to internal orchestration."""
         job_id = sample_job["id"]
         sample_job["status"] = JobStatus.PENDING.value
         mock_job_repo.get_by_id.return_value = sample_job
-        
+
         mock_client_instance = MagicMock()
         mock_client_instance.post.side_effect = httpx.RequestError("Connection refused")
         mock_client_instance.__enter__.return_value = mock_client_instance
         mock_httpx_client.return_value = mock_client_instance
-        
-        with pytest.raises(N8NError) as exc_info:
-            job_service.trigger_discovery(job_id=job_id, user_id="user-123")
-        
-        assert "Connection refused" in str(exc_info.value.message)
+
+        # N8N failure now falls back to internal orchestration instead of raising
+        result = job_service.trigger_discovery(job_id=job_id, user_id="user-123")
+        assert result is not None
 
 
 # =============================================================================
@@ -609,8 +608,8 @@ class TestGetAnalytics:
         result = job_service.get_analytics(job_id=job_id)
         
         assert result["job_id"] == job_id
-        assert result["profiles_discovered"] == 50
-        assert result["average_score"] == 72.5
+        assert result["total_profiles"] == 50
+        assert result["avg_score"] == 72.5
         assert result["profiles_with_email"] == 30
     
     def test_get_analytics_fallback_calculation(
@@ -625,10 +624,10 @@ class TestGetAnalytics:
         result = job_service.get_analytics(job_id=job_id)
         
         assert result["job_id"] == job_id
-        assert result["profiles_discovered"] == 3
+        assert result["total_profiles"] == 3
         assert result["profiles_with_email"] == 1
         # Two profiles have scores (85 and 72)
-        assert result["average_score"] == 78.5
+        assert result["avg_score"] == 78.5
 
 
 # =============================================================================

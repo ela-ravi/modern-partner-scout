@@ -143,21 +143,21 @@ class JobStatus(str, Enum):
 class ProfileStatus(str, Enum):
     """
     Discovered profile status values.
-    
-    Follows the workflow: new -> processing -> scored
-    With error state: failed
+
+    Follows the workflow: new -> processing -> done
+    Must match the DB enum: new, processing, done, skipped
     """
-    
+
     NEW = "new"               # Profile discovered, not yet processed
     PROCESSING = "processing" # Profile is being scored
-    SCORED = "scored"         # Profile has been scored
-    FAILED = "failed"        # Scoring failed for this profile
-    SKIPPED = "skipped"      # Profile was skipped (e.g., duplicate, invalid)
+    SCORED = "done"           # Profile has been scored (DB value: 'done')
+    DONE = "done"             # Alias for SCORED
+    SKIPPED = "skipped"       # Profile was skipped (e.g., duplicate, invalid)
     
     @classmethod
     def processable_statuses(cls) -> FrozenSet["ProfileStatus"]:
         """Return statuses that can be processed/scored."""
-        return frozenset({cls.NEW, cls.FAILED})
+        return frozenset({cls.NEW})
     
     @classmethod
     def terminal_statuses(cls) -> FrozenSet["ProfileStatus"]:
@@ -181,9 +181,8 @@ VALID_JOB_TRANSITIONS: Dict[JobStatus, FrozenSet[JobStatus]] = {
 
 VALID_PROFILE_TRANSITIONS: Dict[ProfileStatus, FrozenSet[ProfileStatus]] = {
     ProfileStatus.NEW: frozenset({ProfileStatus.PROCESSING, ProfileStatus.SKIPPED}),
-    ProfileStatus.PROCESSING: frozenset({ProfileStatus.SCORED, ProfileStatus.FAILED}),
+    ProfileStatus.PROCESSING: frozenset({ProfileStatus.SCORED, ProfileStatus.SKIPPED, ProfileStatus.NEW}),
     ProfileStatus.SCORED: frozenset(),  # Terminal state
-    ProfileStatus.FAILED: frozenset({ProfileStatus.PROCESSING}),  # Can retry
     ProfileStatus.SKIPPED: frozenset(),  # Terminal state
 }
 

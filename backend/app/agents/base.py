@@ -446,37 +446,73 @@ class BaseAgent(ABC, Generic[InputT, OutputT]):
         self,
         chain: RunnableSequence,
         input_data: Dict[str, Any],
+        max_retries: int = 2,
     ) -> Any:
         """
-        Invoke a chain with error handling and metrics collection.
-        
+        Invoke a chain with error handling, retry logic, and metrics collection.
+
+        Retries on transient connection errors (Server disconnected, etc.)
+        with exponential backoff.
+
         Args:
             chain: The chain to invoke
             input_data: Input variables for the chain
-            
+            max_retries: Number of retries for transient errors
+
         Returns:
             Chain output
-            
+
         Raises:
-            AgentError: If chain invocation fails
+            AgentError: If chain invocation fails after all retries
         """
+        import asyncio as _asyncio
+
         start_time = time.time()
-        
-        try:
-            result = await chain.ainvoke(input_data)
-            
-            self._logger.debug(
-                f"Chain invocation completed in {time.time() - start_time:.2f}s"
-            )
-            return result
-            
-        except Exception as e:
-            self._logger.error(f"Chain invocation failed: {e}")
-            raise AgentError(
-                message=f"Agent '{self.agent_name}' chain invocation failed",
-                agent_name=self.agent_name,
-                details={"error": str(e), "input_keys": list(input_data.keys())},
-            )
+        last_error: Optional[Exception] = None
+
+        for attempt in range(max_retries + 1):
+            try:
+                result = await chain.ainvoke(input_data)
+
+                self._logger.debug(
+                    f"Chain invocation completed in {time.time() - start_time:.2f}s"
+                    + (f" (attempt {attempt+1})" if attempt > 0 else "")
+                )
+                return result
+
+            except Exception as e:
+                last_error = e
+                err_str = str(e)
+                is_transient = (
+                    "Server disconnected" in err_str
+                    or "RemoteProtocolError" in type(e).__name__
+                    or "ConnectError" in type(e).__name__
+                    or "ConnectionReset" in err_str
+                    or "ReadTimeout" in type(e).__name__
+                )
+
+                if is_transient and attempt < max_retries:
+                    wait = 1.0 * (2 ** attempt)
+                    self._logger.warning(
+                        f"Chain invocation transient error (attempt {attempt+1}/{max_retries+1}): "
+                        f"{type(e).__name__}: {e}. Retrying in {wait:.1f}s"
+                    )
+                    await _asyncio.sleep(wait)
+                    continue
+
+                self._logger.error(f"Chain invocation failed: {e}")
+                raise AgentError(
+                    message=f"Agent '{self.agent_name}' chain invocation failed",
+                    agent_name=self.agent_name,
+                    details={"error": str(e), "input_keys": list(input_data.keys())},
+                )
+
+        # Should not reach here, but just in case
+        raise AgentError(
+            message=f"Agent '{self.agent_name}' chain invocation failed after {max_retries+1} attempts",
+            agent_name=self.agent_name,
+            details={"error": str(last_error), "input_keys": list(input_data.keys())},
+        )
     
     def invoke_chain_sync(
         self,

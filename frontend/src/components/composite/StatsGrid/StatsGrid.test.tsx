@@ -4,17 +4,16 @@ import { StatsGrid } from './StatsGrid'
 import type { JobAnalytics } from '@/types/api/profile'
 
 const mockAnalytics: JobAnalytics = {
-  total_discovered: 42,
-  total_scored: 35,
-  high_match_count: 15,
-  emails_found: 28,
-  average_score: 72.5,
-  status_breakdown: {
-    new: 7,
-    processing: 5,
-    done: 25,
-    skipped: 5,
-  },
+  job_id: 'job-1',
+  total_profiles: 42,
+  new_profiles: 7,
+  processing_profiles: 5,
+  done_profiles: 25,
+  skipped_profiles: 5,
+  avg_score: 72.5,
+  max_score: 95,
+  min_score: 30,
+  profiles_with_email: 28,
 }
 
 describe('StatsGrid', () => {
@@ -24,8 +23,8 @@ describe('StatsGrid', () => {
     expect(screen.getByText('Discovered')).toBeInTheDocument()
     expect(screen.getByText('42')).toBeInTheDocument()
 
-    expect(screen.getByText('High Match')).toBeInTheDocument()
-    expect(screen.getByText('15')).toBeInTheDocument()
+    expect(screen.getByText('Scored')).toBeInTheDocument()
+    expect(screen.getByText('25')).toBeInTheDocument()
 
     expect(screen.getByText('Emails Found')).toBeInTheDocument()
     expect(screen.getByText('28')).toBeInTheDocument()
@@ -35,7 +34,7 @@ describe('StatsGrid', () => {
   })
 
   it('rounds average score to nearest integer', () => {
-    const analyticsWithDecimal = { ...mockAnalytics, average_score: 82.7 }
+    const analyticsWithDecimal = { ...mockAnalytics, avg_score: 82.7 }
     render(<StatsGrid analytics={analyticsWithDecimal} />)
 
     expect(screen.getByText('83%')).toBeInTheDocument()

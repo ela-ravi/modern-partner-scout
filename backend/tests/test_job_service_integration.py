@@ -130,7 +130,7 @@ class TestJobServiceReadOperations:
             assert analytics is not None
             assert analytics["job_id"] == sample_job_id
             # Seed data has 3 profiles discovered
-            assert analytics["profiles_discovered"] >= 0
+            assert analytics["total_profiles"] >= 0
         except JobNotFoundError:
             pytest.skip("Seed data not available in database")
     

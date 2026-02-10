@@ -15,35 +15,38 @@ export const jobsService = {
   /**
    * List all jobs for the current user
    */
-  list: () => api.get<Job[]>('/api/jobs'),
+  list: async () => {
+    const response = await api.get<{ jobs: Job[]; total: number }>('/jobs')
+    return response.jobs
+  },
 
   /**
    * Get a specific job by ID
    */
-  get: (id: string) => api.get<Job>(`/api/jobs/${id}`),
+  get: (id: string) => api.get<Job>(`/jobs/${id}`),
 
   /**
    * Create a new discovery job
    */
-  create: (data: CreateJobRequest) => api.post<CreateJobResponse>('/api/jobs', data),
+  create: (data: CreateJobRequest) => api.post<CreateJobResponse>('/jobs', data),
 
   /**
    * Delete a job
    */
-  delete: (id: string) => api.delete<{ message: string }>(`/api/jobs/${id}`),
+  delete: (id: string) => api.delete<{ message: string }>(`/jobs/${id}`),
 
   /**
    * Start a pending job
    */
-  start: (id: string) => api.post<JobActionResponse>(`/api/jobs/${id}/start`),
+  start: (id: string) => api.post<JobActionResponse>(`/jobs/${id}/start`),
 
   /**
    * Cancel a running job
    */
-  cancel: (id: string) => api.post<JobActionResponse>(`/api/jobs/${id}/cancel`),
+  cancel: (id: string) => api.post<JobActionResponse>(`/jobs/${id}/cancel`),
 
   /**
    * Retry a failed job
    */
-  retry: (id: string) => api.post<JobActionResponse>(`/api/jobs/${id}/retry`),
+  retry: (id: string) => api.post<JobActionResponse>(`/jobs/${id}/retry`),
 }

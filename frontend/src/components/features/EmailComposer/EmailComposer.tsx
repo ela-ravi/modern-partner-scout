@@ -3,7 +3,7 @@
  * AI-powered email composition for partner outreach
  */
 
-import { useState, useId } from 'react'
+import { useState, useId, useRef, useEffect } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import CloseIcon from '@mui/icons-material/Close'
 import MailIcon from '@mui/icons-material/Mail'
@@ -37,9 +37,19 @@ export function EmailComposer({
   const [body, setBody] = useState('')
   const [selectedTone, setSelectedTone] = useState('professional')
 
+  const hasGenerated = useRef(false)
+
   const { data: tones = [], isLoading: tonesLoading } = useEmailTones()
   const generateEmail = useGenerateEmail()
   const sendEmail = useSendEmail()
+
+  // Auto-regenerate when tone changes (only after first generation)
+  useEffect(() => {
+    if (hasGenerated.current && !generateEmail.isPending) {
+      handleGenerate()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTone])
 
   const handleGenerate = async () => {
     try {
@@ -48,15 +58,16 @@ export function EmailComposer({
         job_id: profile.jobId,
         tone: selectedTone,
       })
-      setSubject(result.subject)
-      setBody(result.body)
+      setSubject(result.subject ?? '')
+      setBody(result.body ?? '')
+      hasGenerated.current = true
     } catch (error) {
       console.error('Failed to generate email:', error)
     }
   }
 
   const handleSend = async () => {
-    if (!subject.trim() || !body.trim()) return
+    if (!(subject || '').trim() || !(body || '').trim()) return
 
     try {
       await sendEmail.mutateAsync({
@@ -77,6 +88,7 @@ export function EmailComposer({
     setSubject('')
     setBody('')
     setSelectedTone('professional')
+    hasGenerated.current = false
     onClose()
   }
 
@@ -226,7 +238,7 @@ export function EmailComposer({
             <Button
               variant="primary"
               onClick={handleSend}
-              disabled={!subject.trim() || !body.trim() || sendEmail.isPending}
+              disabled={!(subject || '').trim() || !(body || '').trim() || sendEmail.isPending}
               loading={sendEmail.isPending}
               leftIcon={!sendEmail.isPending ? <SendIcon /> : undefined}
             >

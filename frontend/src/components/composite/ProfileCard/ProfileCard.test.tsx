@@ -54,14 +54,14 @@ describe('ProfileCard', () => {
   it('renders email badge when profile has email', () => {
     render(<ProfileCard profile={mockProfile} />)
 
-    expect(screen.getByText('📧 Email')).toBeInTheDocument()
+    expect(screen.getByText('Email')).toBeInTheDocument()
   })
 
   it('does not render email badge when profile has no email', () => {
     const profileWithoutEmail = { ...mockProfile, email: undefined }
     render(<ProfileCard profile={profileWithoutEmail} />)
 
-    expect(screen.queryByText('📧 Email')).not.toBeInTheDocument()
+    expect(screen.queryByText('Email')).not.toBeInTheDocument()
   })
 
   it('renders score ring with correct score', () => {

@@ -12,6 +12,7 @@ import { Card } from '@/components/ui/Card'
 import { Stepper, type Step } from '@/components/ui/Stepper'
 import { FollowerPresets, getActivePreset } from '@/components/composite/FollowerPresets'
 import { useCreateJob } from '@/hooks/jobs'
+import { jobsService } from '@/services/jobs'
 import { useToast } from '@/components/ui/Toast'
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
@@ -121,13 +122,25 @@ export default function DiscoveryConfigPage() {
     try {
       const result = await createJob.mutateAsync({
         name: data.name,
+        brand_description: data.brandDescription || data.name,
         reference_profiles: data.referenceProfiles,
-        brand_description: data.brandDescription,
-        min_followers: data.minFollowers,
-        max_followers: data.maxFollowers,
+        follower_range_min: data.minFollowers,
+        follower_range_max: data.maxFollowers,
+        discovery_limit: data.discoveryLimit,
+        keywords: data.keywords,
+        hashtags: data.hashtags,
+        min_score_threshold: data.minScoreThreshold,
       })
-      toast.success('Discovery session created!')
-      navigate(`/jobs/${result.id}`)
+
+      // Start the orchestration pipeline
+      try {
+        await jobsService.start(result.id)
+      } catch (startError) {
+        console.warn('Job start returned error (may still be running):', startError)
+      }
+
+      toast.success('Discovery session launched!')
+      navigate(`/jobs/${result.id}/processing`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to create session')
     }

@@ -10,5 +10,5 @@ export const demoService = {
   /**
    * Start a demo discovery session with sample data
    */
-  start: () => api.post<DemoStartResponse>('/api/demo/start'),
+  start: () => api.post<DemoStartResponse>('/demo/start'),
 }

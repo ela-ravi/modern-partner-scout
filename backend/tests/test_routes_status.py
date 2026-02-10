@@ -371,46 +371,46 @@ class TestUpdateProfileStatus:
         
         response = client.patch(
             f"/api/profiles/{valid_profile_id}/status",
-            json={"status": "scored"},
+            json={"status": "done"},
             headers={"X-Service-Key": service_key},
         )
-        
+
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "scored"
+        assert data["status"] == "done"
         assert data["previous_status"] == "processing"
-        
+
         app.dependency_overrides.clear()
-    
-    def test_update_profile_status_processing_to_failed(
+
+    def test_update_profile_status_processing_to_skipped(
         self, app, client, service_key, valid_profile_id, mock_profile
     ):
-        """Test valid transition from processing to failed."""
+        """Test valid transition from processing to skipped."""
         mock_profile["status"] = ProfileStatus.PROCESSING.value
-        
+
         mock_profile_repo = MagicMock()
         mock_profile_repo.get_by_id.return_value = mock_profile
         mock_profile_repo.update_status.return_value = {
             **mock_profile,
-            "status": ProfileStatus.FAILED.value,
+            "status": ProfileStatus.SKIPPED.value,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
-        
+
         app.dependency_overrides[get_profile_repository] = lambda: mock_profile_repo
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
             service_name="n8n", is_admin=True
         )
-        
+
         response = client.patch(
             f"/api/profiles/{valid_profile_id}/status",
-            json={"status": "failed"},
+            json={"status": "skipped"},
             headers={"X-Service-Key": service_key},
         )
-        
+
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "failed"
-        
+        assert data["status"] == "skipped"
+
         app.dependency_overrides.clear()
     
     def test_update_profile_status_invalid_transition(
@@ -427,10 +427,10 @@ class TestUpdateProfileStatus:
         
         response = client.patch(
             f"/api/profiles/{valid_profile_id}/status",
-            json={"status": "scored"},  # Invalid: new -> scored
+            json={"status": "done"},  # Invalid: new -> done
             headers={"X-Service-Key": service_key},
         )
-        
+
         assert response.status_code == HttpStatus.BAD_REQUEST
         data = response.json()
         assert data["detail"]["error"]["code"] == ErrorCodes.INVALID_TRANSITION
@@ -461,17 +461,17 @@ class TestUpdateProfileStatus:
         
         app.dependency_overrides.clear()
     
-    def test_update_profile_status_retry_failed_profile(
+    def test_update_profile_status_retry_processing_profile(
         self, app, client, service_key, valid_profile_id, mock_profile
     ):
-        """Test retrying a failed profile (failed -> processing)."""
-        mock_profile["status"] = ProfileStatus.FAILED.value
-        
+        """Test retrying a processing profile (processing -> new)."""
+        mock_profile["status"] = ProfileStatus.PROCESSING.value
+
         mock_profile_repo = MagicMock()
         mock_profile_repo.get_by_id.return_value = mock_profile
         mock_profile_repo.update_status.return_value = {
             **mock_profile,
-            "status": ProfileStatus.PROCESSING.value,
+            "status": ProfileStatus.NEW.value,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         
@@ -482,15 +482,15 @@ class TestUpdateProfileStatus:
         
         response = client.patch(
             f"/api/profiles/{valid_profile_id}/status",
-            json={"status": "processing"},
+            json={"status": "new"},
             headers={"X-Service-Key": service_key},
         )
-        
+
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "processing"
-        assert data["previous_status"] == "failed"
-        
+        assert data["status"] == "new"
+        assert data["previous_status"] == "processing"
+
         app.dependency_overrides.clear()
 
 
@@ -687,7 +687,7 @@ class TestBatchUpdateProfileStatuses:
             "id": profile_id,
             "job_id": valid_job_id,
             "username": "testuser",
-            "status": ProfileStatus.NEW.value,  # new -> scored is invalid
+            "status": ProfileStatus.NEW.value,  # new -> done is invalid
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         
@@ -699,7 +699,7 @@ class TestBatchUpdateProfileStatuses:
         
         response = client.patch(
             f"/api/jobs/{valid_job_id}/profiles/status",
-            json={"profile_ids": [profile_id], "status": "scored"},
+            json={"profile_ids": [profile_id], "status": "done"},
             headers={"X-Service-Key": service_key},
         )
         
