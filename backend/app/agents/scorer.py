@@ -1032,36 +1032,49 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
         
         # Check if score already exists
         existing_score = self._score_repo.get_by_profile_id_optional(profile_id)
-        
+
+        score_update_data = {
+            "visual_aesthetic_match": dimensions["visual_aesthetic_match"],
+            "content_theme_alignment": dimensions["content_theme_alignment"],
+            "engagement_rate_score": dimensions["engagement_rate_score"],
+            "follower_quality": dimensions["follower_quality"],
+            "business_indicators": dimensions["business_indicators"],
+            "activity_recency": dimensions["activity_recency"],
+            "final_score": final_score,
+            "recommendation": recommendation,
+            "reasoning": full_reasoning,
+            "is_fake_suspected": is_fake_suspected,
+        }
+
         if existing_score:
             # Update existing score
             score_record = self._score_repo.update_by_profile_id(
                 profile_id=profile_id,
-                data={
-                    "visual_aesthetic_match": dimensions["visual_aesthetic_match"],
-                    "content_theme_alignment": dimensions["content_theme_alignment"],
-                    "engagement_rate_score": dimensions["engagement_rate_score"],
-                    "follower_quality": dimensions["follower_quality"],
-                    "business_indicators": dimensions["business_indicators"],
-                    "activity_recency": dimensions["activity_recency"],
-                    "final_score": final_score,
-                    "recommendation": recommendation,
-                    "reasoning": full_reasoning,
-                    "is_fake_suspected": is_fake_suspected,
-                }
+                data=score_update_data,
             )
             logger.debug(f"Updated existing score for profile: {profile_id}")
         else:
-            # Create new score
-            score_record = self._score_repo.create_full_score(
-                profile_id=profile_id,
-                dimensions=dimensions,
-                final_score=final_score,
-                recommendation=recommendation,
-                reasoning=full_reasoning,
-                is_fake_suspected=is_fake_suspected
-            )
-            logger.debug(f"Created new score for profile: {profile_id}")
+            try:
+                # Create new score
+                score_record = self._score_repo.create_full_score(
+                    profile_id=profile_id,
+                    dimensions=dimensions,
+                    final_score=final_score,
+                    recommendation=recommendation,
+                    reasoning=full_reasoning,
+                    is_fake_suspected=is_fake_suspected
+                )
+                logger.debug(f"Created new score for profile: {profile_id}")
+            except Exception as e:
+                # Handle race condition: score inserted between SELECT and INSERT
+                if "duplicate" in str(e).lower() or "23505" in str(e):
+                    logger.debug(f"Score race condition for profile {profile_id}, falling back to update")
+                    score_record = self._score_repo.update_by_profile_id(
+                        profile_id=profile_id,
+                        data=score_update_data,
+                    )
+                else:
+                    raise
         
         # Store contact information if available
         contact_record = None

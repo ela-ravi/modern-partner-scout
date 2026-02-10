@@ -384,45 +384,38 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
     async def _fetch_profiles(
         self,
         usernames: List[str],
-        batch_size: int = 10
     ) -> List[Dict[str, Any]]:
         """
         Fetch detailed profile data for discovered usernames.
-        
+
+        Sends ALL usernames in a single Apify actor call to minimize
+        costs (each actor.call() has a startup cost).
+
         Args:
             usernames: List of usernames to fetch
-            batch_size: Number of profiles per batch
-            
+
         Returns:
             List of profile data dictionaries
         """
         if not usernames:
             return []
-        
-        logger.info(f"Fetching profile data for {len(usernames)} usernames")
-        
-        all_profiles = []
-        
-        # Process in batches to respect rate limits
-        for i in range(0, len(usernames), batch_size):
-            batch = usernames[i:i + batch_size]
-            
-            try:
-                profiles = await self._apify_service.scrape_profiles(
-                    usernames=batch,
-                    results_limit=5  # Just need basic profile data, not many posts
-                )
-                all_profiles.extend(profiles)
-                
-            except ApifyError as e:
-                logger.warning(f"Failed to fetch batch {i // batch_size + 1}: {e}")
-                continue
-            except Exception as e:
-                logger.warning(f"Profile fetching error for batch: {e}")
-                continue
-        
-        logger.info(f"Successfully fetched {len(all_profiles)} profiles")
-        return all_profiles
+
+        logger.info(f"Fetching profile data for {len(usernames)} usernames (single batch)")
+
+        try:
+            profiles = await self._apify_service.scrape_profiles(
+                usernames=usernames,
+                results_limit=1,  # Only need profile metadata, not posts
+            )
+            logger.info(f"Successfully fetched {len(profiles)} profiles")
+            return profiles
+
+        except ApifyError as e:
+            logger.warning(f"Profile fetching failed: {e}")
+            return []
+        except Exception as e:
+            logger.warning(f"Profile fetching error: {e}")
+            return []
     
     # =========================================================================
     # Follower Range Filtering (SUB-3.3.3.1.3)

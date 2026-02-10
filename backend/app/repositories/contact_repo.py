@@ -4,6 +4,7 @@ PartnerScout AI - Contact Repository
 Repository for managing profile contact information in the database.
 """
 
+import logging
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -11,6 +12,8 @@ from app.repositories.base_repo import BaseRepository
 from app.core.constants import Tables
 from app.core.exceptions import NotFoundError
 from app.db import SupabaseClient
+
+logger = logging.getLogger(__name__)
 
 
 class ContactRepository(BaseRepository[Dict[str, Any]]):
@@ -224,32 +227,45 @@ class ContactRepository(BaseRepository[Dict[str, Any]]):
             Contact data
         """
         existing = self.get_by_profile_id_optional(profile_id)
-        
+
+        update_data = {}
+        if email is not None:
+            update_data["email"] = email
+        if email_source is not None:
+            update_data["email_source"] = email_source
+        if phone is not None:
+            update_data["phone"] = phone
+        if website is not None:
+            update_data["website"] = website
+        if other_contacts is not None:
+            update_data["other_contacts"] = other_contacts
+
         if existing:
-            update_data = {}
-            if email is not None:
-                update_data["email"] = email
-            if email_source is not None:
-                update_data["email_source"] = email_source
-            if phone is not None:
-                update_data["phone"] = phone
-            if website is not None:
-                update_data["website"] = website
-            if other_contacts is not None:
-                update_data["other_contacts"] = other_contacts
-            
             if update_data:
                 return self.update_by_profile_id(profile_id, update_data)
             return existing
         else:
-            return self.create(
-                profile_id=profile_id,
-                email=email,
-                email_source=email_source,
-                phone=phone,
-                website=website,
-                other_contacts=other_contacts
-            )
+            try:
+                return self.create(
+                    profile_id=profile_id,
+                    email=email,
+                    email_source=email_source,
+                    phone=phone,
+                    website=website,
+                    other_contacts=other_contacts,
+                )
+            except Exception as e:
+                # Handle race condition: record was inserted between
+                # the SELECT check and this INSERT (unique constraint violation)
+                if "duplicate" in str(e).lower() or "23505" in str(e):
+                    logger.debug(
+                        f"Contact upsert race condition for profile {profile_id}, "
+                        f"falling back to update"
+                    )
+                    if update_data:
+                        return self.update_by_profile_id(profile_id, update_data)
+                    return self.get_by_profile_id_optional(profile_id) or {}
+                raise
     
     # =========================================================================
     # Delete Operations

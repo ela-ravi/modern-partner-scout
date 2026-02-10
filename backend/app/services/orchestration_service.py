@@ -82,11 +82,27 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
         logger.info(f"[Orchestration] Job {job_id}: Starting Phase 2+3 - Iterative Discovery & Scoring")
         job_service.update_status(job_id, "discovering", validate_transition=True)
 
-        # Prepare discovery parameters
-        discovery_hashtags = hashtags[:5] if hashtags else job_data.get("hashtags", [])[:5]
-        if not discovery_hashtags:
-            discovery_hashtags = ["#sustainable", "#ecofriendly"]
+        # Prepare discovery parameters — use ALL available hashtags
+        all_hashtags = hashtags if hashtags else job_data.get("hashtags", [])
+        if not all_hashtags:
+            all_hashtags = ["#sustainable", "#ecofriendly"]
         discovery_keywords = keywords[:5] if keywords else job_data.get("keywords", [])[:5]
+
+        # Split hashtags into groups for rotation across rounds
+        # Round 1 gets the first batch, Round 2 gets the next, etc.
+        hashtags_per_round = max(5, len(all_hashtags) // Defaults.MAX_DISCOVERY_ROUNDS)
+        hashtag_groups = [
+            all_hashtags[i:i + hashtags_per_round]
+            for i in range(0, len(all_hashtags), hashtags_per_round)
+        ]
+        # Ensure we have at least MAX_DISCOVERY_ROUNDS groups (reuse if needed)
+        while len(hashtag_groups) < Defaults.MAX_DISCOVERY_ROUNDS:
+            hashtag_groups.append(all_hashtags)
+
+        logger.info(
+            f"[Orchestration] Job {job_id}: {len(all_hashtags)} hashtags split into "
+            f"{len(hashtag_groups)} groups for round rotation"
+        )
 
         requested_count = job_data.get("discovery_limit", 10)
         min_score_threshold = job_data.get("min_score_threshold", Defaults.DEFAULT_MIN_SCORE_THRESHOLD)
@@ -131,10 +147,11 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                 f"Need {remaining} more, discovering {discover_count} candidates"
             )
 
-            # --- Discovery ---
+            # --- Discovery (rotate hashtags per round) ---
+            round_hashtags = hashtag_groups[round_num - 1]
             discovery_request = DiscoveryRequest(
                 job_id=job_id,
-                hashtags=discovery_hashtags,
+                hashtags=round_hashtags,
                 keywords=discovery_keywords,
                 limit=discover_count,
                 follower_min=follower_min,
