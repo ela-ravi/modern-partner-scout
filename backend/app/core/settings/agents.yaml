@@ -129,6 +129,26 @@ agents:
       system: "email_composer/system.txt"
       user: "email_composer/user.txt"
 
+  contact_enricher:
+    name: "Contact Enricher"
+    description: "Enriches profile contact info by scraping websites and extracting emails, phones, addresses"
+    enabled: true
+
+    # Model settings
+    temperature: 0.3
+    max_tokens: 1024
+
+    # Enrichment settings
+    enrichment:
+      max_pages_to_fetch: 3
+      request_timeout_seconds: 10
+      max_content_length: 4000
+
+    # Prompts
+    prompts:
+      system: "contact_enricher/system.txt"
+      user: "contact_enricher/user.txt"
+
 # Apify actor configurations
 apify:
   instagram_profile_scraper:
