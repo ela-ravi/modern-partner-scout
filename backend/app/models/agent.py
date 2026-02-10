@@ -64,8 +64,12 @@ class DiscoveryRequest(BaseModel):
     limit: int = Field(
         default=50,
         ge=1,
-        le=100,
-        description="Maximum profiles to discover"
+        le=500,
+        description="Maximum profiles to discover (higher values used for over-discovery)"
+    )
+    excluded_usernames: List[str] = Field(
+        default_factory=list,
+        description="Usernames to exclude (cross-job deduplication)"
     )
     follower_min: int = Field(
         default=5000,

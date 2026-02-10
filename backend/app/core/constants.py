@@ -182,7 +182,7 @@ VALID_JOB_TRANSITIONS: Dict[JobStatus, FrozenSet[JobStatus]] = {
 VALID_PROFILE_TRANSITIONS: Dict[ProfileStatus, FrozenSet[ProfileStatus]] = {
     ProfileStatus.NEW: frozenset({ProfileStatus.PROCESSING, ProfileStatus.SKIPPED}),
     ProfileStatus.PROCESSING: frozenset({ProfileStatus.SCORED, ProfileStatus.SKIPPED, ProfileStatus.NEW}),
-    ProfileStatus.SCORED: frozenset(),  # Terminal state
+    ProfileStatus.SCORED: frozenset({ProfileStatus.SKIPPED}),  # Can be skipped if below threshold
     ProfileStatus.SKIPPED: frozenset(),  # Terminal state
 }
 
@@ -297,6 +297,10 @@ class Defaults:
     MAX_SCORE = 100
     DEFAULT_MIN_SCORE_THRESHOLD = 50
     HIGH_SCORE_THRESHOLD = 80
+
+    # Iterative Discovery
+    OVER_DISCOVERY_MULTIPLIER = 2.0
+    MAX_DISCOVERY_ROUNDS = 3
     
     # Scoring Weights (must sum to 1.0)
     WEIGHT_VISUAL_AESTHETIC = 0.15

@@ -202,7 +202,13 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
             
             # Step 4: Get existing profiles for deduplication (SUB-3.3.3.1.4)
             existing_usernames = await self._get_existing_usernames(job_id)
-            
+
+            # Merge cross-job excluded usernames into dedup set
+            if input_data.excluded_usernames:
+                existing_usernames.update(
+                    u.lower() for u in input_data.excluded_usernames
+                )
+
             # Step 5: Filter out duplicates
             new_usernames = [u for u in candidate_usernames if u not in existing_usernames]
             deduplicated_count = len(candidate_usernames) - len(new_usernames)
@@ -213,8 +219,8 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
             )
             
             # Step 6: Fetch detailed profile data for new usernames
-            # Cost-optimized: 1.3x multiplier instead of 2x to reduce Apify calls
-            usernames_to_fetch = new_usernames[:min(len(new_usernames), int(input_data.limit * 1.3))]
+            # Limit to requested amount (over-discovery is controlled by the orchestration layer)
+            usernames_to_fetch = new_usernames[:input_data.limit]
             
             profiles_data = await self._fetch_profiles(usernames_to_fetch)
             

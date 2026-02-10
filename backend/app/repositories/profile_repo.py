@@ -4,7 +4,7 @@ PartnerScout AI - Profile Repository
 Repository for managing discovered profiles in the database.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 from uuid import UUID
 
 from app.repositories.base_repo import BaseRepository
@@ -432,12 +432,34 @@ class ProfileRepository(BaseRepository[Dict[str, Any]]):
     def check_duplicate(self, job_id: str, username: str) -> bool:
         """
         Check if a username already exists for this job.
-        
+
         Args:
             job_id: Job ID
             username: Username to check
-            
+
         Returns:
             True if duplicate exists
         """
         return self.get_by_username(job_id, username) is not None
+
+    def get_usernames_by_user(self, user_id: str) -> Set[str]:
+        """
+        Get all usernames ever discovered for a user across all jobs.
+
+        Used for cross-job deduplication so the same profiles
+        are not returned in subsequent discovery sessions.
+
+        Args:
+            user_id: User ID to look up
+
+        Returns:
+            Set of lowercase usernames from all past jobs for this user
+        """
+        response = (
+            self.db.table(Tables.DISCOVERED_PROFILES)
+            .select("username, discovery_jobs!inner(user_id)")
+            .eq("discovery_jobs.user_id", user_id)
+            .execute()
+        )
+        data = self._handle_response(response)
+        return {r["username"].lower() for r in data if r.get("username")}
