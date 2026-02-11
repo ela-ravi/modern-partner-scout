@@ -134,7 +134,7 @@ describe('EmailComposer', () => {
   })
 
   it('allows user to edit subject and body', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     renderWithProviders(
       <EmailComposer
         isOpen={true}

@@ -154,7 +154,7 @@ describe('LoginPage', () => {
     })
 
     it('shows error when passwords do not match', async () => {
-      const user = userEvent.setup()
+      const user = userEvent.setup({ delay: null })
       render(<LoginPage />)
 
       await user.click(screen.getByText(/don't have an account/i))
