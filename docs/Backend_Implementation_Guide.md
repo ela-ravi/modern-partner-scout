@@ -923,6 +923,7 @@ class Routes:
     """API route prefixes."""
     HEALTH = "/api/health"
     JOBS = "/api/jobs"
+    PROFILES = "/api/profiles"  # Profile operations (bookmark toggle)
     AGENTS = "/api/agent"
     EMAIL = "/api/email"
     STATUS = "/api"
@@ -1734,6 +1735,7 @@ class JobRepository(BaseRepository[Job]):
 | `/api/jobs/*` | User JWT | `Authorization: Bearer <token>` |
 | `/api/agent/*` | Service Key | `X-Service-Key: <key>` |
 | `/api/profiles/*/status` | Service Key | `X-Service-Key: <key>` |
+| `/api/profiles/*/bookmark` | User JWT | `Authorization: Bearer <token>` |
 | `/api/email/*` | User JWT | `Authorization: Bearer <token>` |
 
 ### 8.2 Job Endpoints
@@ -1808,6 +1810,7 @@ class JobRepository(BaseRepository[Job]):
 | `sort` | string | `score` | Sort by: `score`, `followers`, `created_at` |
 | `order` | string | `desc` | Sort order: `asc`, `desc` |
 | `status` | string | - | Filter by profile status: `new`, `processing`, `done`, `skipped` |
+| `is_bookmarked` | boolean | - | Filter only bookmarked profiles |
 
 **Example:** `GET /api/jobs/{id}?min_score=50&sort=score&order=desc`
 
@@ -1972,6 +1975,29 @@ Cancel a running discovery job mid-execution.
 ```
 
 **Cancellable States:** `pending`, `analyzing`, `discovering`, `scoring`
+
+---
+
+### 8.2b Profile Endpoints
+
+#### PATCH /api/profiles/{profile_id}/bookmark - Toggle Bookmark
+
+Toggle the `is_bookmarked` flag on a discovered profile. Each call flips the boolean.
+
+**Auth:** User JWT (`Authorization: Bearer <token>`)
+
+**Response (200 OK):**
+```json
+{
+  "id": "aaaa1111-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "is_bookmarked": true
+}
+```
+
+**Notes:**
+- First call sets `is_bookmarked: true`, second call sets `is_bookmarked: false`
+- Frontend uses optimistic updates with rollback on error
+- Bookmarked profiles can be filtered via `GET /api/jobs/{id}?is_bookmarked=true`
 
 ---
 

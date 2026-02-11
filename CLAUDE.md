@@ -65,8 +65,9 @@ partner-scout/
 - Destructure props in function parameters
 
 ### API Design
-- RESTful endpoints under `/api/`
+- RESTful endpoints under `/api/` (jobs, profiles, email, demo)
 - Agent endpoints under `/api/agent/`
+- Profile endpoints under `/api/profiles/` (bookmark toggle)
 - Use consistent error response format:
   ```json
   { "error": { "code": "ERROR_CODE", "message": "Human readable message" } }
@@ -78,9 +79,13 @@ partner-scout/
 - `users` - Supabase Auth managed
 - `discovery_jobs` - Discovery sessions (status: pending -> analyzing -> discovering -> scoring -> completed/failed)
 - `brand_dna` - Extracted brand identity (hashtags, keywords, embedding)
-- `discovered_profiles` - Found Instagram profiles (status: new -> processing -> done/skipped)
+- `discovered_profiles` - Found Instagram profiles (status: new -> processing -> done/skipped, is_bookmarked)
 - `profile_scores` - AI scoring results (0-100 with reasoning)
 - `profile_contacts` - Extracted emails
+
+### Key Views
+- `v_job_summary` - Aggregated job stats (total_profiles, done_profiles, avg_score, profiles_with_email)
+- `v_complete_profiles` - Profiles joined with scores, contacts, and is_bookmarked
 
 ### Relationships
 ```

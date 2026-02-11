@@ -61,7 +61,9 @@ supabase/
 │   ├── 001_initial_schema.sql
 │   ├── 002_enable_rls.sql
 │   ├── 003_enable_realtime.sql
-│   └── 004_add_profile_details.sql
+│   ├── 004_add_profile_details.sql
+│   ├── 005_add_target_country.sql
+│   └── 006_add_bookmarks.sql
 ├── seed.sql                  # Sample data for testing
 └── README.md
 ```
@@ -119,6 +121,7 @@ From your Supabase project dashboard, note these values:
                       │ engagement_rate    │
                       │ is_verified        │
                       │ is_business        │
+                      │ is_bookmarked      │
                       │ status             │
                       │ created_at         │
                       └─────────┬──────────┘
@@ -561,7 +564,66 @@ ALTER PUBLICATION supabase_realtime ADD TABLE profile_contacts;
 -- SELECT * FROM pg_publication_tables WHERE pubname = 'supabase_realtime';
 ```
 
-### 4.7 Migration 004: Add Profile Details Columns
+### 4.7 Migration 005: Add Target Country and Enhanced Views
+
+```sql
+-- Add target_country to discovery_jobs
+ALTER TABLE discovery_jobs ADD COLUMN IF NOT EXISTS target_country TEXT;
+
+-- Recreate v_job_summary with enhanced columns
+DROP VIEW IF EXISTS v_job_summary;
+CREATE VIEW v_job_summary AS
+SELECT
+    dj.id AS job_id, dj.user_id, dj.name, dj.brand_description,
+    dj.keywords, dj.hashtags, dj.min_score_threshold, dj.target_country,
+    dj.follower_range_min, dj.follower_range_max, dj.discovery_limit,
+    dj.status, dj.profiles_discovered, dj.profiles_scored,
+    dj.error_message, dj.created_at, dj.updated_at,
+    COUNT(dp.id) AS total_profiles,
+    COUNT(CASE WHEN dp.status = 'new' THEN 1 END) AS new_profiles,
+    COUNT(CASE WHEN dp.status = 'done' THEN 1 END) AS done_profiles,
+    AVG(ps.final_score)::INTEGER AS avg_score,
+    MAX(ps.final_score) AS max_score,
+    COUNT(pc.email) FILTER (WHERE pc.email IS NOT NULL) AS profiles_with_email
+FROM discovery_jobs dj
+LEFT JOIN discovered_profiles dp ON dj.id = dp.job_id
+LEFT JOIN profile_scores ps ON dp.id = ps.profile_id
+LEFT JOIN profile_contacts pc ON dp.id = pc.profile_id
+GROUP BY dj.id;
+```
+
+### 4.8 Migration 006: Add Bookmarks
+
+```sql
+-- Add is_bookmarked column to discovered_profiles
+ALTER TABLE discovered_profiles
+  ADD COLUMN IF NOT EXISTS is_bookmarked BOOLEAN NOT NULL DEFAULT false;
+
+-- Create index for bookmark filtering
+CREATE INDEX IF NOT EXISTS idx_discovered_profiles_bookmarked
+  ON discovered_profiles (job_id, is_bookmarked)
+  WHERE is_bookmarked = true;
+
+-- Recreate v_complete_profiles view to include is_bookmarked
+DROP VIEW IF EXISTS v_complete_profiles;
+CREATE VIEW v_complete_profiles AS
+SELECT
+    dp.id, dp.job_id, dp.instagram_url, dp.username,
+    dp.full_name, dp.profile_picture_url, dp.bio,
+    dp.followers, dp.following, dp.posts_count,
+    dp.engagement_rate, dp.is_verified, dp.is_business,
+    dp.external_url, dp.business_email, dp.business_category,
+    dp.following_ratio, dp.status, dp.is_bookmarked, dp.created_at,
+    ps.score, ps.visual_aesthetic_match, ps.content_theme_alignment,
+    ps.engagement_rate_score, ps.follower_quality,
+    ps.business_indicators, ps.activity_recency, ps.reasoning,
+    pc.email, pc.source AS email_source
+FROM discovered_profiles dp
+LEFT JOIN profile_scores ps ON dp.id = ps.profile_id
+LEFT JOIN profile_contacts pc ON dp.id = pc.profile_id;
+```
+
+### 4.9 Migration 004 (Legacy): Add Profile Details Columns
 
 For existing databases, run this migration to add the new profile columns:
 
@@ -930,6 +992,8 @@ The `discovery_jobs` table maintains denormalized counts for dashboard performan
 Discovery Progress: Discovered 47 profiles | Scored 23/47 (49%)
 ```
 
+> **Important:** These trigger counters can drift during bulk upserts and batch status changes. The backend `JobService._enrich_job_counts()` method replaces them with accurate aggregated counts from the `v_job_summary` view before returning data to the frontend. This ensures the Sessions page, Dashboard header, and StatsGrid always show consistent numbers.
+
 ### 8.5 Real-time Event Flow
 
 With realtime enabled, the frontend receives live database changes:
@@ -1111,6 +1175,7 @@ export interface DiscoveredProfile {
   business_email: string | null;         // Email from business account
   business_category: string | null;      // Business category name
   following_ratio: number | null;        // Calculated: following / followers
+  is_bookmarked: boolean;                // User bookmark flag
   status: ProfileStatus;
   created_at: string;
 }

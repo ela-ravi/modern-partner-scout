@@ -128,6 +128,18 @@
 
 ---
 
+## 7a. Profile Bookmarking
+
+| # | Functionality |
+|---|---------------|
+| 43a | **BOOKMARKED tab** - Display user-bookmarked profiles |
+| 43b | Toggle bookmark on profile card via `PATCH /api/profiles/{id}/bookmark` |
+| 43c | Optimistic UI toggle with rollback on error |
+| 43d | Visual bookmark indicator on profile cards and detail modal |
+| 43e | Filter bookmarked profiles via `GET /api/jobs/{id}?is_bookmarked=true` |
+
+---
+
 ## 8. Profile Detail View
 
 | # | Functionality |
@@ -220,7 +232,7 @@
 | **Login/Signup Page** | 1, 2 |
 | **Session List Page** | 7, 10, 12, 14, 49, 75 |
 | **New Session Form** | 6, 15, 16 |
-| **Main Dashboard** | 39-49, 59-64, 70-74, 76-79 |
+| **Main Dashboard** | 39-49, 43a-43e, 59-64, 70-74, 76-79 |
 | **Profile Card Component** | 25, 42-44, 55a-55c |
 | **Profile Detail Modal** | 50-55, 55a-55c |
 | **Email Composer Modal** | 56-58 (uses `POST /api/email/generate` and `POST /api/email/send`) |
@@ -245,6 +257,8 @@
 | Delete session | `DELETE /api/jobs/{id}` |
 | Generate outreach email | `POST /api/email/generate` |
 | Send email (mock) | `POST /api/email/send` |
+| Toggle bookmark | `PATCH /api/profiles/{id}/bookmark` |
+| Filter bookmarked | `GET /api/jobs/{id}?is_bookmarked=true` |
 | Real-time updates | Supabase Realtime WebSocket |
 
 ---

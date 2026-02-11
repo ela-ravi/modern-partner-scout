@@ -13,11 +13,11 @@
   - Update job status to `cancelled`
   - ✅ Implemented: Feb 2026
 
-- [ ] **2. Bookmark Profile**
-  - `POST /api/profiles/{profile_id}/bookmark` - Save/bookmark a profile
-  - `DELETE /api/profiles/{profile_id}/bookmark` - Remove bookmark
-  - `GET /api/jobs/{job_id}/bookmarks` - Get bookmarked profiles for a job
-  - Requires: Add `bookmarked` boolean column to `discovered_profiles` table
+- [x] **2. Bookmark Profile** ✅ COMPLETED
+  - `PATCH /api/profiles/{profile_id}/bookmark` - Toggle bookmark on/off
+  - `GET /api/jobs/{job_id}?is_bookmarked=true` - Filter bookmarked profiles
+  - Frontend: Bookmarked tab on Dashboard with optimistic toggle + rollback
+  - ✅ Implemented: Feb 2026 - Migration: `006_add_bookmarks.sql`
 
 - [ ] **3. Skip Profile**
   - `PATCH /api/profiles/{profile_id}` with `{ "skipped": true }`
@@ -104,7 +104,7 @@
 
 | Table | Change | For Item |
 |-------|--------|----------|
-| `discovered_profiles` | Add `bookmarked` (boolean, default false) | #2 |
+| `discovered_profiles` | ~~Add `bookmarked` (boolean, default false)~~ ✅ DONE (`is_bookmarked`) | #2 |
 | `discovered_profiles` | Add `skipped` (boolean, default false) | #3 |
 | `discovery_jobs` | Add `keywords` (text[]), `hashtags` (text[]) | #7 |
 | `discovery_jobs` | Add `min_score_threshold` (int, default 50) | #7 |
@@ -116,10 +116,18 @@
 
 ## Implementation Order Recommendation
 
-1. **Phase 1 - Core:** Items 1, 2 (Cancel Job, Bookmark)
-2. **Phase 2 - UX Polish:** Items 3, 4, 5, 7 (Skip, Search, Templates, Keywords)
+1. ~~**Phase 1 - Core:** Items 1, 2 (Cancel Job, Bookmark)~~ ✅ COMPLETED
+2. **Phase 2 - UX Polish:** Items 3, 4, 7 (Skip, Search, Templates)
 3. **Phase 3 - Real-time:** Item 6 (Activity Logs)
-4. **Phase 4 - Nice-to-have:** Items 8-14
+4. **Phase 4 - Nice-to-have:** Items 9-14
+
+### Additional Fixes (Feb 2026)
+
+- [x] **Metrics Consistency Fix** ✅ COMPLETED
+  - `_enrich_job_counts()` in `JobService` replaces stale trigger counters with accurate `v_job_summary` view data
+  - `list_job_summaries()` in `JobRepository` batch-fetches summaries for multiple jobs
+  - Sessions page, Dashboard header, and Dashboard StatsGrid now all show consistent numbers
+  - ✅ Implemented: Feb 2026
 
 ---
 

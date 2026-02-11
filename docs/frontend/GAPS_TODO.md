@@ -149,7 +149,7 @@
 | Contact info section | HIGH | - |
 | "Compose Email" button | HIGH | → Email Composer |
 | "View on Instagram" link | HIGH | External link |
-| Bookmark/Save button | MEDIUM | Future: `POST /api/profiles/{id}/bookmark` |
+| Bookmark/Save button | ~~MEDIUM~~ ✅ DONE | `PATCH /api/profiles/{id}/bookmark` |
 | Skip button | MEDIUM | Future: `POST /api/profiles/{id}/skip` |
 
 ---
@@ -220,7 +220,7 @@
 |---------|---------|---------|
 | `api.ts` | Base axios/fetch client | - |
 | `jobsApi.ts` | CRUD, start, cancel, analytics | `/api/jobs/*` |
-| `profilesApi.ts` | Get profiles for job | `/api/jobs/{id}` |
+| `profilesApi.ts` | Get profiles, toggle bookmark | `/api/jobs/{id}`, `/api/profiles/{id}/bookmark` |
 | `emailApi.ts` | generate, send | `/api/email/*` |
 | `demoApi.ts` | start demo | `/api/demo/start` |
 
@@ -231,6 +231,7 @@
 | `useJobs` | React Query for jobs list |
 | `useJob` | React Query for single job |
 | `useProfiles` | React Query for job profiles |
+| `useToggleBookmark` | Optimistic bookmark toggle with rollback |
 | `useRealtime` | Supabase realtime subscriptions |
 | `useToast` | Toast notifications |
 
@@ -270,6 +271,7 @@
 | `PATCH /api/jobs/{id}/status` | ✅ Ready | Update status |
 | `GET /api/jobs/{id}/analytics` | ✅ Ready | Get stats |
 | `POST /api/demo/start` | ✅ Ready | Demo mode ✅ NEW |
+| `PATCH /api/profiles/{id}/bookmark` | ✅ Ready | Toggle bookmark ✅ NEW |
 | `POST /api/email/generate` | ✅ Ready | AI email |
 | `POST /api/email/send` | ✅ Ready | Send email |
 | `POST /api/agent/*` | ✅ Ready | Agent endpoints |

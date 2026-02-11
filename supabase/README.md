@@ -73,6 +73,9 @@ After configuring credentials, run the migrations in order:
    - `001_initial_schema.sql` - Creates all tables
    - `002_enable_rls.sql` - Enables Row Level Security
    - `003_enable_realtime.sql` - Enables realtime subscriptions
+   - `004_job_creation_enhancements.sql` - Adds keywords, hashtags, min_score_threshold
+   - `005_add_target_country.sql` - Adds target_country, enhanced v_job_summary view
+   - `006_add_bookmarks.sql` - Adds is_bookmarked to discovered_profiles, updates views
 
 ## Step 6: (Optional) Seed Development Data
 

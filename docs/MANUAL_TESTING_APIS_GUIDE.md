@@ -461,6 +461,73 @@ curl -X POST "http://localhost:8000/api/demo/start"
 
 ---
 
+### 3.10 Toggle Profile Bookmark
+
+**Endpoint:** `PATCH /api/profiles/{profile_id}/bookmark`
+
+Toggle the bookmark status of a discovered profile. Each call flips the `is_bookmarked` boolean.
+
+**Swagger Steps:**
+1. Navigate to `PATCH /api/profiles/{profile_id}/bookmark` section
+2. Click "Try it out"
+3. Enter a valid `profile_id` from a discovered profile
+4. Click "Execute"
+
+**Expected Response (200 OK):**
+```json
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "is_bookmarked": true
+}
+```
+
+**curl Command:**
+```bash
+PROFILE_ID="a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+curl -X PATCH "http://localhost:8000/api/profiles/$PROFILE_ID/bookmark" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+**Notes:**
+- First call sets `is_bookmarked: true`, second call sets `is_bookmarked: false`
+- Use `GET /api/jobs/{job_id}?is_bookmarked=true` to filter only bookmarked profiles
+
+---
+
+### 3.11 Get Job Analytics
+
+**Endpoint:** `GET /api/jobs/{job_id}/analytics`
+
+Get aggregated analytics for a job including profile counts, average scores, and score distribution.
+
+**Expected Response (200 OK):**
+```json
+{
+  "total_profiles": 19,
+  "done_profiles": 9,
+  "avg_score": 54,
+  "max_score": 82,
+  "profiles_with_email": 3,
+  "new_profiles": 10,
+  "score_distribution": {
+    "excellent": 1,
+    "good": 3,
+    "moderate": 4,
+    "poor": 1
+  }
+}
+```
+
+**curl Command:**
+```bash
+curl -X GET "http://localhost:8000/api/jobs/$JOB_ID/analytics" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
 ## 4. Agent API Testing
 
 Agent endpoints are called by the workflow orchestrator (N8N or Python script) and require **ServiceKeyAuth**.

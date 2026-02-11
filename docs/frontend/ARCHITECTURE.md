@@ -398,19 +398,30 @@ const { mutate, isPending } = useMutation({
   },
 });
 
-// Optimistic Updates
+// Optimistic Updates (see hooks/profiles/useToggleBookmark.ts)
+// Actual implementation uses PATCH /api/profiles/{id}/bookmark
 const { mutate } = useMutation({
-  mutationFn: profilesService.bookmark,
-  onMutate: async (profileId) => {
-    await queryClient.cancelQueries({ queryKey: ['profiles'] });
-    const previous = queryClient.getQueryData(['profiles']);
-    queryClient.setQueryData(['profiles'], (old) => 
-      old.map(p => p.id === profileId ? { ...p, bookmarked: true } : p)
-    );
-    return { previous };
+  mutationFn: ({ jobId, profileId }) => profilesService.toggleBookmark(jobId, profileId),
+  onMutate: async ({ profileId }) => {
+    await queryClient.cancelQueries({ queryKey: profilesKeys.lists() });
+    const previousQueries = queryClient.getQueriesData({ queryKey: profilesKeys.lists() });
+    queryClient.setQueriesData({ queryKey: profilesKeys.lists() }, (old) => ({
+      ...old,
+      profiles: old.profiles.map(p =>
+        p.id === profileId ? { ...p, is_bookmarked: !p.is_bookmarked } : p
+      ),
+    }));
+    return { previousQueries };
   },
-  onError: (err, variables, context) => {
-    queryClient.setQueryData(['profiles'], context.previous);
+  onError: (_err, _vars, context) => {
+    // Rollback all queries on error
+    for (const [key, data] of context.previousQueries) {
+      queryClient.setQueryData(key, data);
+    }
+  },
+  onSettled: (_, __, { jobId }) => {
+    queryClient.invalidateQueries({ queryKey: profilesKeys.lists() });
+    queryClient.invalidateQueries({ queryKey: profilesKeys.analytics(jobId) });
   },
 });
 ```
@@ -646,8 +657,8 @@ export const profilesService = {
   updateStatus: (jobId: string, profileId: string, data: ProfileUpdateRequest) =>
     api.put<Profile>(`/api/jobs/${jobId}/profiles/${profileId}`, data),
 
-  bookmark: (jobId: string, profileId: string) =>
-    api.post(`/api/jobs/${jobId}/profiles/${profileId}/bookmark`),
+  toggleBookmark: (_jobId: string, profileId: string) =>
+    api.patch<{ id: string; is_bookmarked: boolean }>(`/api/profiles/${profileId}/bookmark`, {}),
 };
 ```
 

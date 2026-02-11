@@ -75,6 +75,7 @@
 | Profile grid display | `GET /api/jobs/{id}` → `profiles` | ✅ |
 | Filter by min score | `GET /api/jobs/{id}?min_score=70` | ✅ |
 | Pagination | `GET /api/jobs/{id}?profile_limit=50&profile_offset=0` | ✅ |
+| Tab: Bookmarked profiles | `GET /api/jobs/{id}?is_bookmarked=true` | ✅ |
 | Sort by score | `GET /api/jobs/{id}?sort=score&order=desc` | ❌ #4b |
 | Search by username | `GET /api/jobs/{id}?search=keyword` | ❌ #4 |
 | Analytics panel | `GET /api/jobs/{id}/analytics` | ✅ |
@@ -109,7 +110,7 @@
 | Contact info (email) | Profile `contact_email` | ✅ |
 | View on Instagram link | External URL | ✅ (No API needed) |
 | Compose Email button | → Email Composer | ✅ (Frontend route) |
-| Save/Bookmark button | `POST /api/profiles/{id}/bookmark` | ❌ #2 |
+| Save/Bookmark button | `PATCH /api/profiles/{id}/bookmark` | ✅ |
 | Skip button | `PATCH /api/profiles/{id}` skipped | ❌ #3 |
 
 ---
@@ -143,12 +144,13 @@
 | 100% | Email generation and sending |
 | 100% | Demo mode |
 | 100% | Job control (start, cancel, retry) |
+| 100% | Profile bookmarking |
 
 ### ❌ Missing APIs (Already in BACKEND_GAPS_TODO.md)
 
 | # | Feature | Priority |
 |---|---------|----------|
-| 2 | Bookmark Profile | HIGH |
+| ~~2~~ | ~~Bookmark Profile~~ | ~~HIGH~~ ✅ DONE |
 | 3 | Skip Profile | HIGH |
 | 4 | Profile Search | HIGH |
 | **4b** | **Profile Sorting** *(NEW)* | **HIGH** |
