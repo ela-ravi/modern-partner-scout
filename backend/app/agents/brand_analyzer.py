@@ -166,7 +166,9 @@ class BrandAnalyzerAgent(BaseAgent[BrandAnalyzerRequest, BrandAnalyzerResponse])
             # Step 1: Fetch job data
             job = await self._fetch_job(job_id)
             brand_description = job.get("brand_description", "")
-            reference_profiles = job.get("reference_profiles", [])
+            reference_profiles = self._normalize_reference_profiles(
+                job.get("reference_profiles", [])
+            )
             
             if not reference_profiles:
                 raise AgentError(
@@ -253,6 +255,35 @@ class BrandAnalyzerAgent(BaseAgent[BrandAnalyzerRequest, BrandAnalyzerResponse])
         logger.debug(f"Fetching job: {job_id}")
         return self._job_repo.get_by_id(job_id)
     
+    def _normalize_reference_profiles(self, raw: Any) -> List[str]:
+        """
+        Normalize reference_profiles from DB to a list of URL strings.
+        Handles TEXT[] array, JSON string, or single string.
+        """
+        if not raw:
+            return []
+        if isinstance(raw, list):
+            urls = []
+            for item in raw:
+                if isinstance(item, str) and item.strip():
+                    urls.append(item.strip())
+                elif isinstance(item, dict) and item.get("url"):
+                    urls.append(str(item["url"]).strip())
+            return urls
+        if isinstance(raw, str):
+            raw = raw.strip()
+            if not raw:
+                return []
+            # Could be JSON array string
+            try:
+                parsed = json.loads(raw)
+                return self._normalize_reference_profiles(parsed)
+            except (json.JSONDecodeError, TypeError):
+                if "instagram" in raw or raw.startswith("http"):
+                    return [raw]
+            return []
+        return []
+    
     # =========================================================================
     # Profile Fetching (SUB-3.3.2.1.2)
     # =========================================================================
@@ -287,10 +318,13 @@ class BrandAnalyzerAgent(BaseAgent[BrandAnalyzerRequest, BrandAnalyzerResponse])
                     usernames.append(username)
         
         if not usernames:
-            logger.warning("No valid usernames extracted from profile URLs")
+            logger.warning(
+                "No valid usernames extracted from profile URLs. "
+                "reference_profiles may be empty or in an unexpected format (expected URLs like https://instagram.com/username)."
+            )
             return [], 0, 0
         
-        logger.debug(f"Extracted usernames: {usernames}")
+        logger.info(f"Extracted usernames from reference_profiles: {usernames}")
         
         try:
             # Fetch profiles via Apify
@@ -299,9 +333,16 @@ class BrandAnalyzerAgent(BaseAgent[BrandAnalyzerRequest, BrandAnalyzerResponse])
                 results_limit=max_posts
             )
             
+            if not profiles:
+                logger.warning(
+                    "Apify returned no profile data (empty list). "
+                    "Check APIFY_API_KEY, actor input schema (usernames, resultsLimit), and that the actor is 'apify/instagram-profile-scraper' or equivalent."
+                )
+                return [], 0, 0
+            
             # Count posts analyzed
             total_posts = sum(
-                len(p.get("recentPosts", [])) 
+                len(p.get("recentPosts", p.get("recent_posts", []))) 
                 for p in profiles
             )
             
@@ -313,10 +354,19 @@ class BrandAnalyzerAgent(BaseAgent[BrandAnalyzerRequest, BrandAnalyzerResponse])
             return profiles, len(profiles), total_posts
             
         except ApifyError as e:
-            logger.warning(f"Apify scraping failed: {e}, using empty profile data")
+            logger.error(
+                "Apify scraping failed (API/key or actor error). Using empty profile data. "
+                "Brand analysis will use only brand_description. Error: %s",
+                e,
+                exc_info=True,
+            )
             return [], 0, 0
         except Exception as e:
-            logger.warning(f"Profile fetching failed: {e}, using empty profile data")
+            logger.error(
+                "Profile fetching failed. Using empty profile data. Error: %s",
+                e,
+                exc_info=True,
+            )
             return [], 0, 0
     
     # =========================================================================
@@ -390,7 +440,12 @@ class BrandAnalyzerAgent(BaseAgent[BrandAnalyzerRequest, BrandAnalyzerResponse])
             return analysis
             
         except Exception as e:
-            logger.error(f"LLM analysis failed: {e}")
+            logger.error(
+                "LLM analysis failed; returning empty hashtags/keywords. "
+                "This can be due to parse errors, timeout, or model output not matching BrandAnalysisOutput schema. Error: %s",
+                e,
+                exc_info=True,
+            )
             # Return empty analysis on failure
             return BrandAnalysisOutput(
                 hashtags=[],
@@ -414,7 +469,10 @@ class BrandAnalyzerAgent(BaseAgent[BrandAnalyzerRequest, BrandAnalyzerResponse])
             Formatted string for prompt
         """
         if not profile_data:
-            return "No reference profiles available."
+            return (
+                "No reference profiles available (Apify did not return data or profile fetch failed). "
+                "Extract hashtags and keywords from the brand description only."
+            )
         
         formatted = []
         for i, profile in enumerate(profile_data, 1):

@@ -42,8 +42,9 @@ logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
-# FastAPI base URL - defaults to localhost:8000
-FASTAPI_BASE_URL = os.getenv("FASTAPI_BASE_URL", "http://localhost:8000")
+# FastAPI base URL - defaults to localhost:8001 (can be overridden via FASTAPI_BASE_URL env var)
+# Default port is 8001 (override with FASTAPI_BASE_URL environment variable if needed)
+FASTAPI_BASE_URL = os.getenv("FASTAPI_BASE_URL", "http://localhost:8001")
 
 # Service key for authentication (same as N8N uses)
 SERVICE_KEY = settings.n8n.service_key
@@ -54,13 +55,44 @@ if not SERVICE_KEY:
 
 
 # =============================================================================
+# Health Check Function
+# =============================================================================
+
+async def check_server_health() -> bool:
+    """
+    Check if the FastAPI server is available and responding.
+    
+    Returns:
+        True if server is healthy, False otherwise
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{FASTAPI_BASE_URL}/api/health",
+                timeout=5.0
+            )
+            response.raise_for_status()
+            return True
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as e:
+        logger.error(
+            f"Cannot connect to FastAPI server at {FASTAPI_BASE_URL}. "
+            f"Please ensure the server is running. Error: {e}"
+        )
+        return False
+    except Exception as e:
+        logger.warning(f"Health check failed: {e}")
+        return False
+
+
+# =============================================================================
 # Status Update Functions (calls Status Update APIs)
 # =============================================================================
 
 async def update_job_status(
     job_id: str,
     status: str,
-    error_message: Optional[str] = None
+    error_message: Optional[str] = None,
+    suppress_connection_error: bool = False
 ) -> Dict:
     """
     Update job status via API.
@@ -72,31 +104,54 @@ async def update_job_status(
         job_id: UUID of the discovery job
         status: One of: pending, analyzing, discovering, scoring, completed, failed
         error_message: Optional error message (only when status=failed)
+        suppress_connection_error: If True, don't raise on connection errors (for error recovery)
     
     Returns:
         Updated job data from API response
         
     Raises:
-        httpx.HTTPStatusError: If API call fails
+        httpx.HTTPStatusError: If API call fails with HTTP error
+        httpx.ConnectError: If cannot connect to server (unless suppress_connection_error=True)
     """
-    async with httpx.AsyncClient() as client:
-        payload = {"status": status}
-        if error_message:
-            payload["error_message"] = error_message
-        
-        logger.debug(f"Updating job {job_id} status to '{status}'")
-        
-        response = await client.patch(
-            f"{FASTAPI_BASE_URL}/api/jobs/{job_id}/status",
-            headers={
-                "X-Service-Key": SERVICE_KEY,
-                "Content-Type": "application/json"
-            },
-            json=payload,
-            timeout=30.0
-        )
-        response.raise_for_status()
-        return response.json()
+    try:
+        async with httpx.AsyncClient() as client:
+            payload = {"status": status}
+            if error_message:
+                payload["error_message"] = error_message
+            
+            logger.debug(f"Updating job {job_id} status to '{status}'")
+            
+            response = await client.patch(
+                f"{FASTAPI_BASE_URL}/api/jobs/{job_id}/status",
+                headers={
+                    "X-Service-Key": SERVICE_KEY,
+                    "Content-Type": "application/json"
+                },
+                json=payload,
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.ConnectError as e:
+        if suppress_connection_error:
+            logger.warning(
+                f"Cannot update job status (server unavailable): {e}. "
+                f"This may be expected if the server is down."
+            )
+            raise
+        else:
+            port = FASTAPI_BASE_URL.split(':')[-1].rstrip('/')
+            error_msg = (
+                f"Cannot connect to FastAPI server at {FASTAPI_BASE_URL}. "
+                f"Please ensure the server is running. "
+                f"Start it with: uvicorn app.main:app --reload --port {port}"
+            )
+            logger.error(error_msg)
+            raise httpx.ConnectError(error_msg) from e
+    except (httpx.TimeoutException, httpx.NetworkError) as e:
+        error_msg = f"Network error while updating job status: {e}"
+        logger.error(error_msg)
+        raise
 
 
 async def update_profile_status(profile_id: str, status: str) -> Dict:
@@ -114,22 +169,46 @@ async def update_profile_status(profile_id: str, status: str) -> Dict:
         Updated profile data from API response
         
     Raises:
-        httpx.HTTPStatusError: If API call fails
+        httpx.HTTPStatusError: If API call fails with HTTP error
+        httpx.ConnectError: If cannot connect to server
     """
-    async with httpx.AsyncClient() as client:
-        logger.debug(f"Updating profile {profile_id} status to '{status}'")
-        
-        response = await client.patch(
-            f"{FASTAPI_BASE_URL}/api/profiles/{profile_id}/status",
-            headers={
-                "X-Service-Key": SERVICE_KEY,
-                "Content-Type": "application/json"
-            },
-            json={"status": status},
-            timeout=30.0
+    try:
+        async with httpx.AsyncClient() as client:
+            logger.debug(f"Updating profile {profile_id} status to '{status}'")
+            
+            response = await client.patch(
+                f"{FASTAPI_BASE_URL}/api/profiles/{profile_id}/status",
+                headers={
+                    "X-Service-Key": SERVICE_KEY,
+                    "Content-Type": "application/json"
+                },
+                json={"status": status},
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.ConnectError as e:
+        error_msg = (
+            f"Cannot connect to FastAPI server at {FASTAPI_BASE_URL}. "
+            f"Please ensure the server is running."
         )
-        response.raise_for_status()
-        return response.json()
+        logger.error(error_msg)
+        raise httpx.ConnectError(error_msg) from e
+    except (httpx.ReadError, httpx.WriteError) as e:
+        error_msg = (
+            f"Connection interrupted while communicating with server at {FASTAPI_BASE_URL}. "
+            f"The server may have closed the connection unexpectedly or there was a network issue."
+        )
+        if str(e):
+            error_msg += f" Error: {e}"
+        logger.error(error_msg)
+        raise httpx.NetworkError(error_msg) from e
+    except (httpx.TimeoutException, httpx.NetworkError) as e:
+        error_msg = f"Network error while communicating with server at {FASTAPI_BASE_URL}"
+        if str(e):
+            error_msg += f": {e}"
+        logger.error(error_msg)
+        raise
 
 
 # =============================================================================
@@ -150,22 +229,46 @@ async def call_brand_analyzer(job_id: str) -> Dict:
         Brand DNA response with hashtags, keywords, and embedding vector
         
     Raises:
-        httpx.HTTPStatusError: If API call fails
+        httpx.HTTPStatusError: If API call fails with HTTP error
+        httpx.ConnectError: If cannot connect to server
     """
-    async with httpx.AsyncClient() as client:
-        logger.debug(f"Calling Brand Analyzer for job {job_id}")
-        
-        response = await client.post(
-            f"{FASTAPI_BASE_URL}/api/agent/analyze-brand",
-            headers={
-                "X-Service-Key": SERVICE_KEY,
-                "Content-Type": "application/json"
-            },
-            json={"job_id": job_id},
-            timeout=120.0  # Same timeout as N8N node
+    try:
+        async with httpx.AsyncClient() as client:
+            logger.debug(f"Calling Brand Analyzer for job {job_id}")
+            
+            response = await client.post(
+                f"{FASTAPI_BASE_URL}/api/agent/analyze-brand",
+                headers={
+                    "X-Service-Key": SERVICE_KEY,
+                    "Content-Type": "application/json"
+                },
+                json={"job_id": job_id},
+                timeout=120.0  # Same timeout as N8N node
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.ConnectError as e:
+        error_msg = (
+            f"Cannot connect to FastAPI server at {FASTAPI_BASE_URL}. "
+            f"Please ensure the server is running."
         )
-        response.raise_for_status()
-        return response.json()
+        logger.error(error_msg)
+        raise httpx.ConnectError(error_msg) from e
+    except (httpx.ReadError, httpx.WriteError) as e:
+        error_msg = (
+            f"Connection interrupted while communicating with server at {FASTAPI_BASE_URL}. "
+            f"The server may have closed the connection unexpectedly or there was a network issue."
+        )
+        if str(e):
+            error_msg += f" Error: {e}"
+        logger.error(error_msg)
+        raise httpx.NetworkError(error_msg) from e
+    except (httpx.TimeoutException, httpx.NetworkError) as e:
+        error_msg = f"Network error while communicating with server at {FASTAPI_BASE_URL}"
+        if str(e):
+            error_msg += f": {e}"
+        logger.error(error_msg)
+        raise
 
 
 async def call_discovery_agent(
@@ -190,30 +293,54 @@ async def call_discovery_agent(
         Discovery response with list of discovered profiles
         
     Raises:
-        httpx.HTTPStatusError: If API call fails
+        httpx.HTTPStatusError: If API call fails with HTTP error
+        httpx.ConnectError: If cannot connect to server
     """
-    async with httpx.AsyncClient() as client:
-        logger.debug(
-            f"Calling Discovery Agent for job {job_id} "
-            f"with {len(hashtags)} hashtags, limit={limit}"
+    try:
+        async with httpx.AsyncClient() as client:
+            logger.debug(
+                f"Calling Discovery Agent for job {job_id} "
+                f"with {len(hashtags)} hashtags, limit={limit}"
+            )
+            
+            response = await client.post(
+                f"{FASTAPI_BASE_URL}/api/agent/discover",
+                headers={
+                    "X-Service-Key": SERVICE_KEY,
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "job_id": job_id,
+                    "hashtags": hashtags,
+                    "keywords": keywords,
+                    "limit": limit
+                },
+                timeout=180.0  # Same timeout as N8N node
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.ConnectError as e:
+        error_msg = (
+            f"Cannot connect to FastAPI server at {FASTAPI_BASE_URL}. "
+            f"Please ensure the server is running."
         )
-        
-        response = await client.post(
-            f"{FASTAPI_BASE_URL}/api/agent/discover",
-            headers={
-                "X-Service-Key": SERVICE_KEY,
-                "Content-Type": "application/json"
-            },
-            json={
-                "job_id": job_id,
-                "hashtags": hashtags,
-                "keywords": keywords,
-                "limit": limit
-            },
-            timeout=180.0  # Same timeout as N8N node
+        logger.error(error_msg)
+        raise httpx.ConnectError(error_msg) from e
+    except (httpx.ReadError, httpx.WriteError) as e:
+        error_msg = (
+            f"Connection interrupted while communicating with server at {FASTAPI_BASE_URL}. "
+            f"The server may have closed the connection unexpectedly or there was a network issue."
         )
-        response.raise_for_status()
-        return response.json()
+        if str(e):
+            error_msg += f" Error: {e}"
+        logger.error(error_msg)
+        raise httpx.NetworkError(error_msg) from e
+    except (httpx.TimeoutException, httpx.NetworkError) as e:
+        error_msg = f"Network error while communicating with server at {FASTAPI_BASE_URL}"
+        if str(e):
+            error_msg += f": {e}"
+        logger.error(error_msg)
+        raise
 
 
 async def call_scorer_agent(profile_id: str, job_id: str) -> Dict:
@@ -231,25 +358,49 @@ async def call_scorer_agent(profile_id: str, job_id: str) -> Dict:
         Scoring response with score, reasoning, and contact info
         
     Raises:
-        httpx.HTTPStatusError: If API call fails
+        httpx.HTTPStatusError: If API call fails with HTTP error
+        httpx.ConnectError: If cannot connect to server
     """
-    async with httpx.AsyncClient() as client:
-        logger.debug(f"Calling Scorer Agent for profile {profile_id}, job {job_id}")
-        
-        response = await client.post(
-            f"{FASTAPI_BASE_URL}/api/agent/score",
-            headers={
-                "X-Service-Key": SERVICE_KEY,
-                "Content-Type": "application/json"
-            },
-            json={
-                "profile_id": profile_id,
-                "job_id": job_id
-            },
-            timeout=60.0  # Same timeout as N8N node
+    try:
+        async with httpx.AsyncClient() as client:
+            logger.debug(f"Calling Scorer Agent for profile {profile_id}, job {job_id}")
+            
+            response = await client.post(
+                f"{FASTAPI_BASE_URL}/api/agent/score",
+                headers={
+                    "X-Service-Key": SERVICE_KEY,
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "profile_id": profile_id,
+                    "job_id": job_id
+                },
+                timeout=60.0  # Same timeout as N8N node
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.ConnectError as e:
+        error_msg = (
+            f"Cannot connect to FastAPI server at {FASTAPI_BASE_URL}. "
+            f"Please ensure the server is running."
         )
-        response.raise_for_status()
-        return response.json()
+        logger.error(error_msg)
+        raise httpx.ConnectError(error_msg) from e
+    except (httpx.ReadError, httpx.WriteError) as e:
+        error_msg = (
+            f"Connection interrupted while communicating with server at {FASTAPI_BASE_URL}. "
+            f"The server may have closed the connection unexpectedly or there was a network issue."
+        )
+        if str(e):
+            error_msg += f" Error: {e}"
+        logger.error(error_msg)
+        raise httpx.NetworkError(error_msg) from e
+    except (httpx.TimeoutException, httpx.NetworkError) as e:
+        error_msg = f"Network error while communicating with server at {FASTAPI_BASE_URL}"
+        if str(e):
+            error_msg += f": {e}"
+        logger.error(error_msg)
+        raise
 
 
 # =============================================================================
@@ -263,27 +414,42 @@ async def run_discovery(job_id: str) -> None:
     Mirrors the N8N workflow exactly, using the same APIs.
     
     Workflow:
-    1. Set job status to 'analyzing'
-    2. Call Brand Analyzer Agent
-    3. Set job status to 'discovering'
-    4. Call Discovery Agent
-    5. Set job status to 'scoring'
-    6. For each profile:
+    1. Check server health
+    2. Set job status to 'analyzing'
+    3. Call Brand Analyzer Agent
+    4. Set job status to 'discovering'
+    5. Call Discovery Agent
+    6. Set job status to 'scoring'
+    7. For each profile:
        a. Set profile status to 'processing'
        b. Call Scorer Agent
        c. Set profile status to 'done'
-    7. Set job status to 'completed'
+    8. Set job status to 'completed'
     
     On any error:
-    - Set job status to 'failed' with error message
+    - Set job status to 'failed' with error message (if server is available)
     
     Args:
         job_id: UUID of the discovery job to process
         
     Raises:
+        httpx.ConnectError: If server is not available
         Exception: If any phase fails
     """
     logger.info(f"[Orchestrator] Starting discovery for job: {job_id}")
+    
+    # Check server health before starting
+    logger.info(f"[Orchestrator] Checking server health at {FASTAPI_BASE_URL}...")
+    if not await check_server_health():
+        error_msg = (
+            f"FastAPI server is not available at {FASTAPI_BASE_URL}. "
+            f"Please start the server before running discovery. "
+            f"Start it with: uvicorn app.main:app --reload --port 8000"
+        )
+        logger.error(f"[Error] {error_msg}")
+        raise httpx.ConnectError(error_msg)
+    
+    logger.info("[Orchestrator] Server is healthy, proceeding with discovery...")
     
     try:
         # =====================================================================
@@ -307,8 +473,16 @@ async def run_discovery(job_id: str) -> None:
         keywords = brand_dna.get("keywords", [])
         
         logger.info(
-            f"[Phase 1] Extracted {len(hashtags)} hashtags, "
-            f"{len(keywords)} keywords"
+            f"[Phase 1] [SUCCESS] Brand Analyzer completed successfully"
+        )
+        logger.info(
+            f"[Phase 1] Extracted {len(hashtags)} hashtags: {hashtags[:5]}{'...' if len(hashtags) > 5 else ''}"
+        )
+        logger.info(
+            f"[Phase 1] Extracted {len(keywords)} keywords: {keywords[:5]}{'...' if len(keywords) > 5 else ''}"
+        )
+        logger.info(
+            f"[Phase 1] [PASS] Passing results to Discovery Agent: {len(hashtags)} hashtags, {len(keywords)} keywords"
         )
         
         # =====================================================================
@@ -316,7 +490,25 @@ async def run_discovery(job_id: str) -> None:
         # Equivalent to N8N Nodes 07-08
         # =====================================================================
         logger.info("[Phase 2] Discovering profiles...")
+        
+        # Check if hashtags are available (Discovery Agent requires at least one)
+        if not hashtags:
+            error_msg = (
+                "Discovery Agent requires at least one hashtag, but Brand Analyzer "
+                f"extracted 0 hashtags. Keywords found: {keywords[:5]}{'...' if len(keywords) > 5 else ''}. "
+                "Cannot proceed with profile discovery."
+            )
+            logger.error(f"[Phase 2] [ERROR] {error_msg}")
+            await update_job_status(job_id, "failed", error_message=error_msg)
+            raise ValueError(error_msg)
+        
         await update_job_status(job_id, "discovering")
+        
+        logger.info(
+            f"[Phase 2] [CALL] Calling Discovery Agent with: "
+            f"hashtags={hashtags[:3]}{'...' if len(hashtags) > 3 else ''}, "
+            f"keywords={keywords[:3]}{'...' if len(keywords) > 3 else ''}, limit=50"
+        )
         
         discovery_result = await call_discovery_agent(
             job_id=job_id,
@@ -330,8 +522,18 @@ async def run_discovery(job_id: str) -> None:
         total_discovered = discovery_result.get("total_discovered", len(profiles))
         
         logger.info(
+            f"[Phase 2] ✓ Discovery Agent completed successfully"
+        )
+        logger.info(
             f"[Phase 2] Discovered {total_discovered} profiles "
             f"({len(profiles)} returned)"
+        )
+        if profiles:
+            logger.info(
+                f"[Phase 2] Sample profiles: {[p.get('username', 'unknown') for p in profiles[:3]]}"
+            )
+        logger.info(
+            f"[Phase 2] [PASS] Passing {len(profiles)} profiles to Scorer Agent"
         )
         
         if not profiles:
@@ -370,6 +572,10 @@ async def run_discovery(job_id: str) -> None:
                 await update_profile_status(profile_id, "processing")
                 
                 # Call scorer (N8N Node 12)
+                logger.debug(
+                    f"[Phase 3] [CALL] Calling Scorer Agent for profile @{username} "
+                    f"(profile_id={profile_id}, job_id={job_id})"
+                )
                 score_result = await call_scorer_agent(profile_id, job_id)
                 
                 # Extract score from response
@@ -383,9 +589,13 @@ async def run_discovery(job_id: str) -> None:
                 if score >= 50:
                     high_score_count += 1
                 
-                logger.debug(
-                    f"[Phase 3] Profile @{username} scored: {score} "
+                logger.info(
+                    f"[Phase 3] [SUCCESS] Profile @{username} scored: {score} "
                     f"(>=50: {score >= 50})"
+                )
+                logger.debug(
+                    f"[Phase 3] Scorer Agent result: score={score}, "
+                    f"recommendation={score_result.get('recommendation', 'N/A')}"
                 )
                 
             except Exception as profile_error:
@@ -421,13 +631,81 @@ async def run_discovery(job_id: str) -> None:
         await update_job_status(job_id, "completed")
         logger.info(f"[Complete] Discovery job {job_id} completed successfully!")
         
+    except httpx.ConnectError as e:
+        # Connection error - server is not available
+        port = FASTAPI_BASE_URL.split(':')[-1].rstrip('/')
+        error_message = (
+            f"Cannot connect to FastAPI server at {FASTAPI_BASE_URL}. "
+            f"Please ensure the server is running. "
+            f"Start it with: uvicorn app.main:app --reload --port {port}"
+        )
+        logger.error(f"[Error] {error_message}")
+        logger.error(f"[Error] Connection error details: {e}")
+        
+        # Don't try to update status if server is down
+        logger.warning(
+            "[Error] Cannot update job status to 'failed' because server is unavailable"
+        )
+        raise
+    
+    except (httpx.ReadError, httpx.WriteError) as e:
+        # Connection interrupted while reading/writing
+        error_message = (
+            f"Connection interrupted while communicating with server at {FASTAPI_BASE_URL}. "
+            f"The server may have closed the connection unexpectedly or there was a network issue. "
+            f"Error: {e}"
+        )
+        logger.error(f"[Error] {error_message}")
+        
+        # Try to update status, but handle failures gracefully
+        try:
+            await update_job_status(
+                job_id, 
+                "failed", 
+                error_message=error_message,
+                suppress_connection_error=True
+            )
+        except httpx.ConnectError:
+            logger.warning(
+                "[Error] Server became unavailable while updating status. "
+                "Job status may not be updated."
+            )
+        except httpx.HTTPStatusError as status_error:
+            # Status update failed (e.g., 422 - invalid transition)
+            logger.warning(
+                f"[Error] Failed to update job status to 'failed': "
+                f"{status_error.response.status_code} - {status_error.response.text}. "
+                f"Job may already be in a terminal state."
+            )
+        except Exception as status_error:
+            logger.error(f"[Error] Failed to update job status: {status_error}")
+        
+        raise httpx.NetworkError(error_message) from e
+    
     except httpx.HTTPStatusError as e:
-        # HTTP error from API
+        # HTTP error from API (server is up but returned error)
         error_message = f"API error: {e.response.status_code} - {e.response.text}"
         logger.error(f"[Error] Discovery failed: {error_message}")
         
         try:
-            await update_job_status(job_id, "failed", error_message=error_message)
+            await update_job_status(
+                job_id, 
+                "failed", 
+                error_message=error_message,
+                suppress_connection_error=True
+            )
+        except httpx.ConnectError:
+            logger.warning(
+                "[Error] Server became unavailable while updating status. "
+                "Job status may not be updated."
+            )
+        except httpx.HTTPStatusError as status_error:
+            # Status update failed (e.g., 422 - invalid transition)
+            logger.warning(
+                f"[Error] Failed to update job status to 'failed': "
+                f"{status_error.response.status_code} - {status_error.response.text}. "
+                f"Job may already be in a terminal state."
+            )
         except Exception as status_error:
             logger.error(f"[Error] Failed to update job status: {status_error}")
         
@@ -442,7 +720,24 @@ async def run_discovery(job_id: str) -> None:
         logger.error(f"[Error] Discovery failed: {error_message}", exc_info=True)
         
         try:
-            await update_job_status(job_id, "failed", error_message=error_message)
+            await update_job_status(
+                job_id, 
+                "failed", 
+                error_message=error_message,
+                suppress_connection_error=True
+            )
+        except httpx.ConnectError:
+            logger.warning(
+                "[Error] Server became unavailable while updating status. "
+                "Job status may not be updated."
+            )
+        except httpx.HTTPStatusError as status_error:
+            # Status update failed (e.g., 422 - invalid transition)
+            logger.warning(
+                f"[Error] Failed to update job status to 'failed': "
+                f"{status_error.response.status_code} - {status_error.response.text}. "
+                f"Job may already be in a terminal state."
+            )
         except Exception as status_error:
             logger.error(f"[Error] Failed to update job status: {status_error}")
         
