@@ -123,6 +123,7 @@ async def create_job(
             keywords=request.keywords,
             hashtags=request.hashtags,
             min_score_threshold=request.min_score_threshold,
+            target_country=request.target_country,
         )
         
         logger.info(f"Created job {job_data['id']} for user {user.user_id}")

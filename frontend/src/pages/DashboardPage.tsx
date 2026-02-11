@@ -97,7 +97,10 @@ export default function DashboardPage() {
     job_id: jobId || '',
     page,
     page_size: 20,
-    filters: statusFilter ? { status: statusFilter } : undefined,
+    filters: {
+      ...(statusFilter ? { status: statusFilter } : {}),
+      ...(job?.min_score_threshold ? { min_score: job.min_score_threshold } : {}),
+    },
     sort,
   })
 

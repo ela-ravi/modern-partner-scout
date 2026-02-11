@@ -33,6 +33,7 @@ const discoveryConfigSchema = z.object({
   hashtags: z.array(z.string().regex(/^#/, 'Hashtags must start with #')).optional(),
   discoveryLimit: z.number().min(10).max(100),
   minScoreThreshold: z.number().min(0).max(100),
+  targetCountry: z.string().max(100).optional(),
   minFollowers: z.number().min(0).optional(),
   maxFollowers: z.number().min(0).optional(),
 })
@@ -47,6 +48,7 @@ const defaultValues: DiscoveryConfigFormData = {
   hashtags: [],
   discoveryLimit: 50,
   minScoreThreshold: 60,
+  targetCountry: '',
   minFollowers: 1000,
   maxFollowers: 500000,
 }
@@ -130,6 +132,7 @@ export default function DiscoveryConfigPage() {
         keywords: data.keywords,
         hashtags: data.hashtags,
         min_score_threshold: data.minScoreThreshold,
+        ...(data.targetCountry ? { target_country: data.targetCountry } : {}),
       })
 
       // Start the orchestration pipeline
@@ -336,6 +339,19 @@ export default function DiscoveryConfigPage() {
                     label="Minimum Score Threshold"
                     helperText="Only show profiles scoring above this value"
                     formatValue={(v) => `${v}%`}
+                  />
+                )}
+              />
+
+              <Controller
+                name="targetCountry"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    label="Target Country / Region"
+                    placeholder="e.g., India, USA, Germany"
+                    helperText="Optional — profiles from this region get priority in scoring"
                   />
                 )}
               />
@@ -564,6 +580,12 @@ export default function DiscoveryConfigPage() {
               {(watchedValues.maxFollowers || 0).toLocaleString()}
             </dd>
           </div>
+          {watchedValues.targetCountry && (
+            <div>
+              <dt className="text-sm text-apple-text-secondary">Target Country</dt>
+              <dd className="text-apple-text font-medium">{watchedValues.targetCountry}</dd>
+            </div>
+          )}
         </dl>
       </Card>
 

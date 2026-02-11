@@ -26,6 +26,7 @@ export interface Job {
   keywords: string[]
   hashtags: string[]
   min_score_threshold: number
+  target_country?: string | null
   profiles_discovered: number
   profiles_scored: number
   error_message?: string
@@ -41,6 +42,7 @@ export interface CreateJobRequest {
   keywords?: string[]
   hashtags?: string[]
   min_score_threshold?: number
+  target_country?: string
 }
 
 export interface CreateJobResponse {

@@ -71,7 +71,12 @@ class CreateJobRequest(BaseModel):
         le=100,
         description="Minimum score threshold for profile filtering"
     )
-    
+    target_country: Optional[str] = Field(
+        default=None,
+        max_length=100,
+        description="Optional target country/region for score boosting (e.g., India, USA, Germany)"
+    )
+
     @field_validator("keywords", mode="before")
     @classmethod
     def validate_keywords(cls, v: List[str]) -> List[str]:
@@ -159,9 +164,9 @@ class UpdateJobRequest(BaseModel):
 
 class JobBase(BaseModel):
     """Base job model with common fields."""
-    
+
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: UUID
     user_id: UUID
     name: Optional[str] = None
@@ -174,6 +179,7 @@ class JobBase(BaseModel):
     keywords: List[str] = Field(default_factory=list)
     hashtags: List[str] = Field(default_factory=list)
     min_score_threshold: int = Field(default=Defaults.DEFAULT_MIN_SCORE_THRESHOLD)
+    target_country: Optional[str] = None
     # Status fields
     status: JobStatus
     profiles_discovered: int = 0
@@ -190,9 +196,9 @@ class Job(JobBase):
 
 class JobSummary(BaseModel):
     """Condensed job information for list views."""
-    
+
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: UUID
     name: Optional[str] = None
     brand_description: str
@@ -200,6 +206,7 @@ class JobSummary(BaseModel):
     keywords: List[str] = Field(default_factory=list)
     hashtags: List[str] = Field(default_factory=list)
     min_score_threshold: int = Field(default=Defaults.DEFAULT_MIN_SCORE_THRESHOLD)
+    target_country: Optional[str] = None
     # Status fields
     status: JobStatus
     profiles_discovered: int = 0

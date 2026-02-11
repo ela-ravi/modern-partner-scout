@@ -76,6 +76,7 @@ class JobService:
         keywords: Optional[List[str]] = None,
         hashtags: Optional[List[str]] = None,
         min_score_threshold: int = 50,
+        target_country: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Create a new discovery job with daily limit enforcement.
@@ -91,7 +92,8 @@ class JobService:
             keywords: Optional target keywords for discovery
             hashtags: Optional target hashtags for discovery
             min_score_threshold: Minimum score filter (0-100)
-            
+            target_country: Optional target country/region for score boosting
+
         Returns:
             Created job data
             
@@ -130,6 +132,7 @@ class JobService:
                 keywords=keywords or [],
                 hashtags=hashtags or [],
                 min_score_threshold=min_score_threshold,
+                target_country=target_country,
             )
             
             logger.info(f"Created job {job['id']} for user {user_id}")

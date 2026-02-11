@@ -68,6 +68,7 @@ class ApifyRunStatus(str, Enum):
 # Default Actor IDs (can be overridden via config)
 DEFAULT_PROFILE_SCRAPER = "apify/instagram-profile-scraper"
 DEFAULT_HASHTAG_SCRAPER = "apify/instagram-hashtag-scraper"
+DEFAULT_GOOGLE_SEARCH_SCRAPER = "apify/google-search-scraper"
 
 # Rate limiting defaults
 DEFAULT_RATE_LIMIT_REQUESTS = 10  # requests per window
@@ -1023,6 +1024,65 @@ class ApifyService:
         # Cap score
         return max(0, min(100, score))
     
+    # =========================================================================
+    # Google Search
+    # =========================================================================
+
+    async def google_search(
+        self,
+        query: str,
+        max_results: int = 5,
+        timeout: int = 60,
+    ) -> List[Dict[str, Any]]:
+        """
+        Search Google using Apify's Google Search Results Scraper.
+
+        Args:
+            query: The search query string
+            max_results: Maximum number of results to return
+            timeout: Maximum wait time in seconds
+
+        Returns:
+            List of search result dicts with keys: title, url, description
+        """
+        await self._rate_limiter.acquire()
+
+        logger.info(f"Google search: {query!r} (max_results={max_results})")
+
+        run_input = {
+            "queries": query,
+            "maxPagesPerQuery": 1,
+            "resultsPerPage": max_results,
+            "languageCode": "en",
+            "mobileResults": False,
+        }
+
+        try:
+            run = self.client.actor(DEFAULT_GOOGLE_SEARCH_SCRAPER).call(
+                run_input=run_input,
+                timeout_secs=timeout,
+            )
+
+            items = list(self.client.dataset(run["defaultDatasetId"]).iterate_items())
+
+            # Apify Google Search returns organic results nested inside each item
+            results = []
+            for item in items:
+                organic = item.get("organicResults", [])
+                for result in organic[:max_results]:
+                    results.append({
+                        "title": result.get("title", ""),
+                        "url": result.get("url", ""),
+                        "description": result.get("description", ""),
+                    })
+
+            logger.info(f"Google search returned {len(results)} results")
+            return results[:max_results]
+
+        except Exception as e:
+            logger.warning(f"Google search failed for query {query!r}: {e}")
+            return []
+
     def __repr__(self) -> str:
         configured = "configured" if self.is_configured() else "not configured"
         return f"ApifyService({configured})"

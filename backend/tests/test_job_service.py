@@ -157,6 +157,7 @@ class TestCreateJob:
             keywords=[],
             hashtags=[],
             min_score_threshold=50,
+            target_country=None,
         )
     
     def test_create_job_daily_limit_exceeded(self, job_service, mock_job_repo):

@@ -115,12 +115,18 @@ class ScoringAnalysisOutput(BaseModel):
         description="Source of the email (bio, business_email, website)"
     )
     
+    # Location Detection
+    detected_country: Optional[str] = Field(
+        default=None,
+        description="Detected country/region of the profile based on bio, location, and content clues"
+    )
+
     # Reasoning
     reasoning: Dict[str, str] = Field(
         default_factory=dict,
         description="Reasoning for each dimension score"
     )
-    
+
     # Recommendation
     recommendation: str = Field(
         default="consider",
@@ -269,10 +275,11 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
             # Step 2: Fetch brand DNA
             brand_dna = input_data.brand_dna or await self._fetch_brand_dna(job_id)
             
-            # Step 3: Fetch job for brand description
+            # Step 3: Fetch job for brand description and target country
             job = await self._fetch_job(job_id)
             brand_description = job.get("brand_description", "")
-            
+            target_country = job.get("target_country")
+
             # Step 4: Detect fake indicators (SUB-3.3.4.1.3)
             fake_indicators = self._detect_fake_indicators(profile_data)
             is_fake_suspected = len(fake_indicators) > 0
@@ -286,7 +293,8 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
                 brand_dna=brand_dna,
                 brand_description=brand_description,
                 fake_indicators=fake_indicators,
-                contact=contact
+                contact=contact,
+                target_country=target_country,
             )
             
             # Step 7: Calculate weighted final score (SUB-3.3.4.1.5)
@@ -300,7 +308,20 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
             }
             
             final_score = self._scoring_service.calculate_final_score_from_dict(dimensions)
-            
+
+            # Apply country boost if target country matches detected country
+            country_boosted = False
+            if target_country and analysis.detected_country:
+                if target_country.lower() in analysis.detected_country.lower() or \
+                   analysis.detected_country.lower() in target_country.lower():
+                    final_score = min(100, final_score + 5)
+                    country_boosted = True
+                    logger.info(
+                        f"Country boost applied for {profile_data.get('username')}: "
+                        f"target={target_country}, detected={analysis.detected_country}, "
+                        f"new_score={final_score}"
+                    )
+
             # Get recommendation from scoring service
             recommendation = self._scoring_service.get_recommendation(
                 final_score=final_score,
@@ -643,7 +664,8 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
         brand_dna: Dict[str, Any],
         brand_description: str,
         fake_indicators: List[str],
-        contact: ExtractedContact
+        contact: ExtractedContact,
+        target_country: Optional[str] = None,
     ) -> ScoringAnalysisOutput:
         """
         Analyze profile using LLM to score across 6 dimensions.
@@ -670,8 +692,19 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
         chain = self.build_json_chain(pydantic_schema=ScoringAnalysisOutput)
         
         # Prepare input variables
+        country_instruction = ""
+        if target_country:
+            country_instruction = (
+                f"\n\n## Country/Region Detection\n"
+                f"The brand is targeting partners in: **{target_country}**\n"
+                f"Please analyze the profile's bio, location, language, and content clues "
+                f"to detect what country/region this profile is likely from. "
+                f"Set the 'detected_country' field to your best guess (e.g., 'India', 'USA', 'Germany') "
+                f"or null if you cannot determine it."
+            )
+
         input_vars = {
-            "brand_description": brand_description,
+            "brand_description": brand_description + country_instruction,
             "brand_dna": brand_dna_summary,
             "username": profile_data.get("username", "unknown"),
             "profile_url": profile_data.get("instagram_url", ""),

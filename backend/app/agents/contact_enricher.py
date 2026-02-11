@@ -24,6 +24,7 @@ from app.agents.base import AgentResult, BaseAgent
 from app.core.exceptions import AgentError
 from app.repositories.contact_repo import ContactRepository
 from app.repositories.profile_repo import ProfileRepository
+from app.services.apify_service import ApifyService, get_apify_service, is_apify_configured
 from app.services.llm_service import LLMService
 
 logger = logging.getLogger(__name__)
@@ -164,11 +165,13 @@ class ContactEnricherAgent(BaseAgent[ContactEnricherRequest, ContactEnricherResp
         llm_service: Optional[LLMService] = None,
         profile_repo: Optional[ProfileRepository] = None,
         contact_repo: Optional[ContactRepository] = None,
+        apify_service: Optional[ApifyService] = None,
         **kwargs,
     ):
         super().__init__(llm_service=llm_service, **kwargs)
         self._profile_repo = profile_repo or ProfileRepository()
         self._contact_repo = contact_repo or ContactRepository()
+        self._apify_service = apify_service
 
     # =========================================================================
     # Main Run Method
@@ -190,47 +193,77 @@ class ContactEnricherAgent(BaseAgent[ContactEnricherRequest, ContactEnricherResp
 
             # Step 2: Determine website URL
             website_url = self._get_website_url(profile)
-            if not website_url:
-                logger.info(f"No website URL for @{username}, skipping enrichment")
-                return ContactEnricherResponse(
-                    profile_id=profile_id,
-                    enrichment_duration_seconds=time.time() - start_time,
-                )
 
-            # Step 3: Fetch website pages
-            pages = await self._fetch_website_pages(website_url)
-            if not pages:
-                logger.info(f"Could not fetch any pages for @{username} ({website_url})")
-                return ContactEnricherResponse(
-                    profile_id=profile_id,
-                    website=website_url,
-                    sources_checked=0,
-                    enrichment_duration_seconds=time.time() - start_time,
-                )
-
-            # Step 4: Extract contacts via regex
-            regex_contacts = self._extract_contacts_regex(pages)
-            logger.info(
-                f"Regex extraction for @{username}: "
-                f"emails={len(regex_contacts['emails'])}, "
-                f"phones={len(regex_contacts['phones'])}"
-            )
-
-            # Step 5: Use LLM for structured extraction (if regex didn't find enough)
+            # Step 3-5: Try website scraping if URL available
+            regex_contacts = {"emails": [], "phones": []}
             llm_contacts = None
-            needs_llm = (
-                not regex_contacts["emails"]
-                or not regex_contacts["phones"]
-            )
-            if needs_llm:
-                combined_text = self._prepare_text_for_llm(pages)
-                if combined_text.strip():
-                    llm_contacts = await self._llm_extract_contacts(
-                        combined_text, username, full_name, website_url
+            pages: Dict[str, str] = {}
+
+            if website_url:
+                # Step 3: Fetch website pages
+                pages = await self._fetch_website_pages(website_url)
+
+                if pages:
+                    # Step 4: Extract contacts via regex
+                    regex_contacts = self._extract_contacts_regex(pages)
+                    logger.info(
+                        f"Regex extraction for @{username}: "
+                        f"emails={len(regex_contacts['emails'])}, "
+                        f"phones={len(regex_contacts['phones'])}"
                     )
+
+                    # Step 5: Use LLM for structured extraction (if regex didn't find enough)
+                    needs_llm = (
+                        not regex_contacts["emails"]
+                        or not regex_contacts["phones"]
+                    )
+                    if needs_llm:
+                        combined_text = self._prepare_text_for_llm(pages)
+                        if combined_text.strip():
+                            llm_contacts = await self._llm_extract_contacts(
+                                combined_text, username, full_name, website_url
+                            )
+            else:
+                logger.info(f"No website URL for @{username}")
+
+            # Step 5.5: Google Search fallback if no email found yet
+            has_email = (
+                regex_contacts["emails"]
+                or (llm_contacts and llm_contacts.email)
+                or profile.get("business_email")
+            )
+            google_email_source = False
+            if not has_email:
+                google_result = await self._google_search_contacts(
+                    username, full_name, profile.get("bio", "") or ""
+                )
+                if google_result:
+                    # Merge Google results into regex_contacts
+                    if google_result.get("emails"):
+                        regex_contacts["emails"].extend(google_result["emails"])
+                        google_email_source = True
+                    if google_result.get("phones") and not regex_contacts["phones"]:
+                        regex_contacts["phones"].extend(google_result["phones"])
+                    if google_result.get("website") and not website_url:
+                        website_url = google_result["website"]
+
+                    # If Google found a website but no emails, try scraping it
+                    if not google_result.get("emails") and google_result.get("website"):
+                        google_pages = await self._fetch_website_pages(google_result["website"])
+                        if google_pages:
+                            google_regex = self._extract_contacts_regex(google_pages)
+                            if google_regex["emails"]:
+                                regex_contacts["emails"].extend(google_regex["emails"])
+                                google_email_source = True
+                            if google_regex["phones"] and not regex_contacts["phones"]:
+                                regex_contacts["phones"].extend(google_regex["phones"])
 
             # Step 6: Merge results (regex + LLM)
             final = self._merge_results(regex_contacts, llm_contacts, profile)
+
+            # Tag email source as google_search if it came from Google fallback
+            if final["email"] and google_email_source and final["email_source"] in (None, "website"):
+                final["email_source"] = "google_search"
 
             # Step 7: Store in database
             if final["email"] or final["phone"] or final["address"]:
@@ -623,6 +656,119 @@ class ContactEnricherAgent(BaseAgent[ContactEnricherRequest, ContactEnricherResp
             if self._is_valid_contact_email(email):
                 return email
         return None
+
+    # =========================================================================
+    # Google Search Fallback
+    # =========================================================================
+
+    async def _google_search_contacts(
+        self,
+        username: str,
+        full_name: str,
+        bio: str,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Search Google for business contact info when website scraping fails.
+
+        Returns:
+            Dict with emails, phones, and website keys, or None on failure.
+        """
+        # Lazily initialize Apify service
+        if self._apify_service is None:
+            if not is_apify_configured():
+                logger.debug("Apify not configured, skipping Google search fallback")
+                return None
+            self._apify_service = get_apify_service()
+
+        # Build a targeted search query
+        search_name = full_name if full_name != username else username
+        query = f'"{search_name}" "{username}" contact email'
+
+        logger.info(f"Google search fallback for @{username}: {query!r}")
+
+        try:
+            results = await self._apify_service.google_search(
+                query=query, max_results=5, timeout=60
+            )
+            if not results:
+                logger.info(f"Google search returned no results for @{username}")
+                return None
+
+            return self._parse_google_results(results, username)
+
+        except Exception as e:
+            logger.warning(f"Google search fallback failed for @{username}: {e}")
+            return None
+
+    def _parse_google_results(
+        self,
+        results: List[Dict[str, Any]],
+        username: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Parse Google search results for contact information."""
+        found_emails: List[str] = []
+        found_phones: List[str] = []
+        found_website: Optional[str] = None
+
+        for result in results:
+            title = result.get("title", "")
+            description = result.get("description", "")
+            url = result.get("url", "")
+            combined_text = f"{title} {description}"
+
+            # Extract emails from snippets
+            emails = EMAIL_PATTERN.findall(combined_text)
+            for email in emails:
+                if self._is_valid_contact_email(email):
+                    found_emails.append(email)
+
+            # Extract phone numbers from snippets
+            phones = PHONE_PATTERN.findall(combined_text)
+            for phone in phones:
+                cleaned = self._clean_phone(phone)
+                if cleaned:
+                    found_phones.append(cleaned)
+
+            # Find a business website URL (not social media)
+            if not found_website and url:
+                domain = urlparse(url).netloc.lower()
+                social_domains = {
+                    "instagram.com", "facebook.com", "twitter.com", "x.com",
+                    "tiktok.com", "youtube.com", "pinterest.com", "linkedin.com",
+                    "google.com", "yelp.com", "wikipedia.org",
+                }
+                if not any(d in domain for d in social_domains):
+                    found_website = url
+
+        # If we found a website but no emails, try scraping it
+        if found_website and not found_emails:
+            logger.info(f"Found website {found_website} via Google for @{username}, will scrape")
+            # Note: actual scraping happens in the caller if needed
+            # We just return the website URL for potential future use
+
+        if not found_emails and not found_phones:
+            logger.info(f"No contacts found in Google results for @{username}")
+            return None
+
+        # Deduplicate
+        seen = set()
+        unique_emails = []
+        for e in found_emails:
+            if e.lower() not in seen:
+                seen.add(e.lower())
+                unique_emails.append(e)
+
+        logger.info(
+            f"Google search found for @{username}: "
+            f"emails={len(unique_emails)}, phones={len(found_phones)}, "
+            f"website={bool(found_website)}"
+        )
+
+        return {
+            "emails": unique_emails,
+            "phones": found_phones,
+            "website": found_website,
+        }
 
     # =========================================================================
     # Validation

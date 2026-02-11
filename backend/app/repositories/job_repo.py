@@ -41,6 +41,7 @@ class JobRepository(BaseRepository[Dict[str, Any]]):
         keywords: Optional[List[str]] = None,
         hashtags: Optional[List[str]] = None,
         min_score_threshold: int = 50,
+        target_country: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Create a new discovery job.
@@ -56,7 +57,8 @@ class JobRepository(BaseRepository[Dict[str, Any]]):
             keywords: Optional target keywords for discovery
             hashtags: Optional target hashtags for discovery
             min_score_threshold: Minimum score filter (0-100)
-            
+            target_country: Optional target country/region for score boosting
+
         Returns:
             Created job data with generated ID
         """
@@ -84,6 +86,8 @@ class JobRepository(BaseRepository[Dict[str, Any]]):
             "hashtags": hashtags or [],
             "min_score_threshold": min_score_threshold,
         }
+        if target_country:
+            enhanced_data["target_country"] = target_country
         try:
             return self.insert(enhanced_data)
         except Exception:
