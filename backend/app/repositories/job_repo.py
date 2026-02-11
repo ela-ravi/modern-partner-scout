@@ -222,10 +222,10 @@ class JobRepository(BaseRepository[Dict[str, Any]]):
     def get_job_summary(self, id: str | UUID) -> Optional[Dict[str, Any]]:
         """
         Get job summary from the v_job_summary view.
-        
+
         Args:
             id: Job UUID
-            
+
         Returns:
             Job summary with statistics
         """
@@ -237,7 +237,27 @@ class JobRepository(BaseRepository[Dict[str, Any]]):
         response = self._execute_with_retry(query)
         data = self._handle_response(response)
         return data[0] if data else None
-    
+
+    def list_job_summaries(self, job_ids: List[str]) -> List[Dict[str, Any]]:
+        """
+        Get job summaries for multiple jobs from the v_job_summary view.
+
+        Args:
+            job_ids: List of job UUIDs
+
+        Returns:
+            List of job summaries with aggregated statistics
+        """
+        if not job_ids:
+            return []
+        query = (
+            self.db.table(Tables.V_JOB_SUMMARY)
+            .select("*")
+            .in_("job_id", job_ids)
+        )
+        response = self._execute_with_retry(query)
+        return self._handle_response(response)
+
     # =========================================================================
     # Update Operations
     # =========================================================================

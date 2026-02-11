@@ -258,15 +258,19 @@ async def get_job(
         ge=0,
         description="Number of profiles to skip"
     ),
+    is_bookmarked: Optional[bool] = Query(
+        None,
+        description="Filter profiles by bookmark status"
+    ),
     user: UserContext = Depends(get_current_user),
     job_service: JobService = Depends(get_job_service),
     job: dict = Depends(verify_job_owner_user_only),  # Verifies ownership
 ) -> JobWithProfiles:
     """
     Get detailed job information with profiles.
-    
+
     Returns the job details along with discovered profiles, scores, and brand DNA.
-    Supports filtering profiles by score threshold and status.
+    Supports filtering profiles by score threshold, status, and bookmark state.
     """
     try:
         result = job_service.get_job_with_profiles(
@@ -275,6 +279,7 @@ async def get_job(
             profile_status=profile_status,
             profile_limit=profile_limit,
             profile_offset=profile_offset,
+            is_bookmarked=is_bookmarked,
         )
         
         return JobWithProfiles(**result)

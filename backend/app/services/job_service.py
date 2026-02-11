@@ -164,6 +164,37 @@ class JobService:
         """
         return self.job_repo.get_by_id(job_id)
     
+    def _enrich_job_counts(self, jobs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Replace denormalized trigger counters with accurate counts from v_job_summary.
+
+        The discovery_jobs table has profiles_discovered/profiles_scored columns
+        maintained by DB triggers that can drift. This method overwrites them
+        with the real aggregated counts from the v_job_summary view.
+        """
+        if not jobs:
+            return jobs
+        job_ids = [j["id"] for j in jobs]
+        try:
+            summaries = self.job_repo.list_job_summaries(job_ids)
+            summary_map = {s["job_id"]: s for s in summaries}
+            for job in jobs:
+                summary = summary_map.get(job["id"])
+                if summary:
+                    old_disc = job.get("profiles_discovered")
+                    old_scored = job.get("profiles_scored")
+                    job["profiles_discovered"] = summary.get("total_profiles", 0)
+                    job["profiles_scored"] = summary.get("done_profiles", 0)
+                    if old_disc != job["profiles_discovered"] or old_scored != job["profiles_scored"]:
+                        logger.info(
+                            f"Enriched job {job['id']}: "
+                            f"discovered {old_disc}->{job['profiles_discovered']}, "
+                            f"scored {old_scored}->{job['profiles_scored']}"
+                        )
+        except Exception as e:
+            logger.warning(f"Failed to enrich job counts from view: {e}", exc_info=True)
+        return jobs
+
     def list_user_jobs(
         self,
         user_id: str,
@@ -173,13 +204,13 @@ class JobService:
     ) -> Dict[str, Any]:
         """
         List jobs for a specific user.
-        
+
         Args:
             user_id: User ID to filter by
             status: Optional status filter
             limit: Maximum results
             offset: Results to skip
-            
+
         Returns:
             Dict with jobs list and pagination info
         """
@@ -189,14 +220,17 @@ class JobService:
             limit=limit,
             offset=offset,
         )
-        
+
+        # Replace stale trigger counters with accurate view counts
+        self._enrich_job_counts(jobs)
+
         return {
             "jobs": jobs,
             "total": len(jobs),  # Note: For accurate total, need count query
             "limit": limit,
             "offset": offset,
         }
-    
+
     def get_job_with_profiles(
         self,
         job_id: str,
@@ -204,42 +238,48 @@ class JobService:
         profile_status: Optional[str] = None,
         profile_limit: int = 100,
         profile_offset: int = 0,
+        is_bookmarked: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """
         Get a job with its associated profiles.
-        
+
         Args:
             job_id: Job UUID
             min_score: Optional minimum score filter for profiles
             profile_status: Optional profile status filter
             profile_limit: Maximum profiles to return
             profile_offset: Profile pagination offset
-            
+            is_bookmarked: Optional bookmark filter
+
         Returns:
             Job data with profiles included
-            
+
         Raises:
             JobNotFoundError: If job is not found
         """
         # Get the job first
         job = self.job_repo.get_by_id(job_id)
-        
+
+        # Replace stale trigger counters with accurate view counts
+        self._enrich_job_counts([job])
+
         # Get profiles with scores
         profiles = self.profile_repo.list_by_job_with_scores(
             job_id=job_id,
             min_score=min_score,
             status=profile_status,
+            is_bookmarked=is_bookmarked,
             limit=profile_limit,
             offset=profile_offset,
         )
-        
+
         # Get brand DNA if available
         try:
             job_with_brand = self.job_repo.get_with_brand_dna(job_id)
             brand_dna = job_with_brand.get("brand_dna")
         except Exception:
             brand_dna = None
-        
+
         return {
             **job,
             "profiles": profiles,

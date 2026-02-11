@@ -209,9 +209,12 @@ class ProfileWithContact(Profile):
 
 class CompleteProfile(Profile):
     """Complete profile with score and contact information."""
-    
+
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
-    
+
+    # Bookmark
+    is_bookmarked: bool = False
+
     # Flatten score fields for convenience
     final_score: Optional[int] = None
     visual_aesthetic_match: Optional[int] = None
@@ -256,6 +259,13 @@ class CompleteProfileListResponse(BaseModel):
 # =============================================================================
 # Batch Operations
 # =============================================================================
+
+class BookmarkResponse(BaseModel):
+    """Response model for bookmark toggle."""
+
+    id: UUID
+    is_bookmarked: bool
+
 
 class BatchCreateProfilesRequest(BaseModel):
     """Request model for creating multiple profiles."""

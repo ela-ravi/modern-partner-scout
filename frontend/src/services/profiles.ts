@@ -93,6 +93,7 @@ export const profilesService = {
 
     if (filters?.status) params.set('profile_status', filters.status)
     if (filters?.min_score) params.set('min_score', String(filters.min_score))
+    if (filters?.is_bookmarked) params.set('is_bookmarked', 'true')
 
     const jobData = await api.get<JobWithProfilesResponse>(
       `/jobs/${job_id}?${params.toString()}`
@@ -150,12 +151,13 @@ export const profilesService = {
   },
 
   /**
-   * Toggle bookmark status for a profile
-   * Note: Backend doesn't have this endpoint yet - uses Supabase direct update
+   * Toggle bookmark status for a profile.
    */
-  toggleBookmark: async (_jobId: string, _profileId: string) => {
-    // TODO: Implement when backend adds bookmark endpoint
-    return { is_bookmarked: true }
+  toggleBookmark: async (_jobId: string, profileId: string) => {
+    return api.patch<{ id: string; is_bookmarked: boolean }>(
+      `/profiles/${profileId}/bookmark`,
+      {}
+    )
   },
 
   /**

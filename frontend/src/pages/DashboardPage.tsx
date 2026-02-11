@@ -22,6 +22,7 @@ import type { EmailComposerData } from '@/types/api/email'
 
 const STATUS_TABS = [
   { value: 'all', label: 'All' },
+  { value: 'bookmarked', label: 'Bookmarked' },
   { value: 'new', label: 'New' },
   { value: 'processing', label: 'Processing' },
   { value: 'done', label: 'Scored' },
@@ -86,7 +87,10 @@ export default function DashboardPage() {
   })
 
   // Fetch profiles
-  const statusFilter = activeTab === 'all' ? undefined : (activeTab as ProfileStatus)
+  const statusFilter = activeTab !== 'all' && activeTab !== 'bookmarked'
+    ? (activeTab as ProfileStatus)
+    : undefined
+  const bookmarkFilter = activeTab === 'bookmarked' ? true : undefined
   const sort = parseSort(sortValue)
 
   const {
@@ -99,6 +103,7 @@ export default function DashboardPage() {
     page_size: 20,
     filters: {
       ...(statusFilter ? { status: statusFilter } : {}),
+      ...(bookmarkFilter ? { is_bookmarked: true } : {}),
       ...(job?.min_score_threshold ? { min_score: job.min_score_threshold } : {}),
     },
     sort,
@@ -218,7 +223,7 @@ export default function DashboardPage() {
               {getJobStatusBadge(job.status)}
             </div>
             <p className="text-sm text-apple-text-secondary mt-0.5">
-              {job.profiles_discovered} profiles discovered • {job.profiles_scored} scored
+              {analytics?.total_profiles ?? job.profiles_discovered} profiles discovered • {analytics?.done_profiles ?? job.profiles_scored} scored
             </p>
           </div>
         </div>

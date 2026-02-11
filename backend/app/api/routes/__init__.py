@@ -15,6 +15,7 @@ from app.api.routes.jobs import router as jobs_router
 from app.api.routes.status import router as status_router
 from app.api.routes.email import router as email_router
 from app.api.routes.agents import router as agents_router
+from app.api.routes.profiles import router as profiles_router
 
 __all__ = [
     "health_router",
@@ -22,4 +23,5 @@ __all__ = [
     "status_router",
     "email_router",
     "agents_router",
+    "profiles_router",
 ]

@@ -186,19 +186,21 @@ class ProfileRepository(BaseRepository[Dict[str, Any]]):
         job_id: str,
         min_score: Optional[int] = None,
         status: Optional[str] = None,
+        is_bookmarked: Optional[bool] = None,
         limit: int = 100,
         offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
         List profiles for a job with their scores joined.
-        
+
         Args:
             job_id: Job ID to filter by
             min_score: Optional minimum final score filter
             status: Optional status filter
+            is_bookmarked: Optional bookmark filter
             limit: Maximum results
             offset: Results to skip
-            
+
         Returns:
             List of profiles with scores
         """
@@ -210,13 +212,16 @@ class ProfileRepository(BaseRepository[Dict[str, Any]]):
             .order("final_score", desc=True, nullsfirst=False)
             .range(offset, offset + limit - 1)
         )
-        
+
         if status:
             query = query.eq("status", status)
-        
+
         if min_score is not None:
             query = query.gte("final_score", min_score)
-        
+
+        if is_bookmarked is not None:
+            query = query.eq("is_bookmarked", is_bookmarked)
+
         response = query.execute()
         return self._handle_response(response)
     
@@ -324,6 +329,23 @@ class ProfileRepository(BaseRepository[Dict[str, Any]]):
         status_value = status.value if isinstance(status, ProfileStatus) else status
         return self.update(str(id), {"status": status_value})
     
+    def toggle_bookmark(self, id: str | UUID) -> Dict[str, Any]:
+        """
+        Toggle the bookmark status of a profile.
+
+        Args:
+            id: Profile UUID
+
+        Returns:
+            Updated profile data with new is_bookmarked value
+
+        Raises:
+            ProfileNotFoundError: If profile is not found
+        """
+        profile = self.get_by_id(str(id))
+        new_value = not profile.get("is_bookmarked", False)
+        return self.update(str(id), {"is_bookmarked": new_value})
+
     def update_status_batch(
         self,
         job_id: str,
