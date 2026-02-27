@@ -13,6 +13,16 @@ const DiscoveryConfigPage = lazy(() => import('@/pages/DiscoveryConfigPage'))
 const ProcessingPage = lazy(() => import('@/pages/ProcessingPage'))
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
 
+// DEV ONLY: Mockup pages for UI design reference — remove before production deploy
+const MockGallery = lazy(() => import('@/mockups/MockGallery'))
+const MockLoginPage = lazy(() => import('@/mockups/MockLoginPage'))
+const MockSessionsPage = lazy(() => import('@/mockups/MockSessionsPage'))
+const MockDiscoveryConfigPage = lazy(() => import('@/mockups/MockDiscoveryConfigPage'))
+const MockProcessingPage = lazy(() => import('@/mockups/MockProcessingPage'))
+const MockDashboardPage = lazy(() => import('@/mockups/MockDashboardPage'))
+const MockErrorPage = lazy(() => import('@/mockups/MockErrorPage'))
+const MockNotFoundPage = lazy(() => import('@/mockups/MockNotFoundPage'))
+
 // Loading fallback
 function PageLoader() {
   return (
@@ -75,6 +85,21 @@ export const router = createBrowserRouter([
           },
         ],
       },
+    ],
+  },
+
+  // DEV ONLY: UI Design Mockups (public, no auth required)
+  {
+    path: '/mockups',
+    children: [
+      { index: true, element: withSuspense(MockGallery) },
+      { path: 'login', element: withSuspense(MockLoginPage) },
+      { path: 'sessions', element: withSuspense(MockSessionsPage) },
+      { path: 'discovery-config', element: withSuspense(MockDiscoveryConfigPage) },
+      { path: 'processing', element: withSuspense(MockProcessingPage) },
+      { path: 'dashboard', element: withSuspense(MockDashboardPage) },
+      { path: 'error', element: withSuspense(MockErrorPage) },
+      { path: 'not-found', element: withSuspense(MockNotFoundPage) },
     ],
   },
 
