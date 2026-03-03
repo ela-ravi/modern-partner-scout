@@ -3,6 +3,7 @@ import { lazy, Suspense, type ReactNode } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layouts/DashboardLayout'
 import { AuthLayout } from '@/components/layouts/AuthLayout'
+import { MarketingLayout } from '@/components/layouts/MarketingLayout'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 
 // Lazy load pages for code splitting
@@ -12,6 +13,13 @@ const SessionsPage = lazy(() => import('@/pages/SessionsPage'))
 const DiscoveryConfigPage = lazy(() => import('@/pages/DiscoveryConfigPage'))
 const ProcessingPage = lazy(() => import('@/pages/ProcessingPage'))
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
+
+// Marketing pages
+const LandingPage = lazy(() => import('@/pages/marketing/LandingPage'))
+const ContactPage = lazy(() => import('@/pages/marketing/ContactPage'))
+const PrivacyPage = lazy(() => import('@/pages/marketing/PrivacyPage'))
+const TermsPage = lazy(() => import('@/pages/marketing/TermsPage'))
+const DocsPage = lazy(() => import('@/pages/marketing/DocsPage'))
 
 // DEV ONLY: Mockup pages for UI design reference — remove before production deploy
 const MockGallery = lazy(() => import('@/mockups/MockGallery'))
@@ -44,10 +52,33 @@ function withSuspense(
 }
 
 export const router = createBrowserRouter([
-  // Redirect root to sessions
+  // Marketing pages (public, with MarketingLayout)
+  // Uses path: '/' so React Router unambiguously owns the root and sub-paths
   {
     path: '/',
-    element: <Navigate to="/sessions" replace />,
+    element: <MarketingLayout />,
+    children: [
+      {
+        index: true,
+        element: withSuspense(LandingPage),
+      },
+      {
+        path: 'contact',
+        element: withSuspense(ContactPage),
+      },
+      {
+        path: 'privacy',
+        element: withSuspense(PrivacyPage),
+      },
+      {
+        path: 'terms',
+        element: withSuspense(TermsPage),
+      },
+      {
+        path: 'docs',
+        element: withSuspense(DocsPage),
+      },
+    ],
   },
 
   // Auth routes (public)
@@ -58,29 +89,30 @@ export const router = createBrowserRouter([
 
   // Protected routes
   {
+    path: '/',
     element: <ProtectedRoute />,
     children: [
       {
         element: <DashboardLayout />,
         children: [
           {
-            path: '/dashboard',
+            path: 'dashboard',
             element: <Navigate to="/sessions" replace />,
           },
           {
-            path: '/sessions',
+            path: 'sessions',
             element: withSuspense(SessionsPage),
           },
           {
-            path: '/new-session',
+            path: 'new-session',
             element: withSuspense(DiscoveryConfigPage),
           },
           {
-            path: '/jobs/:jobId',
+            path: 'jobs/:jobId',
             element: withSuspense(DashboardPage),
           },
           {
-            path: '/jobs/:jobId/processing',
+            path: 'jobs/:jobId/processing',
             element: withSuspense(ProcessingPage),
           },
         ],
