@@ -128,9 +128,9 @@ export function EmailComposer({
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
             {/* Recipient */}
             <div>
-              <label className="block text-sm font-medium text-gray-500 mb-2">
+              <p className="block text-sm font-medium text-gray-500 mb-2">
                 To
-              </label>
+              </p>
               <div className="flex items-center gap-3 p-3.5 bg-gray-50 rounded-xl">
                 <Avatar
                   src={profile.profileImageUrl}
@@ -150,9 +150,9 @@ export function EmailComposer({
 
             {/* Tone Selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-500 mb-3">
+              <p className="block text-sm font-medium text-gray-500 mb-3">
                 Tone
-              </label>
+              </p>
               <div className="flex flex-wrap gap-2">
                 {tonesLoading ? (
                   <Spinner size="sm" />

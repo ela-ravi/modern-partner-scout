@@ -3,7 +3,7 @@
  * Shows real-time AI pipeline processing status
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -116,7 +116,7 @@ export default function ProcessingPage() {
 
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [activityLog, setActivityLog] = useState<LogEntry[]>([])
-  const [hasAutoNavigated, setHasAutoNavigated] = useState(false)
+  const hasAutoNavigated = useRef(false)
 
   // Fetch job details with polling every 3s while running
   const { data: job, isLoading: jobLoading } = useJob(jobId, {
@@ -181,22 +181,29 @@ export default function ProcessingPage() {
     },
   })
 
-  // Add initial log entry
-  useEffect(() => {
-    if (job && activityLog.length === 0) {
-      addLogEntry('info', `Pipeline started for "${job.name}"`)
-    }
-  }, [job, activityLog.length, addLogEntry])
+  // Derive initial log entry from job data (computed during render, auto-memoized by compiler)
+  const initialEntry: LogEntry | null = job
+    ? {
+        id: 'init',
+        timestamp: new Date(job.created_at).toTimeString().slice(0, 8),
+        type: 'info',
+        message: `Pipeline started for "${job.name}"`,
+      }
+    : null
+
+  const displayLog = initialEntry
+    ? [initialEntry, ...activityLog]
+    : activityLog
 
   // Auto-navigate to dashboard when completed
   useEffect(() => {
-    if (job?.status === 'completed' && !hasAutoNavigated) {
-      setHasAutoNavigated(true)
+    if (job?.status === 'completed' && !hasAutoNavigated.current) {
+      hasAutoNavigated.current = true
       toast.success('Discovery completed! Redirecting to results...')
       const timer = setTimeout(() => navigate(`/jobs/${jobId}`), 3000)
       return () => clearTimeout(timer)
     }
-  }, [job?.status, hasAutoNavigated, jobId, navigate, toast])
+  }, [job?.status, jobId, navigate, toast])
 
   const handleCancel = async () => {
     if (!jobId) return
@@ -335,7 +342,7 @@ export default function ProcessingPage() {
 
         {/* Activity Log */}
         <div className="lg:col-span-1">
-          <ActivityLog entries={activityLog} maxHeight="500px" />
+          <ActivityLog entries={displayLog} maxHeight="500px" />
         </div>
       </div>
 

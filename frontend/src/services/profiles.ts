@@ -164,7 +164,8 @@ export const profilesService = {
    * Skip a profile (won't show in results)
    * Note: Backend doesn't have this endpoint yet
    */
-  skip: async (_jobId: string, _profileId: string) => {
+  skip: async (jobId: string, profileId: string) => {
+    void jobId; void profileId
     // TODO: Implement when backend adds skip endpoint
     return { status: 'skipped' }
   },
