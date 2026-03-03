@@ -35,6 +35,81 @@ def _get_profile_field(profile, field: str, default=None):
     return getattr(profile, field, default)
 
 
+def _generate_country_hashtags(target_country: str) -> List[str]:
+    """
+    Generate country/region-specific discovery hashtags.
+
+    These hashtags help find influencers located in the target country.
+
+    Args:
+        target_country: Country or region name (e.g., "India", "USA", "Germany")
+
+    Returns:
+        List of geo-specific hashtags with # prefix
+    """
+    clean = target_country.lower().replace(" ", "")
+    hashtags = [
+        f"#{clean}influencer",
+        f"#{clean}blogger",
+        f"#{clean}creator",
+        f"#{clean}brand",
+        f"#{clean}fashion",
+        f"#{clean}beauty",
+        f"#{clean}lifestyle",
+        f"#madein{clean}",
+    ]
+
+    # Add major city hashtags for well-known countries
+    city_map: Dict[str, List[str]] = {
+        "india": ["mumbai", "delhi", "bangalore", "hyderabad", "chennai", "pune", "kolkata"],
+        "usa": ["nyc", "losangeles", "chicago", "miami", "houston", "sanfrancisco"],
+        "uk": ["london", "manchester", "birmingham", "edinburgh"],
+        "germany": ["berlin", "munich", "hamburg", "frankfurt"],
+        "france": ["paris", "lyon", "marseille", "nice"],
+        "australia": ["sydney", "melbourne", "brisbane", "perth"],
+        "canada": ["toronto", "vancouver", "montreal", "calgary"],
+        "brazil": ["saopaulo", "riodejaneiro", "brasilia"],
+        "uae": ["dubai", "abudhabi"],
+        "japan": ["tokyo", "osaka", "kyoto"],
+        "southkorea": ["seoul", "busan"],
+        "singapore": ["singapore"],
+        "italy": ["milan", "rome", "florence"],
+        "spain": ["madrid", "barcelona", "valencia"],
+        "mexico": ["mexicocity", "cdmx", "guadalajara", "cancun"],
+    }
+
+    cities = city_map.get(clean, [])
+    for city in cities[:5]:
+        hashtags.append(f"#{city}")
+
+    return hashtags
+
+
+def _generate_keyword_hashtags(keywords: List[str]) -> List[str]:
+    """
+    Generate hashtag variants from keywords for fallback discovery.
+
+    When the original brand-analysis hashtags are exhausted (return 0 new
+    profiles), this function creates additional hashtags by appending common
+    suffixes to each keyword.
+
+    Args:
+        keywords: List of brand-related keywords
+
+    Returns:
+        List of generated hashtags with # prefix
+    """
+    suffixes = ["", "lover", "community", "style", "life", "daily", "tips", "inspo"]
+    hashtags: List[str] = []
+    for kw in keywords:
+        clean = kw.lower().replace(" ", "").replace("-", "")
+        for suffix in suffixes:
+            tag = f"#{clean}{suffix}"
+            if tag not in hashtags:
+                hashtags.append(tag)
+    return hashtags
+
+
 async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
     """
     Run the full orchestration pipeline internally.
@@ -88,6 +163,17 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
             all_hashtags = ["#sustainable", "#ecofriendly"]
         discovery_keywords = keywords[:5] if keywords else job_data.get("keywords", [])[:5]
 
+        # Inject country-specific hashtags when target_country is set
+        target_country = job_data.get("target_country")
+        if target_country:
+            geo_hashtags = _generate_country_hashtags(target_country)
+            # Prepend geo hashtags so they're used in early rounds
+            all_hashtags = geo_hashtags + [h for h in all_hashtags if h not in geo_hashtags]
+            logger.info(
+                f"[Orchestration] Job {job_id}: Added {len(geo_hashtags)} "
+                f"geo-specific hashtags for {target_country}"
+            )
+
         # Split hashtags into groups for rotation across rounds
         # Round 1 gets the first batch, Round 2 gets the next, etc.
         hashtags_per_round = max(5, len(all_hashtags) // Defaults.MAX_DISCOVERY_ROUNDS)
@@ -132,6 +218,13 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
         total_discovered = 0
         total_scored = 0
         total_skipped = 0
+        # Track related usernames harvested from profile scraper for next rounds
+        pending_related_usernames: List[str] = []
+        # Track which hashtag sets have been tried (to avoid repeats)
+        tried_hashtag_sets: Set[str] = set()
+        # Generate keyword fallback hashtags upfront
+        keyword_fallback_hashtags = _generate_keyword_hashtags(discovery_keywords) if discovery_keywords else []
+        empty_rounds = 0  # consecutive rounds with 0 profiles
 
         for round_num in range(1, Defaults.MAX_DISCOVERY_ROUNDS + 1):
             remaining = requested_count - len(qualified_profiles)
@@ -140,7 +233,7 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
 
             # Calculate how many to discover this round (2x the gap)
             discover_count = int(remaining * Defaults.OVER_DISCOVERY_MULTIPLIER)
-            discover_count = max(discover_count, 5)  # At least 5
+            discover_count = max(discover_count, 10)  # At least 10
 
             logger.info(
                 f"[Orchestration] Job {job_id}: Round {round_num}/{Defaults.MAX_DISCOVERY_ROUNDS} - "
@@ -149,6 +242,21 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
 
             # --- Discovery (rotate hashtags per round) ---
             round_hashtags = hashtag_groups[round_num - 1]
+
+            # If this exact hashtag set was already tried and returned 0,
+            # switch to keyword-derived fallback hashtags
+            hashtag_key = "|".join(sorted(round_hashtags))
+            if hashtag_key in tried_hashtag_sets and keyword_fallback_hashtags:
+                # Pick a fresh slice of fallback hashtags
+                fallback_start = (round_num - 1) * 8
+                fallback_slice = keyword_fallback_hashtags[fallback_start:fallback_start + 8]
+                if fallback_slice:
+                    round_hashtags = fallback_slice
+                    logger.info(
+                        f"[Orchestration] Job {job_id}: Using keyword-fallback hashtags: {round_hashtags}"
+                    )
+            tried_hashtag_sets.add(hashtag_key)
+
             discovery_request = DiscoveryRequest(
                 job_id=job_id,
                 hashtags=round_hashtags,
@@ -168,12 +276,34 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
             round_profiles = discovery_response.profiles or []
             total_discovered += len(round_profiles)
 
-            if not round_profiles:
-                logger.warning(
-                    f"[Orchestration] Job {job_id}: No new profiles discovered in round {round_num}, "
-                    f"source may be exhausted."
+            # Harvest related usernames for future rounds
+            if discovery_response.related_usernames:
+                new_related = [
+                    u for u in discovery_response.related_usernames
+                    if u.lower() not in excluded_usernames
+                ]
+                pending_related_usernames.extend(new_related)
+                logger.info(
+                    f"[Orchestration] Job {job_id}: Harvested {len(new_related)} "
+                    f"related usernames ({len(pending_related_usernames)} pending total)"
                 )
-                break
+
+            if not round_profiles:
+                empty_rounds += 1
+                logger.warning(
+                    f"[Orchestration] Job {job_id}: No new profiles in round {round_num} "
+                    f"(empty_rounds={empty_rounds})"
+                )
+                # Only break after 2 consecutive empty rounds to give fallback a chance
+                if empty_rounds >= 2:
+                    logger.warning(
+                        f"[Orchestration] Job {job_id}: {empty_rounds} consecutive empty rounds, "
+                        f"stopping discovery."
+                    )
+                    break
+                continue
+            else:
+                empty_rounds = 0  # reset on successful round
 
             # Update profiles_discovered counter
             try:
@@ -181,8 +311,8 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
             except Exception:
                 pass
 
-            # Transition to scoring on first round
-            if round_num == 1:
+            # Transition to scoring on first successful discovery round
+            if total_scored == 0:
                 job_service.update_status(job_id, "scoring", validate_transition=True)
 
             # --- Scoring ---
@@ -206,6 +336,18 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                         job_repo.increment_profiles_scored(job_id)
                     except Exception:
                         pass
+
+                    # Safety net: ensure profile status is set to 'done'
+                    # The scorer agent should do this, but verify it happened
+                    try:
+                        current_profile = profile_repo.get_by_id(str(profile_id))
+                        if current_profile.get("status") != ProfileStatus.SCORED.value:
+                            profile_repo.update_status(str(profile_id), ProfileStatus.SCORED)
+                            logger.info(
+                                f"[Orchestration] Job {job_id}: Fixed profile status for @{username} -> done"
+                            )
+                    except Exception as e:
+                        logger.warning(f"[Orchestration] Job {job_id}: Status fix failed for @{username}: {e}")
 
                     # Check against threshold
                     if score_response.final_score >= min_score_threshold:

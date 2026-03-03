@@ -309,15 +309,26 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
             
             final_score = self._scoring_service.calculate_final_score_from_dict(dimensions)
 
-            # Apply country boost if target country matches detected country
+            # Apply country boost/penalty if target country is set
             country_boosted = False
+            country_penalized = False
             if target_country and analysis.detected_country:
                 if target_country.lower() in analysis.detected_country.lower() or \
                    analysis.detected_country.lower() in target_country.lower():
-                    final_score = min(100, final_score + 5)
+                    # Strong boost for country match (+15)
+                    final_score = min(100, final_score + 15)
                     country_boosted = True
                     logger.info(
-                        f"Country boost applied for {profile_data.get('username')}: "
+                        f"Country boost (+15) applied for {profile_data.get('username')}: "
+                        f"target={target_country}, detected={analysis.detected_country}, "
+                        f"new_score={final_score}"
+                    )
+                else:
+                    # Penalty for country mismatch (-10)
+                    final_score = max(0, final_score - 10)
+                    country_penalized = True
+                    logger.info(
+                        f"Country penalty (-10) applied for {profile_data.get('username')}: "
                         f"target={target_country}, detected={analysis.detected_country}, "
                         f"new_score={final_score}"
                     )
@@ -1131,16 +1142,26 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
     ) -> None:
         """
         Update the profile status.
-        
+
         Args:
             profile_id: Profile UUID
             status: New status
         """
-        try:
-            self._profile_repo.update_status(profile_id, status)
-            logger.debug(f"Updated profile {profile_id} status to {status.value}")
-        except Exception as e:
-            logger.warning(f"Failed to update profile status: {e}")
+        max_retries = 2
+        for attempt in range(max_retries):
+            try:
+                self._profile_repo.update_status(profile_id, status)
+                logger.info(f"Updated profile {profile_id} status to {status.value}")
+                return
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    logger.warning(
+                        f"Failed to update profile {profile_id} status (attempt {attempt + 1}), retrying: {e}"
+                    )
+                else:
+                    logger.error(
+                        f"Failed to update profile {profile_id} status after {max_retries} attempts: {e}"
+                    )
     
     # =========================================================================
     # Validation

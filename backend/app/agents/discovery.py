@@ -190,10 +190,10 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
             job = await self._fetch_job(job_id)
             
             # Step 2: Search hashtags via Apify (SUB-3.3.3.1.2)
-            # Cost-optimized: fetch just enough posts to find unique profiles
+            # Fetch 3x posts to ensure enough unique usernames after dedup/filtering
             raw_posts = await self._search_hashtags(
                 input_data.hashtags,
-                limit_per_hashtag=max(10, input_data.limit // len(input_data.hashtags))
+                limit_per_hashtag=max(30, (input_data.limit * 3) // len(input_data.hashtags))
             )
             
             # Step 3: Extract unique usernames from posts
@@ -232,25 +232,31 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
                 limit=input_data.limit
             )
             
+            # Step 7b: Extract related usernames from fetched profiles
+            related_usernames = self._extract_related_usernames(
+                profiles_data, existing_usernames
+            )
+
             # Step 8: Store profiles in database (SUB-3.3.3.1.5)
             stored_profiles = await self._store_profiles(
                 job_id=job_id,
                 profiles=filtered_profiles,
                 discovery_source=", ".join(input_data.hashtags[:3])
             )
-            
+
             # Calculate duration
             duration = time.time() - start_time
             self._complete_metrics(success=True)
-            
+
             logger.info(
                 f"Discovery completed for job {job_id}: "
                 f"{len(stored_profiles)} profiles discovered, "
                 f"{deduplicated_count} deduplicated, "
                 f"{filtered_out_count} filtered out, "
+                f"{len(related_usernames)} related usernames harvested, "
                 f"duration={duration:.2f}s"
             )
-            
+
             return DiscoveryResponse(
                 job_id=input_data.job_id,
                 profiles=stored_profiles,
@@ -258,6 +264,7 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
                 deduplicated=deduplicated_count,
                 filtered_out=filtered_out_count,
                 discovery_duration_seconds=duration,
+                related_usernames=related_usernames,
             )
             
         except JobNotFoundError:
@@ -377,6 +384,50 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
         
         return list(usernames)
     
+    # =========================================================================
+    # Related Profile Extraction
+    # =========================================================================
+
+    def _extract_related_usernames(
+        self,
+        profiles: List[Dict[str, Any]],
+        existing_usernames: Set[str],
+    ) -> List[str]:
+        """
+        Extract related usernames from Apify profile scraper results.
+
+        The Apify instagram-profile-scraper returns a `relatedProfiles` field
+        with suggested similar accounts. These are free discovery candidates
+        that don't require additional API calls.
+
+        Args:
+            profiles: List of scraped profile data dicts
+            existing_usernames: Set of already-known usernames to exclude
+
+        Returns:
+            List of new related usernames not yet in the exclusion set
+        """
+        related: Set[str] = set()
+
+        for profile in profiles:
+            related_list = profile.get("relatedProfiles") or []
+            for rp in related_list:
+                if isinstance(rp, dict):
+                    username = rp.get("username", "")
+                elif isinstance(rp, str):
+                    username = rp
+                else:
+                    continue
+
+                username = username.strip().lstrip("@").lower()
+                if username and username not in existing_usernames:
+                    related.add(username)
+
+        if related:
+            logger.info(f"Harvested {len(related)} related usernames from profile scraper")
+
+        return list(related)
+
     # =========================================================================
     # Profile Fetching
     # =========================================================================

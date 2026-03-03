@@ -103,7 +103,7 @@ class DiscoveryRequest(BaseModel):
 
 class DiscoveryResponse(BaseModel):
     """Response model from Discovery Agent."""
-    
+
     job_id: UUID
     profiles: List[Dict[str, Any]] = Field(
         default_factory=list,
@@ -113,6 +113,10 @@ class DiscoveryResponse(BaseModel):
     deduplicated: int = 0
     filtered_out: int = 0
     discovery_duration_seconds: Optional[float] = None
+    related_usernames: List[str] = Field(
+        default_factory=list,
+        description="Related usernames harvested from profile scraper for additional discovery"
+    )
 
 
 # =============================================================================

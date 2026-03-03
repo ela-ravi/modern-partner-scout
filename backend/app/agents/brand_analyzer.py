@@ -175,14 +175,19 @@ class BrandAnalyzerAgent(BaseAgent[BrandAnalyzerRequest, BrandAnalyzerResponse])
                     details={"job_id": job_id}
                 )
             
+            # Step 1b: Get target country for geo-targeted discovery
+            target_country = job.get("target_country")
+
             # Step 2: Scrape reference profiles via Apify (SUB-3.3.2.1.2)
             profile_data, profiles_analyzed, posts_analyzed = await self._fetch_profiles(
                 reference_profiles,
                 max_posts=input_data.max_posts_per_profile
             )
-            
+
             # Step 3: Analyze brand with LLM (SUB-3.3.2.1.3)
-            analysis = await self._analyze_brand(brand_description, profile_data)
+            analysis = await self._analyze_brand(
+                brand_description, profile_data, target_country=target_country
+            )
             
             # Step 4: Generate embedding (SUB-3.3.2.1.4)
             embedding_vector = await self._generate_embedding(
@@ -326,29 +331,45 @@ class BrandAnalyzerAgent(BaseAgent[BrandAnalyzerRequest, BrandAnalyzerResponse])
     async def _analyze_brand(
         self,
         brand_description: str,
-        profile_data: List[Dict[str, Any]]
+        profile_data: List[Dict[str, Any]],
+        target_country: Optional[str] = None,
     ) -> BrandAnalysisOutput:
         """
         Analyze brand using LLM to extract hashtags, keywords, and themes.
-        
+
         Args:
             brand_description: Brand description text
             profile_data: List of profile data from Apify
-            
+            target_country: Optional target country for geo-specific hashtags
+
         Returns:
             BrandAnalysisOutput with extracted data
         """
         logger.debug("Analyzing brand with LLM")
-        
+
         # Format profile data for the prompt
         profile_summary = self._format_profiles_for_prompt(profile_data)
-        
+
         # Build the chain with JSON output parser
         chain = self.build_json_chain(pydantic_schema=BrandAnalysisOutput)
-        
+
+        # Add geo-targeting instruction if target country is set
+        geo_instruction = ""
+        if target_country:
+            geo_instruction = (
+                f"\n\n## Geographic Targeting\n"
+                f"The brand is targeting partners in: **{target_country}**\n"
+                f"Include 5-10 country/region-specific hashtags in your output, such as:\n"
+                f"- Location hashtags (cities, regions of {target_country})\n"
+                f"- Country-specific influencer hashtags (e.g., #{target_country.lower().replace(' ', '')}influencer)\n"
+                f"- Local industry hashtags popular in {target_country}\n"
+                f"- Cultural or market-specific tags used by creators in {target_country}\n"
+                f"Mix these with the general brand hashtags for a balanced set."
+            )
+
         # Prepare input variables
         input_vars = {
-            "brand_description": brand_description,
+            "brand_description": brand_description + geo_instruction,
             "reference_profiles": profile_summary,
         }
         

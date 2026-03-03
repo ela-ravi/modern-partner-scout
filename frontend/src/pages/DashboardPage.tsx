@@ -104,7 +104,6 @@ export default function DashboardPage() {
     filters: {
       ...(statusFilter ? { status: statusFilter } : {}),
       ...(bookmarkFilter ? { is_bookmarked: true } : {}),
-      ...(job?.min_score_threshold ? { min_score: job.min_score_threshold } : {}),
     },
     sort,
   })
