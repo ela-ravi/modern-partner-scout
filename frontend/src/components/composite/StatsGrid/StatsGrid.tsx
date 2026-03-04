@@ -72,13 +72,13 @@ export function StatsGrid({ analytics, isLoading, className }: StatsGridProps) {
   return (
     <div className={cn('grid grid-cols-2 lg:grid-cols-4 gap-4', className)}>
       <StatCard
-        label="Discovered"
+        label="Processed"
         value={analytics.total_profiles}
         icon={<PeopleIcon className="w-5 h-5 text-white" />}
         color="bg-apple-blue"
       />
       <StatCard
-        label="Scored"
+        label="Qualified"
         value={analytics.done_profiles}
         icon={<StarIcon className="w-5 h-5 text-white" />}
         color="bg-green-500"

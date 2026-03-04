@@ -318,8 +318,8 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                     f"[Orchestration] Job {job_id}: No new profiles in round {round_num} "
                     f"(empty_rounds={empty_rounds})"
                 )
-                # Only break after 2 consecutive empty rounds to give fallback a chance
-                if empty_rounds >= 2:
+                # Only break after 3 consecutive empty rounds to give fallback a chance
+                if empty_rounds >= 3:
                     logger.warning(
                         f"[Orchestration] Job {job_id}: {empty_rounds} consecutive empty rounds, "
                         f"stopping discovery."
@@ -373,8 +373,7 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                     except Exception as e:
                         logger.warning(f"[Orchestration] Job {job_id}: Status fix failed for @{username}: {e}")
 
-                    # Check against threshold (for contact enrichment eligibility only)
-                    # All scored profiles keep status='done' and remain visible on dashboard
+                    # Check against threshold
                     if score_response.final_score >= min_score_threshold:
                         qualified_profiles.append(profile)
                         logger.info(
@@ -382,10 +381,15 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                             f"@{username} QUALIFIED (score={score_response.final_score})"
                         )
                     else:
+                        # Mark below-threshold profiles as skipped (hidden from dashboard)
                         total_skipped += 1
+                        try:
+                            profile_repo.update_status(str(profile_id), ProfileStatus.SKIPPED)
+                        except Exception:
+                            pass
                         logger.info(
                             f"[Orchestration] Job {job_id}: R{round_num} - "
-                            f"@{username} below threshold (score={score_response.final_score} < {min_score_threshold})"
+                            f"@{username} SKIPPED (score={score_response.final_score} < {min_score_threshold})"
                         )
 
                     # Stop early if we have enough
