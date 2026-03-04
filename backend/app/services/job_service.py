@@ -184,7 +184,10 @@ class JobService:
                     old_disc = job.get("profiles_discovered")
                     old_scored = job.get("profiles_scored")
                     job["profiles_discovered"] = summary.get("total_profiles", 0)
-                    job["profiles_scored"] = summary.get("done_profiles", 0)
+                    # Count all profiles that have been scored (done + skipped)
+                    job["profiles_scored"] = (
+                        summary.get("done_profiles", 0) + summary.get("skipped_profiles", 0)
+                    )
                     if old_disc != job["profiles_discovered"] or old_scored != job["profiles_scored"]:
                         logger.info(
                             f"Enriched job {job['id']}: "
@@ -309,12 +312,15 @@ class JobService:
         summary = self.job_repo.get_job_summary(job_id)
         
         if summary:
+            # done_profiles = scored profiles still visible on dashboard
+            # Include 'skipped' in done count since skipped profiles were scored too
+            scored_total = summary.get("done_profiles", 0) + summary.get("skipped_profiles", 0)
             return {
                 "job_id": job_id,
                 "total_profiles": summary.get("total_profiles", 0),
                 "new_profiles": summary.get("new_profiles", 0),
                 "processing_profiles": summary.get("processing_profiles", 0),
-                "done_profiles": summary.get("done_profiles", 0),
+                "done_profiles": scored_total,
                 "skipped_profiles": summary.get("skipped_profiles", 0),
                 "avg_score": summary.get("avg_score"),
                 "max_score": summary.get("max_score"),

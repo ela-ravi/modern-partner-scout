@@ -373,7 +373,8 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                     except Exception as e:
                         logger.warning(f"[Orchestration] Job {job_id}: Status fix failed for @{username}: {e}")
 
-                    # Check against threshold
+                    # Check against threshold (for contact enrichment eligibility only)
+                    # All scored profiles keep status='done' and remain visible on dashboard
                     if score_response.final_score >= min_score_threshold:
                         qualified_profiles.append(profile)
                         logger.info(
@@ -381,15 +382,10 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                             f"@{username} QUALIFIED (score={score_response.final_score})"
                         )
                     else:
-                        # Mark below-threshold profiles as skipped
                         total_skipped += 1
-                        try:
-                            profile_repo.update_status(str(profile_id), ProfileStatus.SKIPPED)
-                        except Exception:
-                            pass
                         logger.info(
                             f"[Orchestration] Job {job_id}: R{round_num} - "
-                            f"@{username} SKIPPED (score={score_response.final_score} < {min_score_threshold})"
+                            f"@{username} below threshold (score={score_response.final_score} < {min_score_threshold})"
                         )
 
                     # Stop early if we have enough
