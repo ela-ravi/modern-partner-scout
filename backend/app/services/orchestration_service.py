@@ -131,7 +131,7 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
 
     try:
         # =====================================================================
-        # Phase 1: Brand Analysis
+        # Phase 1: Brand Analysis (with retry for cold-start resource errors)
         # =====================================================================
         logger.info(f"[Orchestration] Job {job_id}: Starting Phase 1 - Brand Analysis")
         job_service.update_status(job_id, "analyzing", validate_transition=True)
@@ -141,7 +141,31 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
             job_id=job_id,
             max_posts_per_profile=12,
         )
-        brand_response = await brand_agent.run(brand_request)
+
+        brand_response = None
+        for _attempt in range(3):
+            try:
+                brand_response = await brand_agent.run(brand_request)
+                break
+            except Exception as e:
+                err_str = str(e)
+                is_resource_error = (
+                    "Resource temporarily unavailable" in err_str
+                    or "[Errno 11]" in err_str
+                    or "Cannot allocate memory" in err_str
+                )
+                if is_resource_error and _attempt < 2:
+                    wait_secs = 5 * (_attempt + 1)
+                    logger.warning(
+                        f"[Orchestration] Job {job_id}: Brand analysis hit resource error "
+                        f"(attempt {_attempt + 1}/3), retrying in {wait_secs}s: {e}"
+                    )
+                    await asyncio.sleep(wait_secs)
+                    continue
+                raise
+
+        if brand_response is None:
+            raise Exception("Brand analysis failed after 3 attempts")
 
         hashtags = brand_response.hashtags or []
         keywords = brand_response.keywords or []

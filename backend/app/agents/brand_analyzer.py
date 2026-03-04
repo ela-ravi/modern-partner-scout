@@ -244,19 +244,38 @@ class BrandAnalyzerAgent(BaseAgent[BrandAnalyzerRequest, BrandAnalyzerResponse])
     
     async def _fetch_job(self, job_id: str) -> Dict[str, Any]:
         """
-        Fetch job data from the database.
-        
+        Fetch job data from the database with retry for transient errors.
+
         Args:
             job_id: Job UUID string
-            
+
         Returns:
             Job data dictionary
-            
+
         Raises:
             JobNotFoundError: If job doesn't exist
         """
-        logger.debug(f"Fetching job: {job_id}")
-        return self._job_repo.get_by_id(job_id)
+        import asyncio as _asyncio
+
+        last_err: Exception | None = None
+        for attempt in range(3):
+            try:
+                logger.debug(f"Fetching job: {job_id} (attempt {attempt + 1})")
+                return self._job_repo.get_by_id(job_id)
+            except JobNotFoundError:
+                raise
+            except Exception as e:
+                last_err = e
+                logger.warning(
+                    f"Fetch job attempt {attempt + 1}/3 failed: {e}"
+                )
+                await _asyncio.sleep(2 ** attempt)
+
+        raise AgentError(
+            message=f"Failed to fetch job after 3 attempts: {last_err}",
+            agent_name=self.agent_name,
+            details={"job_id": job_id},
+        )
     
     # =========================================================================
     # Profile Fetching (SUB-3.3.2.1.2)
