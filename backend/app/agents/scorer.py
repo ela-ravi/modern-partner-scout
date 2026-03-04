@@ -295,6 +295,7 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
                 fake_indicators=fake_indicators,
                 contact=contact,
                 target_country=target_country,
+                reference_summaries=input_data.reference_profile_summaries,
             )
             
             # Step 7: Calculate weighted final score (SUB-3.3.4.1.5)
@@ -669,6 +670,44 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
     # LLM Analysis (SUB-3.3.4.1.2)
     # =========================================================================
     
+    def _format_reference_summaries_for_prompt(
+        self, summaries: List[Dict[str, Any]]
+    ) -> str:
+        """
+        Format reference profile summaries into a concise string for the LLM prompt.
+
+        Each reference is rendered as a one-liner so the LLM can compare candidates
+        against concrete examples without bloating the context.
+
+        Args:
+            summaries: List of reference summary dicts from brand analysis
+
+        Returns:
+            Formatted string, or empty string if no summaries
+        """
+        if not summaries:
+            return ""
+
+        lines = []
+        for s in summaries:
+            username = s.get("username", "?")
+            followers = s.get("followers", 0)
+            engagement = s.get("engagement_rate")
+            category = s.get("business_category") or "N/A"
+            is_biz = "Business" if s.get("is_business") else "Personal"
+            bio = (s.get("bio") or "")[:80]
+            top_tags = ", ".join(s.get("top_hashtags", [])[:3]) or "N/A"
+
+            eng_str = f"{engagement:.1f}%" if engagement else "N/A"
+            follower_str = f"{followers // 1000}K" if followers >= 1000 else str(followers)
+
+            lines.append(
+                f"- @{username} ({follower_str} followers, {is_biz}, {category}, "
+                f"{eng_str} engagement) - {bio} [{top_tags}]"
+            )
+
+        return "\n".join(lines)
+
     async def _analyze_profile(
         self,
         profile_data: Dict[str, Any],
@@ -677,31 +716,39 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
         fake_indicators: List[str],
         contact: ExtractedContact,
         target_country: Optional[str] = None,
+        reference_summaries: Optional[List[Dict[str, Any]]] = None,
     ) -> ScoringAnalysisOutput:
         """
         Analyze profile using LLM to score across 6 dimensions.
-        
+
         Args:
             profile_data: Profile data dictionary
             brand_dna: Brand DNA with hashtags, keywords, etc.
             brand_description: Original brand description
             fake_indicators: Pre-detected fake indicators
             contact: Extracted contact information
-            
+            target_country: Optional target country for geo-scoring
+            reference_summaries: Optional reference profile summaries for comparison
+
         Returns:
             ScoringAnalysisOutput with scores and reasoning
         """
         logger.debug(f"Analyzing profile with LLM: {profile_data.get('username')}")
-        
+
         # Format profile data for prompt
         profile_summary = self._format_profile_for_prompt(profile_data)
-        
+
         # Format brand DNA for prompt
         brand_dna_summary = self._format_brand_dna_for_prompt(brand_dna)
-        
+
+        # Format reference profiles for prompt
+        reference_profiles_text = self._format_reference_summaries_for_prompt(
+            reference_summaries or []
+        )
+
         # Build the chain with JSON output parser
         chain = self.build_json_chain(pydantic_schema=ScoringAnalysisOutput)
-        
+
         # Prepare input variables
         country_instruction = ""
         if target_country:
@@ -717,6 +764,7 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
         input_vars = {
             "brand_description": brand_description + country_instruction,
             "brand_dna": brand_dna_summary,
+            "reference_profiles": reference_profiles_text,
             "username": profile_data.get("username", "unknown"),
             "profile_url": profile_data.get("instagram_url", ""),
             "profile_data": profile_summary,

@@ -169,10 +169,14 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
 
         hashtags = brand_response.hashtags or []
         keywords = brand_response.keywords or []
+        related_usernames = brand_response.related_usernames_from_references or []
+        reference_summaries = brand_response.reference_profile_summaries or []
         phase1_time = time.time() - start_time
         logger.info(
             f"[Orchestration] Job {job_id}: Phase 1 complete in {phase1_time:.1f}s - "
-            f"{len(hashtags)} hashtags, {len(keywords)} keywords"
+            f"{len(hashtags)} hashtags, {len(keywords)} keywords, "
+            f"{len(related_usernames)} related usernames, "
+            f"{len(reference_summaries)} reference summaries"
         )
 
         # =====================================================================
@@ -219,6 +223,34 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
         follower_min = job_data.get("follower_range_min", 5000)
         follower_max = job_data.get("follower_range_max", 500000)
 
+        # Calibrate follower range from reference profiles
+        if reference_summaries:
+            ref_followers = [s.get("followers", 0) for s in reference_summaries if s.get("followers", 0) > 0]
+            if ref_followers:
+                avg_ref_followers = sum(ref_followers) / len(ref_followers)
+                calibrated_min = max(follower_min, int(avg_ref_followers * 0.3))
+                calibrated_max = min(follower_max, int(avg_ref_followers * 3.0))
+                # Only apply if calibrated range is valid
+                if calibrated_min < calibrated_max:
+                    logger.info(
+                        f"[Orchestration] Job {job_id}: Follower range calibrated from references: "
+                        f"{follower_min}-{follower_max} -> {calibrated_min}-{calibrated_max} "
+                        f"(avg ref: {avg_ref_followers:.0f})"
+                    )
+                    follower_min = calibrated_min
+                    follower_max = calibrated_max
+
+        # Detect if references are mostly business accounts
+        is_mostly_business = False
+        if reference_summaries:
+            business_count = sum(1 for s in reference_summaries if s.get("is_business"))
+            is_mostly_business = business_count > len(reference_summaries) * 0.6
+            if is_mostly_business:
+                logger.info(
+                    f"[Orchestration] Job {job_id}: {business_count}/{len(reference_summaries)} "
+                    f"references are business accounts - will require business accounts"
+                )
+
         # Cross-job deduplication: get all usernames from past jobs for this user
         user_id = job_data.get("user_id")
         excluded_usernames: Set[str] = set()
@@ -264,32 +296,59 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                 f"Need {remaining} more, discovering {discover_count} candidates"
             )
 
-            # --- Discovery (rotate hashtags per round) ---
-            round_hashtags = hashtag_groups[round_num - 1]
+            # --- Discovery ---
+            if round_num == 1 and related_usernames:
+                # -------------------------------------------------------
+                # Round 1: Reference-related discovery (highest quality)
+                # Use Instagram's relatedProfiles as primary candidates
+                # -------------------------------------------------------
+                ref_batch = related_usernames[:discover_count]
+                logger.info(
+                    f"[Orchestration] Job {job_id}: Round 1 using {len(ref_batch)} "
+                    f"reference-related usernames (skipping hashtag search)"
+                )
+                discovery_request = DiscoveryRequest(
+                    job_id=job_id,
+                    reference_usernames=ref_batch,
+                    limit=discover_count,
+                    follower_min=follower_min,
+                    follower_max=follower_max,
+                    excluded_usernames=list(excluded_usernames),
+                    require_business_account=is_mostly_business,
+                )
+            else:
+                # -------------------------------------------------------
+                # Rounds 2+: Hashtag-based discovery (existing behavior)
+                # -------------------------------------------------------
+                # Offset index by 1 if Round 1 used reference usernames
+                hashtag_idx = round_num - 1
+                if related_usernames:
+                    hashtag_idx = max(0, round_num - 2)  # Round 2 -> index 0
+                round_hashtags = hashtag_groups[min(hashtag_idx, len(hashtag_groups) - 1)]
 
-            # If this exact hashtag set was already tried and returned 0,
-            # switch to keyword-derived fallback hashtags
-            hashtag_key = "|".join(sorted(round_hashtags))
-            if hashtag_key in tried_hashtag_sets and keyword_fallback_hashtags:
-                # Pick a fresh slice of fallback hashtags
-                fallback_start = (round_num - 1) * 8
-                fallback_slice = keyword_fallback_hashtags[fallback_start:fallback_start + 8]
-                if fallback_slice:
-                    round_hashtags = fallback_slice
-                    logger.info(
-                        f"[Orchestration] Job {job_id}: Using keyword-fallback hashtags: {round_hashtags}"
-                    )
-            tried_hashtag_sets.add(hashtag_key)
+                # If this exact hashtag set was already tried and returned 0,
+                # switch to keyword-derived fallback hashtags
+                hashtag_key = "|".join(sorted(round_hashtags))
+                if hashtag_key in tried_hashtag_sets and keyword_fallback_hashtags:
+                    # Pick a fresh slice of fallback hashtags
+                    fallback_start = (round_num - 1) * 8
+                    fallback_slice = keyword_fallback_hashtags[fallback_start:fallback_start + 8]
+                    if fallback_slice:
+                        round_hashtags = fallback_slice
+                        logger.info(
+                            f"[Orchestration] Job {job_id}: Using keyword-fallback hashtags: {round_hashtags}"
+                        )
+                tried_hashtag_sets.add(hashtag_key)
 
-            discovery_request = DiscoveryRequest(
-                job_id=job_id,
-                hashtags=round_hashtags,
-                keywords=discovery_keywords,
-                limit=discover_count,
-                follower_min=follower_min,
-                follower_max=follower_max,
-                excluded_usernames=list(excluded_usernames),
-            )
+                discovery_request = DiscoveryRequest(
+                    job_id=job_id,
+                    hashtags=round_hashtags,
+                    keywords=discovery_keywords,
+                    limit=discover_count,
+                    follower_min=follower_min,
+                    follower_max=follower_max,
+                    excluded_usernames=list(excluded_usernames),
+                )
 
             try:
                 discovery_response = await discovery_agent.run(discovery_request)
@@ -351,6 +410,7 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                     score_request = ScorerRequest(
                         profile_id=str(profile_id),
                         job_id=job_id,
+                        reference_profile_summaries=reference_summaries if reference_summaries else None,
                     )
                     score_response = await scorer_agent.run(score_request)
                     total_scored += 1

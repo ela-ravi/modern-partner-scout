@@ -182,25 +182,16 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
         job_id = str(input_data.job_id)
         logger.info(
             f"Starting discovery for job: {job_id}, "
-            f"hashtags: {input_data.hashtags}, limit: {input_data.limit}"
+            f"hashtags: {input_data.hashtags}, "
+            f"reference_usernames: {len(input_data.reference_usernames)}, "
+            f"limit: {input_data.limit}"
         )
         
         try:
             # Step 1: Validate job exists
             job = await self._fetch_job(job_id)
-            
-            # Step 2: Search hashtags via Apify (SUB-3.3.3.1.2)
-            # Fetch 3x posts to ensure enough unique usernames after dedup/filtering
-            raw_posts = await self._search_hashtags(
-                input_data.hashtags,
-                limit_per_hashtag=max(30, (input_data.limit * 3) // len(input_data.hashtags))
-            )
-            
-            # Step 3: Extract unique usernames from posts
-            candidate_usernames = self._extract_usernames_from_posts(raw_posts)
-            logger.info(f"Extracted {len(candidate_usernames)} unique usernames from posts")
-            
-            # Step 4: Get existing profiles for deduplication (SUB-3.3.3.1.4)
+
+            # Step 2: Get existing profiles for deduplication (SUB-3.3.3.1.4)
             existing_usernames = await self._get_existing_usernames(job_id)
 
             # Merge cross-job excluded usernames into dedup set
@@ -209,29 +200,59 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
                     u.lower() for u in input_data.excluded_usernames
                 )
 
-            # Step 5: Filter out duplicates
-            new_usernames = [u for u in candidate_usernames if u not in existing_usernames]
-            deduplicated_count = len(candidate_usernames) - len(new_usernames)
-            
+            if input_data.reference_usernames:
+                # -------------------------------------------------------
+                # Reference-based discovery: scrape provided usernames
+                # directly (skip hashtag search entirely)
+                # -------------------------------------------------------
+                logger.info(
+                    f"Reference-based discovery: {len(input_data.reference_usernames)} "
+                    f"usernames provided, skipping hashtag search"
+                )
+
+                # Filter out already-known usernames
+                new_usernames = [
+                    u for u in input_data.reference_usernames
+                    if u.lower() not in existing_usernames
+                ]
+                deduplicated_count = len(input_data.reference_usernames) - len(new_usernames)
+
+                usernames_to_fetch = new_usernames[:input_data.limit]
+                profiles_data = await self._fetch_profiles(usernames_to_fetch)
+                discovery_source = "reference_related_profiles"
+            else:
+                # -------------------------------------------------------
+                # Hashtag-based discovery: existing behavior
+                # -------------------------------------------------------
+                raw_posts = await self._search_hashtags(
+                    input_data.hashtags,
+                    limit_per_hashtag=max(30, (input_data.limit * 3) // max(len(input_data.hashtags), 1))
+                )
+
+                candidate_usernames = self._extract_usernames_from_posts(raw_posts)
+                logger.info(f"Extracted {len(candidate_usernames)} unique usernames from posts")
+
+                new_usernames = [u for u in candidate_usernames if u not in existing_usernames]
+                deduplicated_count = len(candidate_usernames) - len(new_usernames)
+
+                usernames_to_fetch = new_usernames[:input_data.limit]
+                profiles_data = await self._fetch_profiles(usernames_to_fetch)
+                discovery_source = ", ".join(input_data.hashtags[:3])
+
             logger.info(
                 f"After deduplication: {len(new_usernames)} new usernames "
                 f"({deduplicated_count} duplicates removed)"
             )
-            
-            # Step 6: Fetch detailed profile data for new usernames
-            # Limit to requested amount (over-discovery is controlled by the orchestration layer)
-            usernames_to_fetch = new_usernames[:input_data.limit]
-            
-            profiles_data = await self._fetch_profiles(usernames_to_fetch)
-            
-            # Step 7: Filter by follower range (SUB-3.3.3.1.3)
+
+            # Step 7: Filter by follower range + business account (SUB-3.3.3.1.3)
             filtered_profiles, filtered_out_count = self._filter_profiles(
                 profiles_data,
                 min_followers=input_data.follower_min,
                 max_followers=input_data.follower_max,
-                limit=input_data.limit
+                limit=input_data.limit,
+                require_business_account=input_data.require_business_account,
             )
-            
+
             # Step 7b: Extract related usernames from fetched profiles
             related_usernames = self._extract_related_usernames(
                 profiles_data, existing_usernames
@@ -241,7 +262,7 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
             stored_profiles = await self._store_profiles(
                 job_id=job_id,
                 profiles=filtered_profiles,
-                discovery_source=", ".join(input_data.hashtags[:3])
+                discovery_source=discovery_source,
             )
 
             # Calculate duration
@@ -479,11 +500,12 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
         max_followers: int = Defaults.DEFAULT_MAX_FOLLOWERS,
         limit: int = Defaults.DEFAULT_DISCOVERY_LIMIT,
         exclude_private: bool = True,
-        exclude_no_posts: bool = True
+        exclude_no_posts: bool = True,
+        require_business_account: bool = False,
     ) -> Tuple[List[Dict[str, Any]], int]:
         """
         Filter profiles by various criteria including follower range.
-        
+
         Args:
             profiles: List of profile data
             min_followers: Minimum follower count
@@ -491,23 +513,26 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
             limit: Maximum profiles to return
             exclude_private: Exclude private accounts
             exclude_no_posts: Exclude accounts with no posts
-            
+            require_business_account: Only keep business accounts
+
         Returns:
             Tuple of (filtered_profiles, filtered_out_count)
         """
         logger.debug(
             f"Filtering profiles: {len(profiles)} candidates, "
-            f"range {min_followers}-{max_followers}, limit {limit}"
+            f"range {min_followers}-{max_followers}, limit {limit}, "
+            f"require_business={require_business_account}"
         )
-        
+
         filtered = []
         filtered_out_reasons = {
             "follower_range": 0,
             "private": 0,
             "no_posts": 0,
             "fake_suspected": 0,
+            "not_business": 0,
         }
-        
+
         for profile in profiles:
             # Get follower count
             followers = (
@@ -515,18 +540,18 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
                 profile.get("followers_count") or
                 0
             )
-            
+
             # Check follower range
             if followers < min_followers or followers > max_followers:
                 filtered_out_reasons["follower_range"] += 1
                 continue
-            
+
             # Check private account
             is_private = profile.get("private") or profile.get("is_private", False)
             if exclude_private and is_private:
                 filtered_out_reasons["private"] += 1
                 continue
-            
+
             # Check posts count
             posts_count = (
                 profile.get("postsCount") or
@@ -536,25 +561,35 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
             if exclude_no_posts and posts_count == 0:
                 filtered_out_reasons["no_posts"] += 1
                 continue
-            
+
+            # Check business account requirement
+            if require_business_account:
+                is_business = (
+                    profile.get("isBusinessAccount")
+                    or profile.get("is_business_account")
+                )
+                if not is_business:
+                    filtered_out_reasons["not_business"] += 1
+                    continue
+
             # Check for fake profile indicators
             if self._is_likely_fake(profile):
                 filtered_out_reasons["fake_suspected"] += 1
                 continue
-            
+
             # Profile passed all filters
             filtered.append(profile)
-            
+
             # Stop if we've reached the limit
             if len(filtered) >= limit:
                 break
-        
+
         total_filtered_out = sum(filtered_out_reasons.values())
         logger.info(
             f"Filtering complete: {len(filtered)} passed, "
             f"{total_filtered_out} filtered out ({filtered_out_reasons})"
         )
-        
+
         return filtered[:limit], total_filtered_out
     
     def _is_likely_fake(self, profile: Dict[str, Any]) -> bool:
@@ -769,13 +804,13 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
     async def validate_input(self, input_data: DiscoveryRequest) -> bool:
         """
         Validate input data before processing.
-        
+
         Args:
             input_data: Input request data
-            
+
         Returns:
             True if valid
-            
+
         Raises:
             AgentError: If validation fails
         """
@@ -785,14 +820,14 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
                 agent_name=self.agent_name,
                 details={"field": "job_id"}
             )
-        
-        if not input_data.hashtags:
+
+        if not input_data.hashtags and not input_data.reference_usernames:
             raise AgentError(
-                message="At least one hashtag is required",
+                message="At least one of hashtags or reference_usernames is required",
                 agent_name=self.agent_name,
-                details={"field": "hashtags"}
+                details={"field": "hashtags/reference_usernames"}
             )
-        
+
         if input_data.follower_min >= input_data.follower_max:
             raise AgentError(
                 message="follower_min must be less than follower_max",
@@ -802,7 +837,7 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
                     "follower_max": input_data.follower_max
                 }
             )
-        
+
         return True
 
 

@@ -31,7 +31,7 @@ class BrandAnalyzerRequest(BaseModel):
 
 class BrandAnalyzerResponse(BaseModel):
     """Response model from Brand Analyzer Agent."""
-    
+
     job_id: UUID
     hashtags: List[str] = Field(default_factory=list)
     keywords: List[str] = Field(default_factory=list)
@@ -42,6 +42,14 @@ class BrandAnalyzerResponse(BaseModel):
     profiles_analyzed: int = 0
     posts_analyzed: int = 0
     analysis_duration_seconds: Optional[float] = None
+    related_usernames_from_references: List[str] = Field(
+        default_factory=list,
+        description="Usernames harvested from relatedProfiles of all reference profiles"
+    )
+    reference_profile_summaries: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Condensed per-profile dicts for passing to scorer"
+    )
 
 
 # =============================================================================
@@ -50,16 +58,23 @@ class BrandAnalyzerResponse(BaseModel):
 
 class DiscoveryRequest(BaseModel):
     """Request model for Discovery Agent."""
-    
+
     job_id: UUID = Field(..., description="ID of the discovery job")
     hashtags: List[str] = Field(
-        ...,
-        min_length=1,
-        description="Hashtags to search for"
+        default_factory=list,
+        description="Hashtags to search for (optional when reference_usernames provided)"
     )
     keywords: List[str] = Field(
         default_factory=list,
         description="Keywords to filter by"
+    )
+    reference_usernames: List[str] = Field(
+        default_factory=list,
+        description="Direct scrape targets (skip hashtag search, scrape these profiles directly)"
+    )
+    require_business_account: bool = Field(
+        default=False,
+        description="Only keep profiles that are business accounts"
     )
     limit: int = Field(
         default=50,
@@ -81,14 +96,14 @@ class DiscoveryRequest(BaseModel):
         le=10000000,
         description="Maximum follower count"
     )
-    
+
     @field_validator("hashtags", mode="before")
     @classmethod
     def normalize_hashtags(cls, v: List[str]) -> List[str]:
-        """Normalize hashtags (ensure # prefix)."""
+        """Normalize hashtags (ensure # prefix). Empty list is allowed when reference_usernames is set."""
         if not v:
-            raise ValueError("At least one hashtag is required")
-        
+            return []
+
         normalized = []
         for tag in v:
             tag = tag.strip()
@@ -97,7 +112,7 @@ class DiscoveryRequest(BaseModel):
             if not tag.startswith("#"):
                 tag = f"#{tag}"
             normalized.append(tag)
-        
+
         return normalized
 
 
@@ -125,13 +140,17 @@ class DiscoveryResponse(BaseModel):
 
 class ScorerRequest(BaseModel):
     """Request model for Scorer Agent."""
-    
+
     profile_id: UUID = Field(..., description="ID of the profile to score")
     job_id: UUID = Field(..., description="ID of the discovery job")
-    
+
     # Optional: include full data to avoid DB lookups
     profile_data: Optional[Dict[str, Any]] = None
     brand_dna: Optional[Dict[str, Any]] = None
+    reference_profile_summaries: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Reference profile summaries for comparison-based scoring"
+    )
 
 
 class ScoreDimension(BaseModel):

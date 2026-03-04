@@ -184,6 +184,12 @@ class BrandAnalyzerAgent(BaseAgent[BrandAnalyzerRequest, BrandAnalyzerResponse])
                 max_posts=input_data.max_posts_per_profile
             )
 
+            # Step 2b: Extract related usernames and reference summaries
+            related_usernames = self._extract_related_usernames(
+                profile_data, reference_profiles
+            )
+            reference_summaries = self._create_reference_summaries(profile_data)
+
             # Step 3: Analyze brand with LLM (SUB-3.3.2.1.3)
             analysis = await self._analyze_brand(
                 brand_description, profile_data, target_country=target_country
@@ -223,6 +229,8 @@ class BrandAnalyzerAgent(BaseAgent[BrandAnalyzerRequest, BrandAnalyzerResponse])
                 profiles_analyzed=profiles_analyzed,
                 posts_analyzed=posts_analyzed,
                 analysis_duration_seconds=duration,
+                related_usernames_from_references=related_usernames,
+                reference_profile_summaries=reference_summaries,
             )
             
         except JobNotFoundError:
@@ -446,39 +454,55 @@ class BrandAnalyzerAgent(BaseAgent[BrandAnalyzerRequest, BrandAnalyzerResponse])
     ) -> str:
         """
         Format profile data for inclusion in the LLM prompt.
-        
+
         Args:
             profile_data: List of profile data dictionaries
-            
+
         Returns:
             Formatted string for prompt
         """
         if not profile_data:
             return "No reference profiles available."
-        
+
         formatted = []
         for i, profile in enumerate(profile_data, 1):
             username = profile.get("username", "unknown")
             full_name = profile.get("fullName", profile.get("full_name", ""))
             bio = profile.get("biography", "")
             followers = profile.get("followersCount", profile.get("followers_count", 0))
-            
+            following = profile.get("followsCount", profile.get("followingCount", profile.get("following_count", 0)))
+
+            # Engagement rate
+            engagement_rate = profile.get("engagementRate") or profile.get("engagement_rate")
+            engagement_str = f"{engagement_rate:.2f}%" if engagement_rate else "N/A"
+
+            # Business account info
+            is_business = profile.get("isBusinessAccount") or profile.get("is_business_account") or False
+            business_category = (
+                profile.get("businessCategoryName")
+                or profile.get("business_category")
+                or "N/A"
+            )
+
             # Extract hashtags from bio and recent posts
             hashtags = self._extract_hashtags_from_profile(profile)
-            
+
             # Get recent post captions for content analysis
             captions = self._extract_post_captions(profile)
-            
+
             profile_info = f"""
 Profile {i}: @{username}
 - Name: {full_name or 'N/A'}
-- Followers: {followers:,}
+- Followers: {followers:,} | Following: {following:,}
+- Engagement Rate: {engagement_str}
+- Business Account: {is_business}
+- Business Category: {business_category}
 - Bio: {bio or 'N/A'}
 - Hashtags used: {', '.join(hashtags[:10]) if hashtags else 'N/A'}
 - Recent content themes: {captions[:500] if captions else 'N/A'}
 """
             formatted.append(profile_info.strip())
-        
+
         return "\n\n".join(formatted)
     
     def _extract_hashtags_from_profile(
@@ -525,6 +549,95 @@ Profile {i}: @{username}
         
         return " | ".join(captions)[:max_length]
     
+    def _extract_related_usernames(
+        self,
+        profile_data: List[Dict[str, Any]],
+        reference_usernames: List[str],
+    ) -> List[str]:
+        """
+        Harvest related usernames from the relatedProfiles field of reference profiles.
+
+        Instagram's profile scraper returns a `relatedProfiles` list with
+        accounts Instagram considers similar. These are high-quality discovery
+        candidates.
+
+        Args:
+            profile_data: List of scraped profile data dicts
+            reference_usernames: The original reference usernames to exclude
+
+        Returns:
+            Deduplicated list of related usernames
+        """
+        ref_set = {u.lower() for u in reference_usernames}
+        related: set[str] = set()
+
+        for profile in profile_data:
+            related_list = profile.get("relatedProfiles") or []
+            for rp in related_list:
+                if isinstance(rp, dict):
+                    username = rp.get("username", "")
+                elif isinstance(rp, str):
+                    username = rp
+                else:
+                    continue
+
+                username = username.strip().lstrip("@").lower()
+                if username and username not in ref_set:
+                    related.add(username)
+
+        if related:
+            logger.info(f"Harvested {len(related)} related usernames from reference profiles")
+
+        return list(related)
+
+    def _create_reference_summaries(
+        self,
+        profile_data: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """
+        Create condensed reference profile summaries for passing to the scorer.
+
+        Each summary contains enough context for the scorer LLM to compare
+        candidates against concrete examples of ideal partners.
+
+        Args:
+            profile_data: List of scraped profile data dicts
+
+        Returns:
+            List of condensed summary dicts
+        """
+        summaries = []
+        for profile in profile_data:
+            username = profile.get("username", "unknown")
+            followers = profile.get("followersCount", profile.get("followers_count", 0))
+            engagement_rate = profile.get("engagementRate") or profile.get("engagement_rate")
+            is_business = (
+                profile.get("isBusinessAccount")
+                or profile.get("is_business_account")
+                or False
+            )
+            business_category = (
+                profile.get("businessCategoryName")
+                or profile.get("business_category")
+            )
+
+            # Top hashtags from posts
+            top_hashtags = self._extract_hashtags_from_profile(profile)[:5]
+
+            summaries.append({
+                "username": username,
+                "full_name": profile.get("fullName", profile.get("full_name", "")),
+                "bio": (profile.get("biography") or "")[:200],
+                "followers": followers,
+                "engagement_rate": round(engagement_rate, 2) if engagement_rate else None,
+                "is_business": bool(is_business),
+                "business_category": business_category,
+                "top_hashtags": top_hashtags,
+            })
+
+        logger.info(f"Created {len(summaries)} reference profile summaries")
+        return summaries
+
     def _normalize_hashtags(self, hashtags: List[str]) -> List[str]:
         """Ensure all hashtags have # prefix and are lowercase."""
         normalized = []

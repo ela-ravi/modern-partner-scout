@@ -44,6 +44,14 @@ You MUST respond with a valid JSON object containing:
 - "target_audience_description": String describing the target audience
 - "confidence_score": Number from 0-100 indicating analysis confidence
 
+## Discovery-Optimized Hashtag Strategy
+
+- Prioritize NICHE hashtags actually used by the reference profiles over generic industry tags
+- Include hashtags from the reference profiles' actual posts (these are proven to reach the right audience)
+- Avoid overly broad hashtags that would dilute discovery quality (e.g., #love, #instagood, #beauty)
+- Include business-specific hashtags (e.g., #wholesalebeauty, #distributorwanted, #b2bpartner)
+- Favor hashtags that indicate a specific business type or content niche over lifestyle/mood hashtags
+
 ## Guidelines
 
 - Base your analysis on the provided brand description and reference profiles
