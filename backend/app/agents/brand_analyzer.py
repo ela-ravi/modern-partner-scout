@@ -443,14 +443,13 @@ class BrandAnalyzerAgent(BaseAgent[BrandAnalyzerRequest, BrandAnalyzerResponse])
             return analysis
             
         except Exception as e:
-            logger.error(f"LLM analysis failed: {e}")
-            # Return empty analysis on failure
-            return BrandAnalysisOutput(
-                hashtags=[],
-                keywords=[],
-                visual_themes=[],
-                content_pillars=[],
-                confidence_score=0
+            logger.error(
+                f"LLM analysis failed ({type(e).__name__}): {e} — "
+                f"falling back to profile-based extraction"
+            )
+            # Fall back to extracting data directly from scraped profiles
+            return self._build_fallback_analysis(
+                brand_description, profile_data, target_country
             )
     
     def _format_profiles_for_prompt(
@@ -656,9 +655,149 @@ Profile {i}: @{username}
         return list(set(normalized))  # Remove duplicates
     
     # =========================================================================
+    # Fallback Analysis (when LLM is unavailable)
+    # =========================================================================
+
+    def _build_fallback_analysis(
+        self,
+        brand_description: str,
+        profile_data: List[Dict[str, Any]],
+        target_country: Optional[str] = None,
+    ) -> BrandAnalysisOutput:
+        """
+        Build brand analysis from profile data without LLM.
+
+        Extracts hashtags from posts, keywords from bio/description,
+        and generates partner search keywords from product category signals.
+
+        Args:
+            brand_description: Brand description text
+            profile_data: List of scraped profile data
+            target_country: Optional target country
+
+        Returns:
+            BrandAnalysisOutput with extracted data
+        """
+        import re
+
+        # 1. Extract hashtags from all reference profiles
+        all_hashtags: set = set()
+        for profile in profile_data:
+            profile_hashtags = self._extract_hashtags_from_profile(profile)
+            all_hashtags.update(profile_hashtags)
+
+        # Remove overly generic hashtags
+        generic = {
+            "#love", "#instagood", "#photooftheday", "#beautiful",
+            "#happy", "#cute", "#fashion", "#like4like", "#followme",
+            "#me", "#selfie", "#summer", "#friends", "#instadaily",
+            "#girl", "#fun", "#repost", "#smile", "#style",
+        }
+        hashtags = [h for h in all_hashtags if h.lower() not in generic][:20]
+
+        # 2. Extract keywords from brand description and bios
+        desc_words = set(re.findall(r'\b[a-zA-Z]{4,}\b', brand_description.lower()))
+        stopwords = {
+            "with", "that", "this", "from", "their", "they", "have",
+            "been", "will", "would", "could", "should", "about", "into",
+            "more", "also", "than", "them", "some", "other", "each",
+            "very", "when", "what", "which", "your", "there", "where",
+            "looking", "products", "brand", "high", "profiles",
+        }
+        keywords = [w for w in desc_words if w not in stopwords][:15]
+
+        # Add keywords from profile bios
+        for profile in profile_data:
+            bio = (profile.get("biography") or "").lower()
+            bio_words = set(re.findall(r'\b[a-zA-Z]{4,}\b', bio))
+            for w in bio_words:
+                if w not in stopwords and w not in keywords and len(keywords) < 15:
+                    keywords.append(w)
+
+        # 3. Detect product category from bios and description
+        combined_text = brand_description.lower()
+        for profile in profile_data:
+            combined_text += " " + (profile.get("biography") or "").lower()
+            category = (
+                profile.get("businessCategoryName")
+                or profile.get("business_category")
+                or ""
+            )
+            combined_text += " " + category.lower()
+
+        # Map product categories to partner search keywords
+        category_keywords: Dict[str, List[str]] = {
+            "fragrance": ["fragrance distributor", "perfume boutique", "perfume reviewer",
+                          "fragrance influencer", "beauty retailer", "niche perfume shop"],
+            "perfume": ["perfume distributor", "fragrance boutique", "perfume reviewer",
+                        "scent influencer", "beauty wholesale"],
+            "beauty": ["beauty distributor", "cosmetics retailer", "beauty influencer",
+                       "makeup boutique", "skincare reviewer"],
+            "fashion": ["fashion distributor", "clothing boutique", "fashion influencer",
+                        "style blogger", "fashion retailer"],
+            "jewelry": ["jewelry distributor", "jewelry boutique", "accessories retailer",
+                        "jewelry influencer", "luxury accessories"],
+            "food": ["food distributor", "gourmet retailer", "food blogger",
+                     "restaurant supplier", "food influencer"],
+            "wellness": ["wellness distributor", "health retailer", "wellness influencer",
+                         "fitness boutique", "supplement retailer"],
+        }
+
+        partner_keywords: List[str] = []
+        for category, pkws in category_keywords.items():
+            if category in combined_text:
+                partner_keywords.extend(pkws)
+
+        # Add generic partner keywords if no category matched
+        if not partner_keywords:
+            partner_keywords = [
+                "distributor", "retailer", "boutique", "wholesale",
+                "influencer", "reviewer", "brand ambassador",
+            ]
+
+        # Add country-specific variants
+        if target_country:
+            country_specific = [f"{kw} {target_country}" for kw in partner_keywords[:5]]
+            partner_keywords = country_specific + partner_keywords
+
+        # Deduplicate
+        seen: set = set()
+        unique_partner_keywords: List[str] = []
+        for kw in partner_keywords:
+            if kw.lower() not in seen:
+                seen.add(kw.lower())
+                unique_partner_keywords.append(kw)
+
+        # 4. Extract visual themes from categories
+        visual_themes = []
+        for profile in profile_data:
+            category = (
+                profile.get("businessCategoryName")
+                or profile.get("business_category")
+                or ""
+            )
+            if category and category not in visual_themes:
+                visual_themes.append(category)
+
+        logger.info(
+            f"Fallback analysis: {len(hashtags)} hashtags, {len(keywords)} keywords, "
+            f"{len(unique_partner_keywords)} partner keywords"
+        )
+
+        return BrandAnalysisOutput(
+            hashtags=self._normalize_hashtags(hashtags),
+            keywords=keywords,
+            visual_themes=visual_themes[:5],
+            content_pillars=[],
+            target_audience_description=f"Target audience based on brand description: {brand_description[:200]}",
+            partner_search_keywords=unique_partner_keywords[:10],
+            confidence_score=30,
+        )
+
+    # =========================================================================
     # Embedding Generation (SUB-3.3.2.1.4)
     # =========================================================================
-    
+
     async def _generate_embedding(
         self,
         brand_description: str,

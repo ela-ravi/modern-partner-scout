@@ -313,7 +313,7 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
             # hard adjustments based on classification and keyword relevance.
             profile_type = self._classify_profile_type(profile_data)
             industry_relevant = self._check_industry_relevance(
-                profile_data, brand_dna
+                profile_data, brand_dna, brand_description
             )
 
             username = profile_data.get("username", "?")
@@ -1207,6 +1207,7 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
         self,
         profile: Dict[str, Any],
         brand_dna: Dict[str, Any],
+        brand_description: str = "",
     ) -> bool:
         """
         Check if a profile has ANY relevance to the brand's industry.
@@ -1216,15 +1217,33 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
         profile is in a completely different industry (e.g., watch store
         when the brand sells perfume).
 
+        Falls back to extracting keywords from brand_description when
+        brand DNA keywords/hashtags are empty (e.g., LLM failure).
+
         Args:
             profile: Profile data dictionary
             brand_dna: Brand DNA with keywords and hashtags
+            brand_description: Original brand description text (fallback)
 
         Returns:
             True if the profile is at least tangentially relevant
         """
         keywords = brand_dna.get("keywords", [])
         hashtags = brand_dna.get("hashtags", [])
+
+        # If brand DNA is empty, extract keywords from brand description
+        if not keywords and not hashtags and brand_description:
+            import re as _re
+            stopwords = {
+                "with", "that", "this", "from", "their", "they", "have",
+                "been", "will", "would", "could", "should", "about", "into",
+                "more", "also", "than", "them", "some", "other", "each",
+                "very", "when", "what", "which", "your", "there", "where",
+                "looking", "products", "brand", "high", "profiles", "find",
+                "globally", "carry", "promote", "specialize", "creating",
+            }
+            desc_words = _re.findall(r'\b[a-zA-Z]{4,}\b', brand_description.lower())
+            keywords = [w for w in set(desc_words) if w not in stopwords]
 
         if not keywords and not hashtags:
             return True  # Can't determine without keywords
