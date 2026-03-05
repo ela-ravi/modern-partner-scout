@@ -307,8 +307,68 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
                 "business_indicators": analysis.business_indicators,
                 "activity_recency": analysis.activity_recency,
             }
-            
+
+            # Step 7a: Programmatic partner-type adjustments
+            # LLMs are unreliable at enforcing scoring rules, so we apply
+            # hard adjustments based on classification and keyword relevance.
+            profile_type = self._classify_profile_type(profile_data)
+            industry_relevant = self._check_industry_relevance(
+                profile_data, brand_dna
+            )
+
+            username = profile_data.get("username", "?")
+
+            if not industry_relevant:
+                # Wrong industry entirely (e.g., watch store for fragrance brand)
+                for key in dimensions:
+                    dimensions[key] = min(dimensions[key], 25)
+                logger.info(
+                    f"[Scorer] @{username}: WRONG INDUSTRY — "
+                    f"all dimensions capped at 25 (type={profile_type})"
+                )
+
+            elif profile_type == "brand":
+                # Competing brand — cap key dimensions
+                dimensions["content_theme_alignment"] = min(
+                    dimensions["content_theme_alignment"], 30
+                )
+                dimensions["business_indicators"] = min(
+                    dimensions["business_indicators"], 25
+                )
+                logger.info(
+                    f"[Scorer] @{username}: COMPETITOR BRAND — "
+                    f"content capped at 30, business capped at 25"
+                )
+
+            elif profile_type in ("distributor", "boutique"):
+                # Exactly what we want — boost key dimensions
+                dimensions["content_theme_alignment"] = min(
+                    100, dimensions["content_theme_alignment"] + 15
+                )
+                dimensions["business_indicators"] = min(
+                    100, dimensions["business_indicators"] + 20
+                )
+                logger.info(
+                    f"[Scorer] @{username}: {profile_type.upper()} — "
+                    f"content +15, business +20"
+                )
+
+            elif profile_type == "influencer":
+                # Good partner — moderate boost
+                dimensions["content_theme_alignment"] = min(
+                    100, dimensions["content_theme_alignment"] + 10
+                )
+                logger.info(
+                    f"[Scorer] @{username}: INFLUENCER — content +10"
+                )
+
             final_score = self._scoring_service.calculate_final_score_from_dict(dimensions)
+
+            # Apply hard cap for wrong industry or competitor
+            if not industry_relevant:
+                final_score = min(final_score, 25)
+            elif profile_type == "brand":
+                final_score = min(final_score, 45)
 
             # Apply country boost/penalty if target country is set
             country_boosted = False
@@ -1048,9 +1108,161 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
         )
     
     # =========================================================================
+    # Partner-Type Classification & Industry Relevance
+    # =========================================================================
+
+    def _classify_profile_type(self, profile: Dict[str, Any]) -> str:
+        """
+        Classify a profile as distributor, influencer, boutique, brand, personal, or unknown.
+
+        Uses businessCategoryName and bio text signals. This is the same logic
+        as DiscoveryAgent._classify_profile but works with both camelCase (Apify)
+        and snake_case (DB) field names.
+
+        Args:
+            profile: Profile data dictionary
+
+        Returns:
+            One of: "distributor", "influencer", "boutique", "brand", "personal", "unknown"
+        """
+        category = (
+            profile.get("businessCategoryName")
+            or profile.get("business_category")
+            or ""
+        ).lower()
+        bio = (
+            profile.get("biography") or profile.get("bio") or ""
+        ).lower()
+
+        # Distributor / Retailer signals
+        distributor_categories = {
+            "shopping & retail", "retail company",
+            "e-commerce website", "grocery store",
+        }
+        distributor_bio_words = [
+            "we carry", "stockist", "wholesale", "authorized dealer",
+            "shop our collection of", "multi-brand", "featuring brands",
+            "distributor", "retailer", "reseller", "official dealer",
+        ]
+        if category in distributor_categories:
+            return "distributor"
+        for word in distributor_bio_words:
+            if word in bio:
+                return "distributor"
+
+        # Influencer / Creator signals
+        influencer_categories = {
+            "digital creator", "creator", "video creator",
+            "blogger", "public figure",
+        }
+        influencer_bio_words = [
+            "review", "collab", "brand ambassador", "dm for collabs",
+            "content creator", "blogger", "vlogger", "youtuber",
+            "pr friendly", "partnerships",
+        ]
+        if category in influencer_categories:
+            return "influencer"
+        for word in influencer_bio_words:
+            if word in bio:
+                return "influencer"
+
+        # Boutique signals
+        boutique_bio_words = [
+            "boutique", "curated", "select shop", "concept store",
+            "handpicked", "carefully selected",
+        ]
+        for word in boutique_bio_words:
+            if word in bio:
+                return "boutique"
+
+        # Brand signals (only promotes own products)
+        brand_categories = {
+            "product/service", "health/beauty", "clothing (brand)",
+        }
+        brand_bio_words = [
+            "our products", "founded by", "our brand", "our collection",
+            "handcrafted by us", "we create", "made by us", "est.",
+            "established", "founder", "co-founder",
+        ]
+        if category in brand_categories:
+            for word in brand_bio_words:
+                if word in bio:
+                    return "brand"
+        for word in brand_bio_words:
+            if word in bio:
+                return "brand"
+
+        # Personal account
+        is_business = (
+            profile.get("isBusinessAccount")
+            or profile.get("is_business_account")
+            or False
+        )
+        if not is_business and not category:
+            return "personal"
+
+        return "unknown"
+
+    def _check_industry_relevance(
+        self,
+        profile: Dict[str, Any],
+        brand_dna: Dict[str, Any],
+    ) -> bool:
+        """
+        Check if a profile has ANY relevance to the brand's industry.
+
+        Compares brand keywords and hashtags against the profile's bio,
+        business category, and full name. If there is ZERO overlap, the
+        profile is in a completely different industry (e.g., watch store
+        when the brand sells perfume).
+
+        Args:
+            profile: Profile data dictionary
+            brand_dna: Brand DNA with keywords and hashtags
+
+        Returns:
+            True if the profile is at least tangentially relevant
+        """
+        keywords = brand_dna.get("keywords", [])
+        hashtags = brand_dna.get("hashtags", [])
+
+        if not keywords and not hashtags:
+            return True  # Can't determine without keywords
+
+        # Combine all profile text to search
+        bio = (
+            profile.get("biography") or profile.get("bio") or ""
+        ).lower()
+        category = (
+            profile.get("businessCategoryName")
+            or profile.get("business_category")
+            or ""
+        ).lower()
+        full_name = (
+            profile.get("fullName") or profile.get("full_name") or ""
+        ).lower()
+        username = (profile.get("username") or "").lower()
+
+        profile_text = f"{bio} {category} {full_name} {username}"
+
+        # Check keywords (e.g., "perfume", "fragrance", "beauty")
+        for keyword in keywords:
+            kw = keyword.lower().strip()
+            if len(kw) >= 3 and kw in profile_text:
+                return True
+
+        # Check hashtag roots (e.g., "#perfume" → "perfume")
+        for tag in hashtags:
+            tag_clean = tag.lower().strip().lstrip("#")
+            if len(tag_clean) >= 3 and tag_clean in profile_text:
+                return True
+
+        return False
+
+    # =========================================================================
     # Score Calculation (SUB-3.3.4.1.5)
     # =========================================================================
-    
+
     def _build_dimension_list(
         self,
         dimensions: Dict[str, int],
