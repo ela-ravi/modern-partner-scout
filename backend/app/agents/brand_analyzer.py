@@ -70,6 +70,10 @@ class BrandAnalysisOutput(BaseModel):
         default=None,
         description="Brand DNA summary including voice, aesthetic, audience"
     )
+    partner_search_keywords: List[str] = Field(
+        default_factory=list,
+        description="5-10 Instagram user search queries to find COMPLEMENTARY partners — NOT competing brands"
+    )
     confidence_score: int = Field(
         default=70,
         ge=0,
@@ -231,6 +235,7 @@ class BrandAnalyzerAgent(BaseAgent[BrandAnalyzerRequest, BrandAnalyzerResponse])
                 analysis_duration_seconds=duration,
                 related_usernames_from_references=related_usernames,
                 reference_profile_summaries=reference_summaries,
+                partner_search_keywords=analysis.partner_search_keywords,
             )
             
         except JobNotFoundError:

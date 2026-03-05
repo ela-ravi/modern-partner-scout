@@ -251,6 +251,7 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
                 max_followers=input_data.follower_max,
                 limit=input_data.limit,
                 require_business_account=input_data.require_business_account,
+                deprioritize_brands=input_data.deprioritize_brands,
             )
 
             # Step 7b: Extract related usernames from fetched profiles
@@ -490,9 +491,98 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
             return []
     
     # =========================================================================
+    # Profile Classification
+    # =========================================================================
+
+    def _classify_profile(self, profile: Dict[str, Any]) -> str:
+        """
+        Classify a profile as distributor, influencer, boutique, brand, personal, or unknown.
+
+        Uses businessCategoryName and bio text signals to determine the profile type.
+
+        Args:
+            profile: Profile data dictionary
+
+        Returns:
+            One of: "distributor", "influencer", "boutique", "brand", "personal", "unknown"
+        """
+        category = (
+            profile.get("businessCategoryName")
+            or profile.get("business_category")
+            or ""
+        ).lower()
+        bio = (profile.get("biography") or profile.get("bio") or "").lower()
+
+        # Distributor / Retailer signals
+        distributor_categories = {"shopping & retail", "retail company", "e-commerce website", "grocery store"}
+        distributor_bio_words = [
+            "we carry", "stockist", "wholesale", "authorized dealer",
+            "shop our collection of", "multi-brand", "featuring brands",
+            "distributor", "retailer", "reseller", "official dealer",
+        ]
+
+        if category in distributor_categories:
+            return "distributor"
+        for word in distributor_bio_words:
+            if word in bio:
+                return "distributor"
+
+        # Influencer / Creator signals
+        influencer_categories = {"digital creator", "creator", "video creator", "blogger", "public figure"}
+        influencer_bio_words = [
+            "review", "collab", "brand ambassador", "dm for collabs",
+            "content creator", "blogger", "vlogger", "youtuber",
+            "pr friendly", "partnerships",
+        ]
+
+        if category in influencer_categories:
+            return "influencer"
+        for word in influencer_bio_words:
+            if word in bio:
+                return "influencer"
+
+        # Boutique signals
+        boutique_bio_words = [
+            "boutique", "curated", "select shop", "concept store",
+            "handpicked", "carefully selected",
+        ]
+        for word in boutique_bio_words:
+            if word in bio:
+                return "boutique"
+
+        # Brand signals — account that only promotes its own products
+        brand_categories = {"product/service", "health/beauty", "clothing (brand)"}
+        brand_bio_words = [
+            "our products", "founded by", "our brand", "our collection",
+            "handcrafted by us", "we create", "made by us", "est.",
+            "established", "founder", "co-founder",
+        ]
+
+        if category in brand_categories:
+            # Only classify as brand if bio also contains brand signals
+            for word in brand_bio_words:
+                if word in bio:
+                    return "brand"
+
+        for word in brand_bio_words:
+            if word in bio:
+                return "brand"
+
+        # Personal account (no business category, generic bio)
+        is_business = (
+            profile.get("isBusinessAccount")
+            or profile.get("is_business_account")
+            or False
+        )
+        if not is_business and not category:
+            return "personal"
+
+        return "unknown"
+
+    # =========================================================================
     # Follower Range Filtering (SUB-3.3.3.1.3)
     # =========================================================================
-    
+
     def _filter_profiles(
         self,
         profiles: List[Dict[str, Any]],
@@ -502,9 +592,14 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
         exclude_private: bool = True,
         exclude_no_posts: bool = True,
         require_business_account: bool = False,
+        deprioritize_brands: bool = False,
     ) -> Tuple[List[Dict[str, Any]], int]:
         """
         Filter profiles by various criteria including follower range.
+
+        When deprioritize_brands is True, profiles are classified and sorted so
+        distributors/influencers/boutiques come first and brands/personal come last.
+        Brands are NOT excluded entirely — they are just ranked lower.
 
         Args:
             profiles: List of profile data
@@ -514,6 +609,7 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
             exclude_private: Exclude private accounts
             exclude_no_posts: Exclude accounts with no posts
             require_business_account: Only keep business accounts
+            deprioritize_brands: Sort results so partners come first, brands last
 
         Returns:
             Tuple of (filtered_profiles, filtered_out_count)
@@ -521,7 +617,8 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
         logger.debug(
             f"Filtering profiles: {len(profiles)} candidates, "
             f"range {min_followers}-{max_followers}, limit {limit}, "
-            f"require_business={require_business_account}"
+            f"require_business={require_business_account}, "
+            f"deprioritize_brands={deprioritize_brands}"
         )
 
         filtered = []
@@ -531,6 +628,7 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
             "no_posts": 0,
             "fake_suspected": 0,
             "not_business": 0,
+            "brand_deprioritized": 0,
         }
 
         for profile in profiles:
@@ -580,11 +678,43 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
             # Profile passed all filters
             filtered.append(profile)
 
-            # Stop if we've reached the limit
-            if len(filtered) >= limit:
-                break
+        # When deprioritize_brands is enabled, classify and sort
+        if deprioritize_brands and filtered:
+            # Priority: distributor=0, influencer=1, boutique=2, unknown=3, personal=4, brand=5
+            priority_map = {
+                "distributor": 0,
+                "influencer": 1,
+                "boutique": 2,
+                "unknown": 3,
+                "personal": 4,
+                "brand": 5,
+            }
 
-        total_filtered_out = sum(filtered_out_reasons.values())
+            classified = []
+            for profile in filtered:
+                profile_type = self._classify_profile(profile)
+                priority = priority_map.get(profile_type, 3)
+                classified.append((priority, profile_type, profile))
+
+                if profile_type == "brand":
+                    filtered_out_reasons["brand_deprioritized"] += 1
+
+            # Sort by priority (partners first, brands last)
+            classified.sort(key=lambda x: x[0])
+            filtered = [item[2] for item in classified]
+
+            # Log classification breakdown
+            type_counts: Dict[str, int] = {}
+            for _, ptype, _ in classified:
+                type_counts[ptype] = type_counts.get(ptype, 0) + 1
+            logger.info(
+                f"Profile classification: {type_counts} "
+                f"({filtered_out_reasons['brand_deprioritized']} brands deprioritized)"
+            )
+
+        total_filtered_out = sum(
+            v for k, v in filtered_out_reasons.items() if k != "brand_deprioritized"
+        )
         logger.info(
             f"Filtering complete: {len(filtered)} passed, "
             f"{total_filtered_out} filtered out ({filtered_out_reasons})"

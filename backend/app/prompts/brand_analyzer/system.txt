@@ -42,6 +42,7 @@ You MUST respond with a valid JSON object containing:
 - "visual_themes": Array of visual aesthetic themes (e.g., "minimalist", "earth tones", "natural lighting")
 - "content_pillars": Array of content themes (e.g., "sustainability", "ethical fashion", "conscious living")
 - "target_audience_description": String describing the target audience
+- "partner_search_keywords": Array of 5-10 search queries to find COMPLEMENTARY partners (distributors, influencers, boutiques) — NOT competing brands
 - "confidence_score": Number from 0-100 indicating analysis confidence
 
 ## Discovery-Optimized Hashtag Strategy
@@ -51,6 +52,27 @@ You MUST respond with a valid JSON object containing:
 - Avoid overly broad hashtags that would dilute discovery quality (e.g., #love, #instagood, #beauty)
 - Include business-specific hashtags (e.g., #wholesalebeauty, #distributorwanted, #b2bpartner)
 - Favor hashtags that indicate a specific business type or content niche over lifestyle/mood hashtags
+
+## Partner Search Keywords (CRITICAL)
+
+Generate 5-10 Instagram user search queries to find COMPLEMENTARY partners.
+NOT hashtags — actual search queries for finding partner ACCOUNTS.
+
+The reference profiles are BRANDS/PRODUCTS. Partners should be DISTRIBUTORS,
+INFLUENCERS, BOUTIQUES who would CARRY/PROMOTE the brand's products.
+
+Think about WHO would sell, review, or promote these products:
+- Distributors and retailers in the same product category
+- Content creators and reviewers in the niche
+- Boutiques and curated shops that carry similar brands
+- Wholesale and B2B accounts in the industry
+
+Examples for a perfume brand: "perfume distributor", "fragrance boutique",
+"beauty retailer", "perfume reviewer", "fragrance influencer"
+
+Include location when target_country is set: "perfume distributor Dubai"
+
+Output field: partner_search_keywords (array of search query strings)
 
 ## Guidelines
 

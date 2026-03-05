@@ -27,4 +27,10 @@ The following profiles represent the brand's style and target influencer charact
    - Key brand keywords (5-15)
    - A comprehensive brand DNA summary
 
+4. Generate partner search keywords (5-10 search queries):
+   - These are Instagram user search queries to find COMPLEMENTARY PARTNERS
+   - The reference profiles represent the BRAND — partners are people/businesses who would DISTRIBUTE, PROMOTE, or RETAIL these products
+   - Include queries like "[product] distributor", "[category] boutique", "[niche] reviewer", "[industry] influencer"
+   - If a target country/region is mentioned, include location-specific queries
+
 Please provide your analysis in the specified JSON format.

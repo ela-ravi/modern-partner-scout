@@ -118,6 +118,14 @@ class ApifySettings(BaseSettings):
         default="apify/instagram-hashtag-scraper",
         description="Actor ID for Instagram hashtag scraping"
     )
+    search_scraper_id: str = Field(
+        default="apify/instagram-search-scraper",
+        description="Actor ID for Instagram user/keyword search"
+    )
+    tagged_scraper_id: str = Field(
+        default="apify/instagram-tagged-scraper",
+        description="Actor ID for Instagram tagged posts (find who tags a brand)"
+    )
 
 
 class N8NSettings(BaseSettings):

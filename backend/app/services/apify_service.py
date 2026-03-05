@@ -69,6 +69,8 @@ class ApifyRunStatus(str, Enum):
 DEFAULT_PROFILE_SCRAPER = "apify/instagram-profile-scraper"
 DEFAULT_HASHTAG_SCRAPER = "apify/instagram-hashtag-scraper"
 DEFAULT_GOOGLE_SEARCH_SCRAPER = "apify/google-search-scraper"
+DEFAULT_SEARCH_SCRAPER = "apify/instagram-search-scraper"
+DEFAULT_TAGGED_SCRAPER = "apify/instagram-tagged-scraper"
 
 # Rate limiting defaults
 DEFAULT_RATE_LIMIT_REQUESTS = 10  # requests per window
@@ -309,20 +311,26 @@ class ApifyService:
         api_key: Optional[str] = None,
         profile_scraper_id: Optional[str] = None,
         hashtag_scraper_id: Optional[str] = None,
+        search_scraper_id: Optional[str] = None,
+        tagged_scraper_id: Optional[str] = None,
         rate_limiter: Optional[RateLimiter] = None,
     ):
         """
         Initialize the Apify service.
-        
+
         Args:
             api_key: Apify API key (defaults to env var)
             profile_scraper_id: Actor ID for profile scraping
             hashtag_scraper_id: Actor ID for hashtag scraping
+            search_scraper_id: Actor ID for user/keyword search
+            tagged_scraper_id: Actor ID for tagged posts scraping
             rate_limiter: Optional custom rate limiter
         """
         self._api_key = api_key or settings.apify.api_key
         self._profile_scraper_id = profile_scraper_id or settings.apify.instagram_scraper_id
         self._hashtag_scraper_id = hashtag_scraper_id or settings.apify.hashtag_scraper_id
+        self._search_scraper_id = search_scraper_id or settings.apify.search_scraper_id
+        self._tagged_scraper_id = tagged_scraper_id or settings.apify.tagged_scraper_id
         self._rate_limiter = rate_limiter or RateLimiter()
 
         # Profile cache to avoid redundant scrapes (1 hour TTL)
@@ -791,6 +799,177 @@ class ApifyService:
             )
     
     # =========================================================================
+    # Keyword User Search Methods
+    # =========================================================================
+
+    @retry(
+        retry=retry_if_exception_type((ApifyError, TimeoutError)),
+        stop=stop_after_attempt(Defaults.MAX_RETRIES),
+        wait=wait_exponential(multiplier=Defaults.RETRY_DELAY_SECONDS, min=2, max=30),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        reraise=True,
+    )
+    async def search_users(
+        self,
+        keywords: List[str],
+        limit_per_keyword: int = 20,
+        timeout: int = DEFAULT_MAX_WAIT_TIME,
+    ) -> List[Dict[str, Any]]:
+        """
+        Search for Instagram users by keyword using apify/instagram-search-scraper.
+
+        This finds user accounts matching search queries like "perfume distributor"
+        or "fragrance boutique" — useful for discovering complementary partners
+        rather than competitors.
+
+        Args:
+            keywords: List of search query strings
+            limit_per_keyword: Maximum user results per keyword
+            timeout: Maximum wait time per keyword in seconds
+
+        Returns:
+            Flat list of user profile results (may contain duplicates across keywords)
+
+        Raises:
+            ApifyError: If all keyword searches fail
+        """
+        all_results: List[Dict[str, Any]] = []
+        seen_usernames: set = set()
+
+        for keyword in keywords:
+            keyword = keyword.strip()
+            if not keyword:
+                continue
+
+            await self._rate_limiter.acquire()
+
+            logger.info(f"Keyword user search: {keyword!r} (limit={limit_per_keyword})")
+
+            run_input = {
+                "search": keyword,
+                "searchType": "user",
+                "resultsLimit": limit_per_keyword,
+            }
+
+            try:
+                run = self.client.actor(self._search_scraper_id).call(
+                    run_input=run_input,
+                    timeout_secs=timeout,
+                )
+
+                items = list(self.client.dataset(run["defaultDatasetId"]).iterate_items())
+
+                # Deduplicate by username across keywords
+                for item in items:
+                    username = (
+                        item.get("username")
+                        or item.get("userName")
+                        or ""
+                    ).lower()
+                    if username and username not in seen_usernames:
+                        seen_usernames.add(username)
+                        all_results.append(item)
+
+                logger.info(
+                    f"Keyword search {keyword!r} returned {len(items)} results "
+                    f"({len(all_results)} unique total)"
+                )
+
+            except Exception as e:
+                logger.warning(f"Keyword user search failed for {keyword!r}: {e}")
+                continue
+
+        logger.info(
+            f"Keyword user search complete: {len(all_results)} unique users "
+            f"from {len(keywords)} keywords"
+        )
+        return all_results
+
+    # =========================================================================
+    # Tagged Posts Discovery
+    # =========================================================================
+
+    @retry(
+        retry=retry_if_exception_type((ApifyError, TimeoutError)),
+        stop=stop_after_attempt(Defaults.MAX_RETRIES),
+        wait=wait_exponential(multiplier=Defaults.RETRY_DELAY_SECONDS, min=2, max=30),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        reraise=True,
+    )
+    async def search_tagged_posts(
+        self,
+        usernames: List[str],
+        results_limit: int = 50,
+        timeout: int = DEFAULT_MAX_WAIT_TIME,
+    ) -> List[str]:
+        """
+        Find accounts that tag the given brand profiles.
+
+        Uses apify/instagram-tagged-scraper to scrape the "Tagged" tab of
+        brand profiles. People who tag a brand are warm leads — distributors
+        showcasing stock, influencers reviewing products, boutiques featuring
+        the brand.
+
+        Args:
+            usernames: Brand profile usernames to check tagged posts for
+            results_limit: Maximum tagged posts to retrieve per username
+            timeout: Maximum wait time in seconds
+
+        Returns:
+            Deduplicated list of usernames who tagged the brand profiles
+        """
+        await self._rate_limiter.acquire()
+
+        clean_usernames = [u.lstrip("@").strip() for u in usernames if u.strip()]
+        if not clean_usernames:
+            return []
+
+        logger.info(
+            f"Tagged posts discovery: checking who tags {clean_usernames} "
+            f"(limit={results_limit})"
+        )
+
+        run_input = {
+            "usernames": clean_usernames,
+            "resultsLimit": results_limit,
+        }
+
+        try:
+            run = self.client.actor(self._tagged_scraper_id).call(
+                run_input=run_input,
+                timeout_secs=timeout,
+            )
+
+            items = list(self.client.dataset(run["defaultDatasetId"]).iterate_items())
+
+            # Extract unique usernames of people who tagged the brand
+            taggers: set = set()
+            brand_set = {u.lower() for u in clean_usernames}
+
+            for item in items:
+                # The tagged scraper returns posts — extract the post owner
+                owner = (
+                    item.get("ownerUsername")
+                    or item.get("owner_username")
+                    or (item.get("owner") or {}).get("username")
+                    or item.get("username")
+                    or ""
+                ).lower().strip().lstrip("@")
+
+                if owner and owner not in brand_set:
+                    taggers.add(owner)
+
+            logger.info(
+                f"Tagged posts discovery: {len(taggers)} unique accounts "
+                f"tag {clean_usernames} (from {len(items)} tagged posts)"
+            )
+            return list(taggers)
+
+        except Exception as e:
+            logger.warning(f"Tagged posts discovery failed: {e}")
+            return []
+
+    # =========================================================================
     # Helper Methods for Discovery
     # =========================================================================
     
@@ -1109,15 +1288,19 @@ def create_apify_service(
     api_key: Optional[str] = None,
     profile_scraper_id: Optional[str] = None,
     hashtag_scraper_id: Optional[str] = None,
+    search_scraper_id: Optional[str] = None,
+    tagged_scraper_id: Optional[str] = None,
 ) -> ApifyService:
     """
     Create a new ApifyService instance with custom configuration.
-    
+
     Args:
         api_key: Custom API key
         profile_scraper_id: Custom profile scraper actor ID
         hashtag_scraper_id: Custom hashtag scraper actor ID
-        
+        search_scraper_id: Custom search scraper actor ID
+        tagged_scraper_id: Custom tagged posts scraper actor ID
+
     Returns:
         ApifyService instance
     """
@@ -1125,6 +1308,8 @@ def create_apify_service(
         api_key=api_key,
         profile_scraper_id=profile_scraper_id,
         hashtag_scraper_id=hashtag_scraper_id,
+        search_scraper_id=search_scraper_id,
+        tagged_scraper_id=tagged_scraper_id,
     )
 
 
@@ -1156,4 +1341,6 @@ def get_apify_config() -> Dict[str, Any]:
         "configured": is_apify_configured(),
         "profile_scraper_id": settings.apify.instagram_scraper_id,
         "hashtag_scraper_id": settings.apify.hashtag_scraper_id,
+        "search_scraper_id": settings.apify.search_scraper_id,
+        "tagged_scraper_id": settings.apify.tagged_scraper_id,
     }

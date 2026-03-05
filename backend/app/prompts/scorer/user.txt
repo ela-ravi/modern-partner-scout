@@ -8,16 +8,20 @@ Please evaluate the following Instagram profile for brand partnership potential.
 **Brand DNA:**
 {brand_dna}
 
-## Reference Profiles (Ideal Partners)
+## Reference Profiles (The BRAND — What They Sell)
 
-The following profiles represent the TYPE of partner the brand is looking for.
-Score the candidate by how similar they are to these reference profiles in content theme, business type, audience size, and engagement patterns:
+These profiles represent the BRAND's own accounts. The candidate should be someone
+who would DISTRIBUTE, PROMOTE, or RETAIL these products — NOT another brand making
+the same products.
 
 {reference_profiles}
 
-IMPORTANT: A candidate that closely matches the reference profiles in content theme, business type, audience size, and engagement patterns should score 75-90+.
-A candidate that shares some hashtags but differs significantly in business type or content focus should score below 60.
-If no reference profiles are provided above, score based on brand DNA alone.
+SCORING RULES:
+1. Candidate is ANOTHER similar brand (competitor) that only promotes its own products → score LOW (30-45)
+2. Candidate is a DISTRIBUTOR/RETAILER that carries products from multiple brands → score HIGH (70-90)
+3. Candidate is an INFLUENCER/REVIEWER who covers the product category → score HIGH (65-85)
+4. Candidate is a BOUTIQUE/CURATED SHOP featuring selected brands → score HIGH (70-90)
+5. If no reference profiles are provided above, score based on brand DNA alone.
 
 ## Profile to Score
 

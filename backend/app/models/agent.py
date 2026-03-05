@@ -50,6 +50,10 @@ class BrandAnalyzerResponse(BaseModel):
         default_factory=list,
         description="Condensed per-profile dicts for passing to scorer"
     )
+    partner_search_keywords: List[str] = Field(
+        default_factory=list,
+        description="Search queries to find complementary partners (distributors, influencers, boutiques)"
+    )
 
 
 # =============================================================================
@@ -85,6 +89,10 @@ class DiscoveryRequest(BaseModel):
     excluded_usernames: List[str] = Field(
         default_factory=list,
         description="Usernames to exclude (cross-job deduplication)"
+    )
+    deprioritize_brands: bool = Field(
+        default=False,
+        description="Sort results so distributors/influencers come first, brands come last"
     )
     follower_min: int = Field(
         default=5000,

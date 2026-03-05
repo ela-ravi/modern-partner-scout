@@ -21,6 +21,7 @@ from app.agents.scorer import get_scorer_agent
 from app.agents.contact_enricher import get_contact_enricher_agent, ContactEnricherRequest
 from app.core.constants import Defaults, ProfileStatus
 from app.models.agent import BrandAnalyzerRequest, DiscoveryRequest, ScorerRequest
+from app.services.apify_service import get_apify_service
 from app.services.job_service import JobService
 from app.repositories.job_repo import JobRepository
 from app.repositories.profile_repo import ProfileRepository
@@ -110,6 +111,59 @@ def _generate_keyword_hashtags(keywords: List[str]) -> List[str]:
     return hashtags
 
 
+async def _try_keyword_user_search(
+    job_id: str,
+    partner_search_keywords: List[str],
+    discover_count: int,
+    follower_min: int,
+    follower_max: int,
+    excluded_usernames: Set[str],
+) -> "DiscoveryRequest | None":
+    """
+    Try keyword user search and return a DiscoveryRequest, or None on failure.
+
+    Uses apify/instagram-search-scraper with searchType="user" to find
+    complementary partners (distributors, influencers, boutiques).
+    """
+    try:
+        apify_service = get_apify_service()
+        search_results = await apify_service.search_users(
+            keywords=partner_search_keywords[:5],
+            limit_per_keyword=max(10, discover_count // 5),
+        )
+        search_usernames = []
+        for result in search_results:
+            username = (
+                result.get("username")
+                or result.get("userName")
+                or ""
+            ).strip().lstrip("@")
+            if username and username.lower() not in excluded_usernames:
+                search_usernames.append(username)
+
+        logger.info(
+            f"[Orchestration] Job {job_id}: Keyword search found "
+            f"{len(search_usernames)} new usernames"
+        )
+
+        if search_usernames:
+            return DiscoveryRequest(
+                job_id=job_id,
+                reference_usernames=search_usernames[:discover_count],
+                limit=discover_count,
+                follower_min=follower_min,
+                follower_max=follower_max,
+                excluded_usernames=list(excluded_usernames),
+                deprioritize_brands=True,
+            )
+    except Exception as e:
+        logger.warning(
+            f"[Orchestration] Job {job_id}: Keyword user search failed: {e}"
+        )
+
+    return None
+
+
 async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
     """
     Run the full orchestration pipeline internally.
@@ -171,12 +225,21 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
         keywords = brand_response.keywords or []
         related_usernames = brand_response.related_usernames_from_references or []
         reference_summaries = brand_response.reference_profile_summaries or []
+        partner_search_keywords = brand_response.partner_search_keywords or []
+
+        # Extract reference profile usernames for tagged-posts discovery
+        reference_usernames_for_tagging = [
+            s["username"] for s in reference_summaries if s.get("username")
+        ]
+
         phase1_time = time.time() - start_time
         logger.info(
             f"[Orchestration] Job {job_id}: Phase 1 complete in {phase1_time:.1f}s - "
             f"{len(hashtags)} hashtags, {len(keywords)} keywords, "
             f"{len(related_usernames)} related usernames, "
-            f"{len(reference_summaries)} reference summaries"
+            f"{len(reference_summaries)} reference summaries, "
+            f"{len(partner_search_keywords)} partner search keywords, "
+            f"{len(reference_usernames_for_tagging)} reference usernames for tag discovery"
         )
 
         # =====================================================================
@@ -297,15 +360,146 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
             )
 
             # --- Discovery ---
-            if round_num == 1 and related_usernames:
+            # Round strategy (priority order):
+            #   Round 1: Tagged posts — who already tags the brand (warmest leads)
+            #   Round 2: Keyword user search — partner_search_keywords (high quality)
+            #   Round 3: Related profiles — deprioritize_brands (medium quality)
+            #   Round 4+: Hashtag-based discovery (broadest net)
+
+            if round_num == 1 and reference_usernames_for_tagging:
                 # -------------------------------------------------------
-                # Round 1: Reference-related discovery (highest quality)
-                # Use Instagram's relatedProfiles as primary candidates
+                # Round 1: Tagged-posts discovery (WARMEST LEADS)
+                # Find accounts that already tag the brand's profiles.
+                # These are distributors reposting products, influencers
+                # tagging in reviews, boutiques showcasing stock.
+                # -------------------------------------------------------
+                logger.info(
+                    f"[Orchestration] Job {job_id}: Round 1 tagged-posts discovery "
+                    f"for {len(reference_usernames_for_tagging)} reference profiles"
+                )
+                discovery_request = None
+                try:
+                    apify_service = get_apify_service()
+                    tagger_usernames = await apify_service.search_tagged_posts(
+                        usernames=reference_usernames_for_tagging,
+                        results_limit=max(30, discover_count * 2),
+                    )
+                    # Filter out already-known usernames
+                    new_taggers = [
+                        u for u in tagger_usernames
+                        if u.lower() not in excluded_usernames
+                    ]
+                    logger.info(
+                        f"[Orchestration] Job {job_id}: Tagged-posts found "
+                        f"{len(new_taggers)} new accounts that tag the brand"
+                    )
+
+                    if new_taggers:
+                        discovery_request = DiscoveryRequest(
+                            job_id=job_id,
+                            reference_usernames=new_taggers[:discover_count],
+                            limit=discover_count,
+                            follower_min=follower_min,
+                            follower_max=follower_max,
+                            excluded_usernames=list(excluded_usernames),
+                            deprioritize_brands=True,
+                        )
+                except Exception as e:
+                    logger.warning(
+                        f"[Orchestration] Job {job_id}: Tagged-posts discovery failed: {e}"
+                    )
+
+                # Fall back to keyword search if tagged-posts returned nothing
+                if discovery_request is None and partner_search_keywords:
+                    logger.info(
+                        f"[Orchestration] Job {job_id}: Tagged-posts empty, "
+                        f"falling back to keyword user search"
+                    )
+                    discovery_request = await _try_keyword_user_search(
+                        job_id, partner_search_keywords, discover_count,
+                        follower_min, follower_max, excluded_usernames,
+                    )
+
+                # Fall back to related profiles
+                if discovery_request is None and related_usernames:
+                    ref_batch = related_usernames[:discover_count]
+                    discovery_request = DiscoveryRequest(
+                        job_id=job_id,
+                        reference_usernames=ref_batch,
+                        limit=discover_count,
+                        follower_min=follower_min,
+                        follower_max=follower_max,
+                        excluded_usernames=list(excluded_usernames),
+                        require_business_account=is_mostly_business,
+                        deprioritize_brands=True,
+                    )
+
+                # Final fallback to hashtags
+                if discovery_request is None:
+                    round_hashtags = hashtag_groups[0]
+                    discovery_request = DiscoveryRequest(
+                        job_id=job_id,
+                        hashtags=round_hashtags,
+                        keywords=discovery_keywords,
+                        limit=discover_count,
+                        follower_min=follower_min,
+                        follower_max=follower_max,
+                        excluded_usernames=list(excluded_usernames),
+                    )
+
+            elif round_num <= 2 and partner_search_keywords:
+                # -------------------------------------------------------
+                # Round 2 (or Round 1 if no tagged discovery):
+                # Keyword user search (HIGH QUALITY)
+                # Search for complementary partners by keyword using
+                # apify/instagram-search-scraper with searchType="user"
+                # -------------------------------------------------------
+                logger.info(
+                    f"[Orchestration] Job {job_id}: Round {round_num} keyword user search "
+                    f"with {len(partner_search_keywords)} partner keywords"
+                )
+                discovery_request = await _try_keyword_user_search(
+                    job_id, partner_search_keywords, discover_count,
+                    follower_min, follower_max, excluded_usernames,
+                )
+
+                # Fall back to related profiles if keyword search failed/empty
+                if discovery_request is None and related_usernames:
+                    ref_batch = related_usernames[:discover_count]
+                    discovery_request = DiscoveryRequest(
+                        job_id=job_id,
+                        reference_usernames=ref_batch,
+                        limit=discover_count,
+                        follower_min=follower_min,
+                        follower_max=follower_max,
+                        excluded_usernames=list(excluded_usernames),
+                        require_business_account=is_mostly_business,
+                        deprioritize_brands=True,
+                    )
+                elif discovery_request is None:
+                    round_hashtags = hashtag_groups[0]
+                    discovery_request = DiscoveryRequest(
+                        job_id=job_id,
+                        hashtags=round_hashtags,
+                        keywords=discovery_keywords,
+                        limit=discover_count,
+                        follower_min=follower_min,
+                        follower_max=follower_max,
+                        excluded_usernames=list(excluded_usernames),
+                    )
+
+                # Mark keywords as consumed so we don't repeat
+                partner_search_keywords = []
+
+            elif round_num <= 3 and related_usernames:
+                # -------------------------------------------------------
+                # Round 3 (or earlier if prior rounds were skipped):
+                # Reference-related discovery with brand deprioritization
                 # -------------------------------------------------------
                 ref_batch = related_usernames[:discover_count]
                 logger.info(
-                    f"[Orchestration] Job {job_id}: Round 1 using {len(ref_batch)} "
-                    f"reference-related usernames (skipping hashtag search)"
+                    f"[Orchestration] Job {job_id}: Round {round_num} using {len(ref_batch)} "
+                    f"reference-related usernames (deprioritize_brands=True)"
                 )
                 discovery_request = DiscoveryRequest(
                     job_id=job_id,
@@ -315,15 +509,24 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                     follower_max=follower_max,
                     excluded_usernames=list(excluded_usernames),
                     require_business_account=is_mostly_business,
+                    deprioritize_brands=True,
                 )
+                # Consume related usernames so we don't repeat
+                related_usernames = []
+
             else:
                 # -------------------------------------------------------
-                # Rounds 2+: Hashtag-based discovery (existing behavior)
+                # Rounds 4+: Hashtag-based discovery (broadest net)
                 # -------------------------------------------------------
-                # Offset index by 1 if Round 1 used reference usernames
-                hashtag_idx = round_num - 1
-                if related_usernames:
-                    hashtag_idx = max(0, round_num - 2)  # Round 2 -> index 0
+                # Calculate hashtag group index, accounting for earlier rounds
+                rounds_used_for_non_hashtag = 0
+                if reference_usernames_for_tagging:
+                    rounds_used_for_non_hashtag += 1
+                if brand_response.partner_search_keywords:
+                    rounds_used_for_non_hashtag += 1
+                if brand_response.related_usernames_from_references:
+                    rounds_used_for_non_hashtag += 1
+                hashtag_idx = max(0, round_num - 1 - rounds_used_for_non_hashtag)
                 round_hashtags = hashtag_groups[min(hashtag_idx, len(hashtag_groups) - 1)]
 
                 # If this exact hashtag set was already tried and returned 0,
