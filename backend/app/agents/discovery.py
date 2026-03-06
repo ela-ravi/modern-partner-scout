@@ -514,11 +514,23 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
         bio = (profile.get("biography") or profile.get("bio") or "").lower()
 
         # Distributor / Retailer signals
-        distributor_categories = {"shopping & retail", "retail company", "e-commerce website", "grocery store"}
+        distributor_categories = {
+            "shopping & retail", "retail company",
+            "e-commerce website", "grocery store",
+            "shopping district", "beauty supply",
+        }
         distributor_bio_words = [
             "we carry", "stockist", "wholesale", "authorized dealer",
             "shop our collection of", "multi-brand", "featuring brands",
             "distributor", "retailer", "reseller", "official dealer",
+            "all brands", "brands under one roof", "authentic fragrance",
+            "original scent", "100% original", "best prices",
+            "free delivery", "shop now", "order now", "we sell",
+            "we ship", "we deliver", "your one stop", "one-stop",
+            "multi brand", "various brands", "top brands",
+            "authorized reseller", "official store", "fragrance shop",
+            "perfume shop", "beauty store", "cosmetics store",
+            "encargos", "tienda", "importador",
         ]
 
         if category in distributor_categories:
@@ -528,11 +540,19 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
                 return "distributor"
 
         # Influencer / Creator signals
-        influencer_categories = {"digital creator", "creator", "video creator", "blogger", "public figure"}
+        influencer_categories = {
+            "digital creator", "creator", "video creator",
+            "blogger", "public figure", "personal blog",
+        }
         influencer_bio_words = [
             "review", "collab", "brand ambassador", "dm for collabs",
             "content creator", "blogger", "vlogger", "youtuber",
-            "pr friendly", "partnerships",
+            "pr friendly", "partnerships", "fragrance lover",
+            "perfume lover", "beauty lover", "scent lover",
+            "fragrance enthusiast", "perfume enthusiast",
+            "my favorite", "i love fragrance", "i love perfume",
+            "fragrance community", "perfume community",
+            "honest review", "fragrance journey",
         ]
 
         if category in influencer_categories:
@@ -544,7 +564,8 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
         # Boutique signals
         boutique_bio_words = [
             "boutique", "curated", "select shop", "concept store",
-            "handpicked", "carefully selected",
+            "handpicked", "carefully selected", "niche perfumery",
+            "niche fragrance", "artisanal selection", "luxury selection",
         ]
         for word in boutique_bio_words:
             if word in bio:
@@ -556,6 +577,14 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
             "our products", "founded by", "our brand", "our collection",
             "handcrafted by us", "we create", "made by us", "est.",
             "established", "founder", "co-founder",
+            "maison de", "crafted in france", "made in france",
+            "our fragrances", "our perfumes", "our scents",
+            "discover our", "explore our", "the art of perfum",
+            "the house of", "parfumerie", "haute parfumerie",
+            "the world of", "step into the world",
+            "captivating blend", "unique fragrance",
+            "inspired by music", "inspired by nature",
+            "fuses", "bridge between",
         ]
 
         if category in brand_categories:

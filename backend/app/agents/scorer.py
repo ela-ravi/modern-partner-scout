@@ -995,19 +995,22 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
     ) -> ScoringAnalysisOutput:
         """
         Generate fallback scores using heuristics when LLM fails.
-        
+
+        Uses bio keyword overlap with brand DNA for content alignment,
+        profile type classification for business indicators, and
+        engagement/follower metrics for quality dimensions.
+
         Args:
             profile_data: Profile data
             brand_dna: Brand DNA
             fake_indicators: Detected fake indicators
             contact: Extracted contact
-            
+
         Returns:
             ScoringAnalysisOutput with heuristic-based scores
         """
-        logger.warning("Using fallback heuristic scoring")
-        
-        # Default middle scores
+        logger.warning(f"Using fallback heuristic scoring for @{profile_data.get('username', '?')}")
+
         scores = {
             "visual_aesthetic_match": 50,
             "content_theme_alignment": 50,
@@ -1016,81 +1019,158 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
             "business_indicators": 50,
             "activity_recency": 50,
         }
-        
         reasoning = {}
-        
-        # Engagement rate scoring
+
+        # --- Content theme alignment: bio/username vs brand keywords ---
+        bio = (
+            profile_data.get("biography") or profile_data.get("bio") or ""
+        ).lower()
+        username = (profile_data.get("username") or "").lower()
+        full_name = (
+            profile_data.get("fullName") or profile_data.get("full_name") or ""
+        ).lower()
+        profile_text = f"{bio} {username} {full_name}"
+
+        brand_keywords = brand_dna.get("keywords", [])
+        brand_hashtags = brand_dna.get("hashtags", [])
+        all_brand_terms = [
+            k.lower().strip().lstrip("#") for k in brand_keywords + brand_hashtags
+            if len(k.strip().lstrip("#")) >= 3
+        ]
+
+        if all_brand_terms:
+            hits = sum(1 for term in all_brand_terms if term in profile_text)
+            overlap_ratio = hits / len(all_brand_terms)
+            if overlap_ratio >= 0.4:
+                scores["content_theme_alignment"] = 80
+                reasoning["content_theme_alignment"] = f"Strong keyword overlap ({hits}/{len(all_brand_terms)} brand terms in bio)"
+            elif overlap_ratio >= 0.2:
+                scores["content_theme_alignment"] = 60
+                reasoning["content_theme_alignment"] = f"Moderate keyword overlap ({hits}/{len(all_brand_terms)} brand terms in bio)"
+            elif hits >= 1:
+                scores["content_theme_alignment"] = 45
+                reasoning["content_theme_alignment"] = f"Weak keyword overlap ({hits}/{len(all_brand_terms)} brand terms in bio)"
+            else:
+                scores["content_theme_alignment"] = 20
+                reasoning["content_theme_alignment"] = "No keyword overlap with brand DNA"
+        else:
+            scores["content_theme_alignment"] = 40
+            reasoning["content_theme_alignment"] = "No brand keywords available for comparison"
+
+        # --- Visual aesthetic match: use business category overlap ---
+        category = (
+            profile_data.get("businessCategoryName")
+            or profile_data.get("business_category")
+            or ""
+        ).lower()
+        if category:
+            # Check if category matches brand-relevant categories
+            brand_desc_lower = " ".join(brand_keywords).lower() if brand_keywords else ""
+            category_relevant = any(
+                term in category for term in all_brand_terms[:5]
+            ) or any(
+                cat_word in brand_desc_lower
+                for cat_word in category.split()
+                if len(cat_word) >= 4
+            )
+            if category_relevant:
+                scores["visual_aesthetic_match"] = 65
+                reasoning["visual_aesthetic_match"] = f"Business category '{category}' matches brand industry"
+            else:
+                scores["visual_aesthetic_match"] = 35
+                reasoning["visual_aesthetic_match"] = f"Business category '{category}' doesn't match brand industry"
+        else:
+            scores["visual_aesthetic_match"] = 45
+            reasoning["visual_aesthetic_match"] = "No business category available"
+
+        # --- Engagement rate scoring ---
         engagement = profile_data.get("engagement_rate", 0) or 0
         if engagement >= 6:
             scores["engagement_rate_score"] = 95
-            reasoning["engagement_rate_score"] = "Excellent engagement rate"
+            reasoning["engagement_rate_score"] = f"Excellent engagement rate ({engagement:.1f}%)"
         elif engagement >= 3:
             scores["engagement_rate_score"] = 80
-            reasoning["engagement_rate_score"] = "Good engagement rate"
+            reasoning["engagement_rate_score"] = f"Good engagement rate ({engagement:.1f}%)"
         elif engagement >= 1.5:
             scores["engagement_rate_score"] = 65
-            reasoning["engagement_rate_score"] = "Average engagement rate"
+            reasoning["engagement_rate_score"] = f"Average engagement rate ({engagement:.1f}%)"
         elif engagement >= 0.5:
             scores["engagement_rate_score"] = 40
-            reasoning["engagement_rate_score"] = "Below average engagement rate"
+            reasoning["engagement_rate_score"] = f"Below average engagement ({engagement:.1f}%)"
         else:
             scores["engagement_rate_score"] = 20
-            reasoning["engagement_rate_score"] = "Low engagement rate"
-        
-        # Follower quality based on ratio
+            reasoning["engagement_rate_score"] = f"Low engagement rate ({engagement:.1f}%)"
+
+        # --- Follower quality based on ratio ---
         followers = profile_data.get("followers_count", 0) or 0
         following = profile_data.get("following_count", 0) or 0
-        
+
         if followers > 0 and following > 0:
             ratio = following / followers
             if ratio < 0.5:
                 scores["follower_quality"] = 80
-                reasoning["follower_quality"] = "Good follower/following ratio"
+                reasoning["follower_quality"] = f"Good ratio ({ratio:.1f}x)"
             elif ratio < 1.0:
                 scores["follower_quality"] = 65
-                reasoning["follower_quality"] = "Acceptable follower/following ratio"
+                reasoning["follower_quality"] = f"Acceptable ratio ({ratio:.1f}x)"
             elif ratio < 2.0:
                 scores["follower_quality"] = 45
-                reasoning["follower_quality"] = "Moderate follower/following ratio"
+                reasoning["follower_quality"] = f"Moderate ratio ({ratio:.1f}x)"
             else:
                 scores["follower_quality"] = 25
-                reasoning["follower_quality"] = "Poor follower/following ratio"
-        
-        # Business indicators
+                reasoning["follower_quality"] = f"Poor ratio ({ratio:.1f}x)"
+
+        # --- Business indicators: use profile type classification ---
+        profile_type = self._classify_profile_type(profile_data)
         is_business = profile_data.get("is_business_account", False)
         has_email = bool(contact.email)
         has_website = bool(contact.website)
         is_verified = profile_data.get("is_verified", False)
-        
-        business_score = 40  # Base
-        if is_business:
-            business_score += 20
-        if has_email:
-            business_score += 15
-        if has_website:
-            business_score += 15
-        if is_verified:
-            business_score += 10
-        
+
+        if profile_type in ("distributor", "boutique"):
+            business_score = 85
+            reasoning["business_indicators"] = f"Classified as {profile_type} — ideal partner type"
+        elif profile_type == "influencer":
+            business_score = 70
+            reasoning["business_indicators"] = "Classified as influencer — good partner type"
+        elif profile_type == "brand":
+            business_score = 30
+            reasoning["business_indicators"] = "Classified as competing brand — not a partner"
+        else:
+            business_score = 40
+            if is_business:
+                business_score += 15
+            if has_email:
+                business_score += 10
+            if has_website:
+                business_score += 10
+            if is_verified:
+                business_score += 5
+            reasoning["business_indicators"] = f"Type={profile_type}, business features score"
+
         scores["business_indicators"] = min(100, business_score)
-        reasoning["business_indicators"] = "Based on business account features"
-        
-        # Activity recency (default to moderate if no data)
-        scores["activity_recency"] = 60
-        reasoning["activity_recency"] = "Activity data not available for detailed analysis"
-        
-        # Visual and content alignment (default without LLM)
-        scores["visual_aesthetic_match"] = 50
-        scores["content_theme_alignment"] = 50
-        reasoning["visual_aesthetic_match"] = "Unable to analyze visual content without LLM"
-        reasoning["content_theme_alignment"] = "Unable to analyze content themes without LLM"
-        
+
+        # --- Activity recency ---
+        posts_count = profile_data.get("posts_count", 0) or 0
+        if posts_count >= 100:
+            scores["activity_recency"] = 75
+            reasoning["activity_recency"] = f"Active account ({posts_count} posts)"
+        elif posts_count >= 30:
+            scores["activity_recency"] = 60
+            reasoning["activity_recency"] = f"Moderate activity ({posts_count} posts)"
+        elif posts_count >= 10:
+            scores["activity_recency"] = 45
+            reasoning["activity_recency"] = f"Low activity ({posts_count} posts)"
+        else:
+            scores["activity_recency"] = 25
+            reasoning["activity_recency"] = f"Very low activity ({posts_count} posts)"
+
         # Reduce scores if fake indicators present
         is_fake = len(fake_indicators) >= 2
         if is_fake:
             for key in scores:
                 scores[key] = max(10, scores[key] - 20)
-        
+
         return ScoringAnalysisOutput(
             visual_aesthetic_match=scores["visual_aesthetic_match"],
             content_theme_alignment=scores["content_theme_alignment"],
@@ -1138,11 +1218,20 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
         distributor_categories = {
             "shopping & retail", "retail company",
             "e-commerce website", "grocery store",
+            "shopping district", "beauty supply",
         }
         distributor_bio_words = [
             "we carry", "stockist", "wholesale", "authorized dealer",
             "shop our collection of", "multi-brand", "featuring brands",
             "distributor", "retailer", "reseller", "official dealer",
+            "all brands", "brands under one roof", "authentic fragrance",
+            "original scent", "100% original", "best prices",
+            "free delivery", "shop now", "order now", "we sell",
+            "we ship", "we deliver", "your one stop", "one-stop",
+            "multi brand", "various brands", "top brands",
+            "authorized reseller", "official store", "fragrance shop",
+            "perfume shop", "beauty store", "cosmetics store",
+            "encargos", "tienda", "importador",
         ]
         if category in distributor_categories:
             return "distributor"
@@ -1153,12 +1242,17 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
         # Influencer / Creator signals
         influencer_categories = {
             "digital creator", "creator", "video creator",
-            "blogger", "public figure",
+            "blogger", "public figure", "personal blog",
         }
         influencer_bio_words = [
             "review", "collab", "brand ambassador", "dm for collabs",
             "content creator", "blogger", "vlogger", "youtuber",
-            "pr friendly", "partnerships",
+            "pr friendly", "partnerships", "fragrance lover",
+            "perfume lover", "beauty lover", "scent lover",
+            "fragrance enthusiast", "perfume enthusiast",
+            "my favorite", "i love fragrance", "i love perfume",
+            "fragrance community", "perfume community",
+            "honest review", "fragrance journey",
         ]
         if category in influencer_categories:
             return "influencer"
@@ -1169,7 +1263,8 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
         # Boutique signals
         boutique_bio_words = [
             "boutique", "curated", "select shop", "concept store",
-            "handpicked", "carefully selected",
+            "handpicked", "carefully selected", "niche perfumery",
+            "niche fragrance", "artisanal selection", "luxury selection",
         ]
         for word in boutique_bio_words:
             if word in bio:
@@ -1183,6 +1278,14 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
             "our products", "founded by", "our brand", "our collection",
             "handcrafted by us", "we create", "made by us", "est.",
             "established", "founder", "co-founder",
+            "maison de", "crafted in france", "made in france",
+            "our fragrances", "our perfumes", "our scents",
+            "discover our", "explore our", "the art of perfum",
+            "the house of", "parfumerie", "haute parfumerie",
+            "the world of", "step into the world",
+            "captivating blend", "unique fragrance",
+            "inspired by music", "inspired by nature",
+            "fuses", "bridge between",
         ]
         if category in brand_categories:
             for word in brand_bio_words:
