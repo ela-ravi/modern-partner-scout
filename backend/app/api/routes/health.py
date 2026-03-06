@@ -73,7 +73,22 @@ async def detailed_health_check():
             )
             user_data = _json.loads(resp.read())
             plan = user_data.get("data", {}).get("plan", {}).get("id", "?")
-            services["apify"] = f"healthy (plan={plan})"
+            username = user_data.get("data", {}).get("username", "?")
+            services["apify"] = f"healthy (plan={plan}, user={username})"
+
+            # Check recent actor runs
+            runs_url = f"https://api.apify.com/v2/actor-runs?token={apify_key}&limit=5&desc=true"
+            runs_resp = urllib.request.urlopen(
+                urllib.request.Request(runs_url), timeout=10
+            )
+            runs_data = _json.loads(runs_resp.read())
+            runs = runs_data.get("data", {}).get("items", [])
+            services["apify_recent_runs"] = len(runs)
+            if runs:
+                latest = runs[0]
+                services["apify_last_run"] = (
+                    f"{latest.get('status')} at {latest.get('startedAt', '?')}"
+                )
         except Exception as e:
             services["apify"] = f"error: {str(e)[:120]}"
 
