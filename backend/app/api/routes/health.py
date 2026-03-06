@@ -117,74 +117,105 @@ async def detailed_health_check():
 
 
 @router.get("/health/apify-test")
-async def apify_scrape_test():
+async def apify_pipeline_test():
     """
-    Run a minimal Apify actor call to verify end-to-end scraping works.
+    Test each Apify-powered discovery method used by the pipeline.
 
-    Returns diagnostics about the apify_client library, API key, and actor run.
+    Tests: profile scraper, hashtag scraper, search scraper, tagged scraper.
+    Returns step-by-step results showing exactly what works and what doesn't.
     """
-    import os
     import traceback
+    from app.services.apify_service import get_apify_service
 
-    result: dict = {"steps": []}
+    result: dict = {"tests": {}}
+    svc = get_apify_service()
 
-    def log(msg: str):
-        result["steps"].append(msg)
-
-    # Step 1: Check env var
-    apify_key = os.environ.get("APIFY_API_KEY", "")
-    log(f"APIFY_API_KEY set: {bool(apify_key)}, prefix: {apify_key[:12]}...")
-
-    # Step 2: Try importing apify_client
+    # Test 1: Profile scraper (used by brand analysis + discovery)
     try:
-        from apify_client import ApifyClient
-        import apify_client as _ac
-        log(f"apify_client imported OK, version={getattr(_ac, '__version__', '?')}")
-    except Exception as e:
-        log(f"apify_client import FAILED: {e}")
-        result["error"] = str(e)
-        return result
-
-    # Step 3: Create client and try to run actor
-    try:
-        client = ApifyClient(apify_key)
-        log("ApifyClient created")
-
-        # Run the profile scraper with a single well-known username
-        run_input = {
-            "usernames": ["instagram"],
-            "resultsLimit": 1,
+        profiles = await svc.scrape_profiles(["argosfragrances"], results_limit=1)
+        p = profiles[0] if profiles else {}
+        related = p.get("relatedProfiles", [])
+        result["tests"]["profile_scraper"] = {
+            "status": "OK",
+            "profiles_returned": len(profiles),
+            "username": p.get("username"),
+            "followers": p.get("followersCount"),
+            "related_profiles_count": len(related),
+            "related_sample": [r.get("username", r) if isinstance(r, dict) else r for r in related[:3]],
         }
-        log("Starting actor run: apify/instagram-profile-scraper")
-        run = client.actor("apify/instagram-profile-scraper").call(
-            run_input=run_input,
-            timeout_secs=120,
-        )
-        log(f"Actor run completed: status={run.get('status')}, id={run.get('id', '?')[:12]}")
-
-        dataset_id = run.get("defaultDatasetId")
-        if dataset_id:
-            items = list(client.dataset(dataset_id).iterate_items())
-            log(f"Dataset items: {len(items)}")
-            if items:
-                item = items[0]
-                log(
-                    f"Profile: @{item.get('username')}, "
-                    f"followers={item.get('followersCount')}"
-                )
-                result["success"] = True
-            else:
-                log("No items in dataset")
-                result["success"] = False
-        else:
-            log("No dataset ID in run result")
-            result["success"] = False
-
     except Exception as e:
-        tb = traceback.format_exc()
-        log(f"Actor run FAILED: {e}")
-        log(f"Traceback: {tb[-300:]}")
-        result["error"] = str(e)
-        result["success"] = False
+        result["tests"]["profile_scraper"] = {
+            "status": "FAILED",
+            "error": str(e),
+            "traceback": traceback.format_exc()[-300:],
+        }
+
+    # Test 2: Hashtag scraper (used by discovery rounds 4+)
+    try:
+        hashtag_results = await svc.search_hashtags(["perfume"], limit_per_hashtag=5)
+        posts = hashtag_results.get("perfume", [])
+        usernames = set()
+        for post in posts:
+            owner = post.get("ownerUsername") or (post.get("owner", {}) or {}).get("username")
+            if owner:
+                usernames.add(owner)
+        result["tests"]["hashtag_scraper"] = {
+            "status": "OK",
+            "posts_returned": len(posts),
+            "unique_usernames": len(usernames),
+            "sample_usernames": list(usernames)[:5],
+            "sample_post_keys": list(posts[0].keys()) if posts else [],
+        }
+    except Exception as e:
+        result["tests"]["hashtag_scraper"] = {
+            "status": "FAILED",
+            "error": str(e),
+            "traceback": traceback.format_exc()[-300:],
+        }
+
+    # Test 3: Search scraper (used by keyword user search in round 2)
+    try:
+        search_results = await svc.search_users(
+            keywords=["perfume distributor"],
+            limit_per_keyword=5,
+        )
+        result["tests"]["search_scraper"] = {
+            "status": "OK",
+            "users_returned": len(search_results),
+            "sample_users": [
+                r.get("username") or r.get("userName") or "?"
+                for r in search_results[:5]
+            ],
+            "sample_keys": list(search_results[0].keys()) if search_results else [],
+        }
+    except Exception as e:
+        result["tests"]["search_scraper"] = {
+            "status": "FAILED",
+            "error": str(e),
+            "traceback": traceback.format_exc()[-300:],
+        }
+
+    # Test 4: Tagged scraper (used by round 1)
+    try:
+        taggers = await svc.search_tagged_posts(
+            usernames=["argosfragrances"],
+            results_limit=10,
+        )
+        result["tests"]["tagged_scraper"] = {
+            "status": "OK",
+            "taggers_found": len(taggers),
+            "sample_taggers": taggers[:5],
+        }
+    except Exception as e:
+        result["tests"]["tagged_scraper"] = {
+            "status": "FAILED",
+            "error": str(e),
+            "traceback": traceback.format_exc()[-300:],
+        }
+
+    # Summary
+    statuses = {k: v.get("status") for k, v in result["tests"].items()}
+    result["summary"] = statuses
+    result["all_ok"] = all(s == "OK" for s in statuses.values())
 
     return result
