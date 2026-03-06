@@ -695,6 +695,18 @@ Profile {i}: @{username}
         }
         hashtags = [h for h in all_hashtags if h.lower() not in generic][:20]
 
+        # Also generate hashtags from brand description keywords
+        desc_nouns = re.findall(r'\b[a-zA-Z]{4,}\b', brand_description.lower())
+        industry_words = {
+            "fragrance", "perfume", "beauty", "cosmetics", "skincare",
+            "fashion", "jewelry", "luxury", "artisanal", "handcrafted",
+            "organic", "wellness", "fitness", "food", "gourmet",
+            "sustainable", "ethical", "vintage", "boutique", "designer",
+        }
+        for word in desc_nouns:
+            if word in industry_words and f"#{word}" not in [h.lower() for h in hashtags]:
+                hashtags.append(f"#{word}")
+
         # 2. Extract keywords from brand description and bios
         desc_words = set(re.findall(r'\b[a-zA-Z]{4,}\b', brand_description.lower()))
         stopwords = {
@@ -703,6 +715,9 @@ Profile {i}: @{username}
             "more", "also", "than", "them", "some", "other", "each",
             "very", "when", "what", "which", "your", "there", "where",
             "looking", "products", "brand", "high", "profiles",
+            "carry", "east", "globally", "creating", "promote",
+            "specialize", "unique", "middle", "house", "find",
+            "influencers", "distributors", "boutiques", "partners",
         }
         keywords = [w for w in desc_words if w not in stopwords][:15]
 

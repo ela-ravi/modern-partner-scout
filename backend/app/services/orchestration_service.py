@@ -248,11 +248,14 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
         logger.info(f"[Orchestration] Job {job_id}: Starting Phase 2+3 - Iterative Discovery & Scoring")
         job_service.update_status(job_id, "discovering", validate_transition=True)
 
-        # Prepare discovery parameters — use ALL available hashtags
-        all_hashtags = hashtags if hashtags else job_data.get("hashtags", [])
+        # Prepare discovery parameters — MERGE brand + job hashtags
+        job_hashtags = job_data.get("hashtags", [])
+        all_hashtags = list(dict.fromkeys(hashtags + job_hashtags))  # deduplicated, order preserved
         if not all_hashtags:
             all_hashtags = ["#sustainable", "#ecofriendly"]
-        discovery_keywords = keywords[:5] if keywords else job_data.get("keywords", [])[:5]
+        discovery_keywords = list(dict.fromkeys(
+            (keywords[:5] if keywords else []) + (job_data.get("keywords", [])[:5])
+        ))
 
         # Inject country-specific hashtags when target_country is set
         target_country = job_data.get("target_country")
