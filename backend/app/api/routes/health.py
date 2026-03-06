@@ -114,3 +114,77 @@ async def detailed_health_check():
         version="1.0.0",
         services=services
     )
+
+
+@router.get("/health/apify-test")
+async def apify_scrape_test():
+    """
+    Run a minimal Apify actor call to verify end-to-end scraping works.
+
+    Returns diagnostics about the apify_client library, API key, and actor run.
+    """
+    import os
+    import traceback
+
+    result: dict = {"steps": []}
+
+    def log(msg: str):
+        result["steps"].append(msg)
+
+    # Step 1: Check env var
+    apify_key = os.environ.get("APIFY_API_KEY", "")
+    log(f"APIFY_API_KEY set: {bool(apify_key)}, prefix: {apify_key[:12]}...")
+
+    # Step 2: Try importing apify_client
+    try:
+        from apify_client import ApifyClient
+        import apify_client as _ac
+        log(f"apify_client imported OK, version={getattr(_ac, '__version__', '?')}")
+    except Exception as e:
+        log(f"apify_client import FAILED: {e}")
+        result["error"] = str(e)
+        return result
+
+    # Step 3: Create client and try to run actor
+    try:
+        client = ApifyClient(apify_key)
+        log("ApifyClient created")
+
+        # Run the profile scraper with a single well-known username
+        run_input = {
+            "usernames": ["instagram"],
+            "resultsLimit": 1,
+        }
+        log("Starting actor run: apify/instagram-profile-scraper")
+        run = client.actor("apify/instagram-profile-scraper").call(
+            run_input=run_input,
+            timeout_secs=120,
+        )
+        log(f"Actor run completed: status={run.get('status')}, id={run.get('id', '?')[:12]}")
+
+        dataset_id = run.get("defaultDatasetId")
+        if dataset_id:
+            items = list(client.dataset(dataset_id).iterate_items())
+            log(f"Dataset items: {len(items)}")
+            if items:
+                item = items[0]
+                log(
+                    f"Profile: @{item.get('username')}, "
+                    f"followers={item.get('followersCount')}"
+                )
+                result["success"] = True
+            else:
+                log("No items in dataset")
+                result["success"] = False
+        else:
+            log("No dataset ID in run result")
+            result["success"] = False
+
+    except Exception as e:
+        tb = traceback.format_exc()
+        log(f"Actor run FAILED: {e}")
+        log(f"Traceback: {tb[-300:]}")
+        result["error"] = str(e)
+        result["success"] = False
+
+    return result
