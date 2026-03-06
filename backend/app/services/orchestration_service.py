@@ -289,19 +289,35 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
         follower_min = job_data.get("follower_range_min", 5000)
         follower_max = job_data.get("follower_range_max", 500000)
 
-        # Calibrate follower range from reference profiles
+        # Calibrate follower range from reference profiles.
+        # We find COMPLEMENTARY partners — distributors, influencers, boutiques —
+        # who typically have FEWER followers than the brand itself. So anchor
+        # the range on the SMALLEST reference profile and use a wide band.
         if reference_summaries:
-            ref_followers = [s.get("followers", 0) for s in reference_summaries if s.get("followers", 0) > 0]
+            ref_followers = sorted(
+                [s.get("followers", 0) for s in reference_summaries if s.get("followers", 0) > 0]
+            )
             if ref_followers:
-                avg_ref_followers = sum(ref_followers) / len(ref_followers)
-                calibrated_min = max(follower_min, int(avg_ref_followers * 0.3))
-                calibrated_max = min(follower_max, int(avg_ref_followers * 3.0))
-                # Only apply if calibrated range is valid
+                min_ref = ref_followers[0]
+                max_ref = ref_followers[-1]
+
+                # Partners can be smaller than the brand — use 10% of the
+                # smallest reference as the floor, capped at 5000 so we
+                # don't accidentally filter out small but real accounts.
+                calibrated_min = max(follower_min, min(int(min_ref * 0.1), 5000))
+
+                # Partners can be larger than some references — use 3x the
+                # largest reference, but respect the job's upper bound.
+                calibrated_max = min(follower_max, int(max_ref * 3.0))
+                # Ensure at least a 50K-wide window
+                calibrated_max = max(calibrated_max, calibrated_min + 50000)
+                calibrated_max = min(calibrated_max, follower_max)
+
                 if calibrated_min < calibrated_max:
                     logger.info(
-                        f"[Orchestration] Job {job_id}: Follower range calibrated from references: "
+                        f"[Orchestration] Job {job_id}: Follower range calibrated: "
                         f"{follower_min}-{follower_max} -> {calibrated_min}-{calibrated_max} "
-                        f"(avg ref: {avg_ref_followers:.0f})"
+                        f"(refs: {min_ref}-{max_ref})"
                     )
                     follower_min = calibrated_min
                     follower_max = calibrated_max
