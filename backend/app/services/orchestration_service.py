@@ -438,6 +438,8 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                         job_id, partner_search_keywords, discover_count,
                         follower_min, follower_max, excluded_usernames,
                     )
+                    # Mark keywords as consumed so Round 2 doesn't repeat
+                    partner_search_keywords = []
 
                 # Fall back to related profiles
                 if discovery_request is None and related_usernames:
