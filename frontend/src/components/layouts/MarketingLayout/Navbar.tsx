@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
+import { useAuth } from '@/contexts/AuthContext'
 import MenuIcon from '@mui/icons-material/Menu'
 import CloseIcon from '@mui/icons-material/Close'
 
@@ -16,6 +17,7 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
+  const { isAuthenticated } = useAuth()
 
   useEffect(() => {
     function onScroll() {
@@ -84,12 +86,20 @@ export function Navbar() {
 
           {/* Desktop CTAs */}
           <div className="hidden md:flex items-center gap-3">
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/login">Log in</Link>
-            </Button>
-            <Button variant="primary" size="sm" asChild>
-              <Link to="/login">Get Started</Link>
-            </Button>
+            {isAuthenticated ? (
+              <Button variant="primary" size="sm" asChild>
+                <Link to="/sessions">Dashboard</Link>
+              </Button>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/login">Log in</Link>
+                </Button>
+                <Button variant="primary" size="sm" asChild>
+                  <Link to="/login">Get Started</Link>
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Mobile hamburger */}
@@ -127,12 +137,20 @@ export function Navbar() {
                 </Link>
               ))}
               <div className="flex flex-col gap-2 mt-3 px-4">
-                <Button variant="secondary" size="md" asChild>
-                  <Link to="/login" onClick={closeMobile}>Log in</Link>
-                </Button>
-                <Button variant="primary" size="md" asChild>
-                  <Link to="/login" onClick={closeMobile}>Get Started</Link>
-                </Button>
+                {isAuthenticated ? (
+                  <Button variant="primary" size="md" asChild>
+                    <Link to="/sessions" onClick={closeMobile}>Dashboard</Link>
+                  </Button>
+                ) : (
+                  <>
+                    <Button variant="secondary" size="md" asChild>
+                      <Link to="/login" onClick={closeMobile}>Log in</Link>
+                    </Button>
+                    <Button variant="primary" size="md" asChild>
+                      <Link to="/login" onClick={closeMobile}>Get Started</Link>
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </div>
