@@ -585,6 +585,14 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
             "captivating blend", "unique fragrance",
             "inspired by music", "inspired by nature",
             "fuses", "bridge between",
+            "luxury perfume", "premium fragrance", "artisan perfume",
+            "niche perfume", "perfume brand", "fragrance brand",
+            "official account", "official page",
+            "our line", "our range", "we craft", "we blend",
+            "handmade perfume", "handmade fragrance",
+            "by appointment", "bespoke fragrance",
+            "perfume house", "fragrance house",
+            "scent brand", "scent house",
         ]
 
         if category in brand_categories:
@@ -597,12 +605,17 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
             if word in bio:
                 return "brand"
 
-        # Personal account (no business category, generic bio)
+        # Category-based brand fallback: business account in brand category
+        # with no distributor/influencer/boutique signals = likely a self-brand
         is_business = (
             profile.get("isBusinessAccount")
             or profile.get("is_business_account")
             or False
         )
+        if category in brand_categories and is_business:
+            return "brand"
+
+        # Personal account (no business category, generic bio)
         if not is_business and not category:
             return "personal"
 

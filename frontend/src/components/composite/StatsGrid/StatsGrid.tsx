@@ -72,7 +72,7 @@ export function StatsGrid({ analytics, isLoading, className }: StatsGridProps) {
   return (
     <div className={cn('grid grid-cols-2 lg:grid-cols-4 gap-4', className)}>
       <StatCard
-        label="Processed"
+        label="Discovered"
         value={analytics.total_profiles}
         icon={<PeopleIcon className="w-5 h-5 text-white" />}
         color="bg-apple-blue"

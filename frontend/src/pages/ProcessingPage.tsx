@@ -335,7 +335,7 @@ export default function ProcessingPage() {
             stages={stages}
             overallProgress={progress}
             totalProfiles={job.discovery_limit ?? 50}
-            completedProfiles={job.profiles_scored}
+            completedProfiles={analytics?.done_profiles ?? job.profiles_scored}
             estimatedTime={isRunning ? '2-5 minutes' : undefined}
           />
         </div>

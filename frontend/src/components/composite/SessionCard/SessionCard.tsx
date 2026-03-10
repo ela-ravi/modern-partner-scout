@@ -94,7 +94,7 @@ export function SessionCard({ job, onDelete, className }: SessionCardProps) {
 
           <div className="flex items-center gap-2 text-apple-text-secondary">
             <CheckCircleIcon className="w-4 h-4" />
-            <span>Scored: </span>
+            <span>Qualified: </span>
             <span className="font-medium text-apple-text">{job.profiles_scored}</span>
           </div>
 

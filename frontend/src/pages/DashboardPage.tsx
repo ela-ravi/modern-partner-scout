@@ -217,7 +217,7 @@ export default function DashboardPage() {
               {getJobStatusBadge(job.status)}
             </div>
             <p className="text-sm text-apple-text-secondary mt-0.5">
-              {analytics?.total_profiles ?? job.profiles_discovered} processed • {analytics?.done_profiles ?? job.profiles_scored} qualified
+              {analytics?.total_profiles ?? job.profiles_discovered} discovered • {analytics?.done_profiles ?? job.profiles_scored} qualified
             </p>
           </div>
         </div>

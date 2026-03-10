@@ -691,12 +691,6 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                     score_response = await scorer_agent.run(score_request)
                     total_scored += 1
 
-                    # Increment profiles_scored counter
-                    try:
-                        job_repo.increment_profiles_scored(job_id)
-                    except Exception:
-                        pass
-
                     # Safety net: ensure profile status is set to 'done'
                     # The scorer agent should do this, but verify it happened
                     try:
@@ -712,6 +706,10 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                     # Check against threshold
                     if score_response.final_score >= min_score_threshold:
                         qualified_profiles.append(profile)
+                        try:
+                            job_repo.increment_profiles_scored(job_id)
+                        except Exception:
+                            pass
                         logger.info(
                             f"[Orchestration] Job {job_id}: R{round_num} - "
                             f"@{username} QUALIFIED (score={score_response.final_score})"
@@ -755,7 +753,7 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
         try:
             job_repo.update(str(job_id), {
                 "profiles_discovered": total_discovered,
-                "profiles_scored": total_scored,
+                "profiles_scored": len(qualified_profiles),
             })
         except Exception:
             pass

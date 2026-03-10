@@ -394,6 +394,12 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
                         f"new_score={final_score}"
                     )
 
+            # RE-APPLY hard caps after country adjustment (prevent country boost from leaking brands through)
+            if not industry_relevant:
+                final_score = min(final_score, 25)
+            elif profile_type == "brand":
+                final_score = min(final_score, 45)
+
             # Get recommendation from scoring service
             recommendation = self._scoring_service.get_recommendation(
                 final_score=final_score,
@@ -1286,6 +1292,14 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
             "captivating blend", "unique fragrance",
             "inspired by music", "inspired by nature",
             "fuses", "bridge between",
+            "luxury perfume", "premium fragrance", "artisan perfume",
+            "niche perfume", "perfume brand", "fragrance brand",
+            "official account", "official page",
+            "our line", "our range", "we craft", "we blend",
+            "handmade perfume", "handmade fragrance",
+            "by appointment", "bespoke fragrance",
+            "perfume house", "fragrance house",
+            "scent brand", "scent house",
         ]
         if category in brand_categories:
             for word in brand_bio_words:
@@ -1295,12 +1309,17 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
             if word in bio:
                 return "brand"
 
-        # Personal account
+        # Category-based brand fallback: business account in brand category
+        # with no distributor/influencer/boutique signals = likely a self-brand
         is_business = (
             profile.get("isBusinessAccount")
             or profile.get("is_business_account")
             or False
         )
+        if category in brand_categories and is_business:
+            return "brand"
+
+        # Personal account
         if not is_business and not category:
             return "personal"
 
