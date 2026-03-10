@@ -299,8 +299,8 @@ class Defaults:
     HIGH_SCORE_THRESHOLD = 80
 
     # Iterative Discovery
-    OVER_DISCOVERY_MULTIPLIER = 3.0
-    MAX_DISCOVERY_ROUNDS = 10
+    OVER_DISCOVERY_MULTIPLIER = 4.0
+    MAX_DISCOVERY_ROUNDS = 15
     
     # Scoring Weights (must sum to 1.0)
     WEIGHT_VISUAL_AESTHETIC = 0.15

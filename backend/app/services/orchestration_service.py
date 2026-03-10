@@ -371,7 +371,7 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
 
             # Calculate how many to discover this round (2x the gap)
             discover_count = int(remaining * Defaults.OVER_DISCOVERY_MULTIPLIER)
-            discover_count = max(discover_count, 10)  # At least 10
+            discover_count = max(discover_count, 15)  # At least 15
 
             logger.info(
                 f"[Orchestration] Job {job_id}: Round {round_num}/{Defaults.MAX_DISCOVERY_ROUNDS} - "
@@ -537,42 +537,60 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
 
             else:
                 # -------------------------------------------------------
-                # Rounds 4+: Hashtag-based discovery (broadest net)
+                # Rounds 4+: Prefer pending related usernames, then hashtags
                 # -------------------------------------------------------
-                # Calculate hashtag group index, accounting for earlier rounds
-                rounds_used_for_non_hashtag = 0
-                if reference_usernames_for_tagging:
-                    rounds_used_for_non_hashtag += 1
-                if brand_response.partner_search_keywords:
-                    rounds_used_for_non_hashtag += 1
-                if brand_response.related_usernames_from_references:
-                    rounds_used_for_non_hashtag += 1
-                hashtag_idx = max(0, round_num - 1 - rounds_used_for_non_hashtag)
-                round_hashtags = hashtag_groups[min(hashtag_idx, len(hashtag_groups) - 1)]
+                if pending_related_usernames:
+                    batch = pending_related_usernames[:discover_count]
+                    pending_related_usernames = pending_related_usernames[discover_count:]
+                    logger.info(
+                        f"[Orchestration] Job {job_id}: Round {round_num} using "
+                        f"{len(batch)} pending related usernames"
+                    )
+                    discovery_request = DiscoveryRequest(
+                        job_id=job_id,
+                        reference_usernames=batch,
+                        limit=discover_count,
+                        follower_min=follower_min,
+                        follower_max=follower_max,
+                        excluded_usernames=list(excluded_usernames),
+                        deprioritize_brands=True,
+                    )
+                else:
+                    # Hashtag-based discovery (broadest net)
+                    # Calculate hashtag group index, accounting for earlier rounds
+                    rounds_used_for_non_hashtag = 0
+                    if reference_usernames_for_tagging:
+                        rounds_used_for_non_hashtag += 1
+                    if brand_response.partner_search_keywords:
+                        rounds_used_for_non_hashtag += 1
+                    if brand_response.related_usernames_from_references:
+                        rounds_used_for_non_hashtag += 1
+                    hashtag_idx = max(0, round_num - 1 - rounds_used_for_non_hashtag)
+                    round_hashtags = hashtag_groups[min(hashtag_idx, len(hashtag_groups) - 1)]
 
-                # If this exact hashtag set was already tried and returned 0,
-                # switch to keyword-derived fallback hashtags
-                hashtag_key = "|".join(sorted(round_hashtags))
-                if hashtag_key in tried_hashtag_sets and keyword_fallback_hashtags:
-                    # Pick a fresh slice of fallback hashtags
-                    fallback_start = (round_num - 1) * 8
-                    fallback_slice = keyword_fallback_hashtags[fallback_start:fallback_start + 8]
-                    if fallback_slice:
-                        round_hashtags = fallback_slice
-                        logger.info(
-                            f"[Orchestration] Job {job_id}: Using keyword-fallback hashtags: {round_hashtags}"
-                        )
-                tried_hashtag_sets.add(hashtag_key)
+                    # If this exact hashtag set was already tried and returned 0,
+                    # switch to keyword-derived fallback hashtags
+                    hashtag_key = "|".join(sorted(round_hashtags))
+                    if hashtag_key in tried_hashtag_sets and keyword_fallback_hashtags:
+                        # Pick a fresh slice of fallback hashtags
+                        fallback_start = (round_num - 1) * 8
+                        fallback_slice = keyword_fallback_hashtags[fallback_start:fallback_start + 8]
+                        if fallback_slice:
+                            round_hashtags = fallback_slice
+                            logger.info(
+                                f"[Orchestration] Job {job_id}: Using keyword-fallback hashtags: {round_hashtags}"
+                            )
+                    tried_hashtag_sets.add(hashtag_key)
 
-                discovery_request = DiscoveryRequest(
-                    job_id=job_id,
-                    hashtags=round_hashtags,
-                    keywords=discovery_keywords,
-                    limit=discover_count,
-                    follower_min=follower_min,
-                    follower_max=follower_max,
-                    excluded_usernames=list(excluded_usernames),
-                )
+                    discovery_request = DiscoveryRequest(
+                        job_id=job_id,
+                        hashtags=round_hashtags,
+                        keywords=discovery_keywords,
+                        limit=discover_count,
+                        follower_min=follower_min,
+                        follower_max=follower_max,
+                        excluded_usernames=list(excluded_usernames),
+                    )
 
             try:
                 discovery_response = await discovery_agent.run(discovery_request)
@@ -596,13 +614,47 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                 )
 
             if not round_profiles:
+                # Try rescue from pending related usernames before declaring empty
+                if pending_related_usernames:
+                    rescue_batch = pending_related_usernames[:discover_count]
+                    pending_related_usernames = pending_related_usernames[discover_count:]
+                    logger.info(
+                        f"[Orchestration] Job {job_id}: Round {round_num} empty, "
+                        f"rescuing with {len(rescue_batch)} related usernames"
+                    )
+                    rescue_request = DiscoveryRequest(
+                        job_id=job_id,
+                        reference_usernames=rescue_batch,
+                        limit=discover_count,
+                        follower_min=follower_min,
+                        follower_max=follower_max,
+                        excluded_usernames=list(excluded_usernames),
+                        deprioritize_brands=True,
+                    )
+                    try:
+                        rescue_response = await discovery_agent.run(rescue_request)
+                        round_profiles = rescue_response.profiles or []
+                        total_discovered += len(round_profiles)
+                        # Harvest related usernames from rescue
+                        if rescue_response.related_usernames:
+                            new_related = [
+                                u for u in rescue_response.related_usernames
+                                if u.lower() not in excluded_usernames
+                            ]
+                            pending_related_usernames.extend(new_related)
+                    except Exception as e:
+                        logger.warning(
+                            f"[Orchestration] Job {job_id}: Rescue discovery failed: {e}"
+                        )
+
+            if not round_profiles:
                 empty_rounds += 1
                 logger.warning(
                     f"[Orchestration] Job {job_id}: No new profiles in round {round_num} "
                     f"(empty_rounds={empty_rounds})"
                 )
-                # Only break after 3 consecutive empty rounds to give fallback a chance
-                if empty_rounds >= 3:
+                # Only break after 5 consecutive empty rounds to give fallback a chance
+                if empty_rounds >= 5:
                     logger.warning(
                         f"[Orchestration] Job {job_id}: {empty_rounds} consecutive empty rounds, "
                         f"stopping discovery."
