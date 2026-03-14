@@ -351,6 +351,11 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
         # Initialize agents
         discovery_agent = get_discovery_agent()
         scorer_agent = get_scorer_agent()
+        # Disable scorer's own status updates — orchestration controls status
+        # to prevent profiles from appearing as 'done' before qualification check
+        scorer_agent._manage_profile_status = False
+
+        SCORING_BATCH_SIZE = 3  # Score up to 3 profiles concurrently
 
         qualified_profiles: List[Dict[str, Any]] = []
         total_discovered = 0
@@ -674,66 +679,71 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
             if total_scored == 0:
                 job_service.update_status(job_id, "scoring", validate_transition=True)
 
-            # --- Scoring ---
-            for i, profile in enumerate(round_profiles):
-                profile_id = _get_profile_field(profile, "id")
-                if not profile_id:
-                    continue
-
-                username = _get_profile_field(profile, "username", "?")
-
+            # --- Scoring (concurrent batches) ---
+            async def _score_one(prof):
+                """Score a single profile. Returns result dict or None."""
+                pid = _get_profile_field(prof, "id")
+                if not pid:
+                    return None
+                uname = _get_profile_field(prof, "username", "?")
                 try:
-                    score_request = ScorerRequest(
-                        profile_id=str(profile_id),
+                    # Keep profile in 'processing' state until qualification decided
+                    try:
+                        profile_repo.update_status(str(pid), ProfileStatus.PROCESSING)
+                    except Exception:
+                        pass
+                    req = ScorerRequest(
+                        profile_id=str(pid),
                         job_id=job_id,
                         reference_profile_summaries=reference_summaries if reference_summaries else None,
                     )
-                    score_response = await scorer_agent.run(score_request)
+                    resp = await scorer_agent.run(req)
+                    return {"profile": prof, "pid": pid, "username": uname, "response": resp}
+                except Exception as e:
+                    logger.error(f"[Orchestration] Job {job_id}: Failed to score @{uname}: {e}")
+                    return None
+
+            for batch_start in range(0, len(round_profiles), SCORING_BATCH_SIZE):
+                if len(qualified_profiles) >= requested_count:
+                    break
+                batch = round_profiles[batch_start:batch_start + SCORING_BATCH_SIZE]
+                results = await asyncio.gather(*[_score_one(p) for p in batch])
+
+                for result in results:
+                    if result is None:
+                        continue
                     total_scored += 1
+                    pid = result["pid"]
+                    uname = result["username"]
+                    resp = result["response"]
 
-                    # Safety net: ensure profile status is set to 'done'
-                    # The scorer agent should do this, but verify it happened
-                    try:
-                        current_profile = profile_repo.get_by_id(str(profile_id))
-                        if current_profile.get("status") != ProfileStatus.SCORED.value:
-                            profile_repo.update_status(str(profile_id), ProfileStatus.SCORED)
-                            logger.info(
-                                f"[Orchestration] Job {job_id}: Fixed profile status for @{username} -> done"
-                            )
-                    except Exception as e:
-                        logger.warning(f"[Orchestration] Job {job_id}: Status fix failed for @{username}: {e}")
-
-                    # Check against threshold
-                    if score_response.final_score >= min_score_threshold:
-                        qualified_profiles.append(profile)
+                    if resp.final_score >= min_score_threshold:
+                        qualified_profiles.append(result["profile"])
+                        try:
+                            profile_repo.update_status(str(pid), ProfileStatus.SCORED)
+                        except Exception:
+                            pass
                         try:
                             job_repo.increment_profiles_scored(job_id)
                         except Exception:
                             pass
                         logger.info(
                             f"[Orchestration] Job {job_id}: R{round_num} - "
-                            f"@{username} QUALIFIED (score={score_response.final_score})"
+                            f"@{uname} QUALIFIED (score={resp.final_score})"
                         )
                     else:
-                        # Mark below-threshold profiles as skipped (hidden from dashboard)
                         total_skipped += 1
                         try:
-                            profile_repo.update_status(str(profile_id), ProfileStatus.SKIPPED)
+                            profile_repo.update_status(str(pid), ProfileStatus.SKIPPED)
                         except Exception:
                             pass
                         logger.info(
                             f"[Orchestration] Job {job_id}: R{round_num} - "
-                            f"@{username} SKIPPED (score={score_response.final_score} < {min_score_threshold})"
+                            f"@{uname} SKIPPED (score={resp.final_score} < {min_score_threshold})"
                         )
 
-                    # Stop early if we have enough
-                    if len(qualified_profiles) >= requested_count:
-                        break
-
-                except Exception as e:
-                    logger.error(
-                        f"[Orchestration] Job {job_id}: Failed to score @{username}: {e}"
-                    )
+                if len(qualified_profiles) >= requested_count:
+                    break
 
             # Add newly discovered usernames to exclusion set for next round
             for profile in round_profiles:
@@ -781,37 +791,43 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
             )
 
             enricher_agent = get_contact_enricher_agent()
+            ENRICHMENT_BATCH_SIZE = 5
 
-            for i, profile in enumerate(qualified_profiles):
-                profile_id = _get_profile_field(profile, "id")
-                if not profile_id:
-                    continue
-
-                username = _get_profile_field(profile, "username", "?")
-
+            async def _enrich_one(prof, idx):
+                """Enrich a single profile. Returns enriched flag or None."""
+                pid = _get_profile_field(prof, "id")
+                if not pid:
+                    return None
+                uname = _get_profile_field(prof, "username", "?")
                 try:
-                    enrich_request = ContactEnricherRequest(
-                        profile_id=str(profile_id),
+                    req = ContactEnricherRequest(
+                        profile_id=str(pid),
                         job_id=job_id,
-                        profile_data=profile if isinstance(profile, dict) else None,
+                        profile_data=prof if isinstance(prof, dict) else None,
                     )
-                    result = await enricher_agent.run(enrich_request)
-
-                    if result.email or result.phone or result.address:
-                        enriched_count += 1
+                    res = await enricher_agent.run(req)
+                    if res.email or res.phone or res.address:
                         logger.info(
-                            f"[Orchestration] Job {job_id}: Enriched {i+1}/{len(qualified_profiles)} - "
-                            f"@{username} (email={bool(result.email)}, phone={bool(result.phone)}, "
-                            f"address={bool(result.address)})"
+                            f"[Orchestration] Job {job_id}: Enriched {idx+1}/{len(qualified_profiles)} - "
+                            f"@{uname} (email={bool(res.email)}, phone={bool(res.phone)}, "
+                            f"address={bool(res.address)})"
                         )
+                        return True
                     else:
                         logger.info(
-                            f"[Orchestration] Job {job_id}: No contacts found {i+1}/{len(qualified_profiles)} - @{username}"
+                            f"[Orchestration] Job {job_id}: No contacts found {idx+1}/{len(qualified_profiles)} - @{uname}"
                         )
+                        return False
                 except Exception as e:
-                    logger.warning(
-                        f"[Orchestration] Job {job_id}: Contact enrichment failed for @{username}: {e}"
-                    )
+                    logger.warning(f"[Orchestration] Job {job_id}: Contact enrichment failed for @{uname}: {e}")
+                    return None
+
+            for batch_start in range(0, len(qualified_profiles), ENRICHMENT_BATCH_SIZE):
+                batch = qualified_profiles[batch_start:batch_start + ENRICHMENT_BATCH_SIZE]
+                results = await asyncio.gather(*[
+                    _enrich_one(p, batch_start + i) for i, p in enumerate(batch)
+                ])
+                enriched_count += sum(1 for r in results if r is True)
         except Exception as e:
             logger.error(
                 f"[Orchestration] Job {job_id}: Phase 4 (Contact Enrichment) failed entirely: {e}. "

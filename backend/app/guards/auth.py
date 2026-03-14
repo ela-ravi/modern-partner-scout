@@ -9,7 +9,9 @@ Implements authentication guards for securing API endpoints.
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+import hashlib
 import logging
+import time as _time
 
 import jwt
 from fastapi import Depends, Header, HTTPException, Request, Security
@@ -144,14 +146,44 @@ class AuthGuard(ABC):
 # User Guard (JWT Authentication)
 # =============================================================================
 
+class _TokenCache:
+    """Simple in-memory cache for validated tokens with TTL."""
+
+    def __init__(self, ttl_seconds: int = 300, max_size: int = 200):
+        self._ttl = ttl_seconds
+        self._max_size = max_size
+        self._store: Dict[str, tuple] = {}  # hash -> (UserContext, expiry)
+
+    def get(self, token: str) -> Optional["UserContext"]:
+        key = hashlib.sha256(token.encode()).hexdigest()[:16]
+        entry = self._store.get(key)
+        if entry and _time.time() < entry[1]:
+            return entry[0]
+        if entry:
+            del self._store[key]
+        return None
+
+    def put(self, token: str, ctx: "UserContext") -> None:
+        key = hashlib.sha256(token.encode()).hexdigest()[:16]
+        self._store[key] = (ctx, _time.time() + self._ttl)
+        # Evict expired entries when cache is large
+        if len(self._store) > self._max_size:
+            now = _time.time()
+            self._store = {k: v for k, v in self._store.items() if v[1] > now}
+
+
+# Singleton token cache (5-minute TTL)
+_token_cache = _TokenCache(ttl_seconds=300)
+
+
 class UserGuard(AuthGuard):
     """
     Guard for user authentication via Supabase JWT tokens.
-    
+
     Validates JWT tokens and extracts user information.
     Supports both HS256 (legacy) and ES256 (modern Supabase) algorithms.
     """
-    
+
     def __init__(self, jwt_secret: Optional[str] = None, algorithms: list = None):
         """
         Initialize the user guard.
@@ -216,11 +248,16 @@ class UserGuard(AuthGuard):
             InvalidTokenError: If token is invalid
             ExpiredTokenError: If token has expired
         """
+        # Check cache first (avoids Supabase roundtrip)
+        cached = _token_cache.get(token)
+        if cached is not None:
+            return cached
+
         try:
             # Decode header to check algorithm
             unverified_header = jwt.get_unverified_header(token)
             algorithm = unverified_header.get("alg", "HS256")
-            
+
             # Choose verification method based on algorithm
             if algorithm == "ES256":
                 # For ES256 tokens, use Supabase's getUser() API to verify the token
@@ -233,11 +270,11 @@ class UserGuard(AuthGuard):
                     )
                     # Verify token via Supabase's auth.getUser()
                     user_response = supabase_client.auth.get_user(token)
-                    
+
                     if user_response and user_response.user:
                         user = user_response.user
                         # Return UserContext directly since Supabase verified the token
-                        return UserContext(
+                        ctx = UserContext(
                             user_id=user.id,
                             email=user.email,
                             role=user.role or "authenticated",
@@ -245,6 +282,8 @@ class UserGuard(AuthGuard):
                             raw_token=token,
                             claims={"sub": user.id, "email": user.email},
                         )
+                        _token_cache.put(token, ctx)
+                        return ctx
                     else:
                         raise InvalidTokenError(
                             message="Invalid authentication token",
@@ -285,7 +324,7 @@ class UserGuard(AuthGuard):
                 exp_timestamp = payload.get("exp")
                 exp = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc) if exp_timestamp else None
                 
-                return UserContext(
+                ctx = UserContext(
                     user_id=user_id,
                     email=email,
                     role=role,
@@ -293,7 +332,9 @@ class UserGuard(AuthGuard):
                     raw_token=token,
                     claims=payload,
                 )
-        
+                _token_cache.put(token, ctx)
+                return ctx
+
         except jwt.ExpiredSignatureError:
             raise ExpiredTokenError(
                 message="Token has expired",

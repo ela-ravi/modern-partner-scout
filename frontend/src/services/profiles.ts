@@ -134,7 +134,7 @@ export const profilesService = {
       total: jobData.profiles_discovered ?? profiles.length,
       page,
       page_size,
-      has_more: profiles.length === page_size,
+      has_more: profiles.length >= page_size,
     }
   },
 

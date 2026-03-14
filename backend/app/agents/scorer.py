@@ -226,7 +226,12 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
         
         # Initialize scoring service
         self._scoring_service = scoring_service or get_scoring_service()
-        
+
+        # When False, scorer will NOT update profile status in DB.
+        # Used by orchestration service to prevent race conditions where
+        # profiles briefly appear as 'done' before qualification check.
+        self._manage_profile_status = True
+
         # Load scoring weights and thresholds
         self._weights = get_scoring_weights()
         self._thresholds = get_scoring_thresholds()
@@ -1548,6 +1553,8 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
             profile_id: Profile UUID
             status: New status
         """
+        if not self._manage_profile_status:
+            return
         max_retries = 2
         for attempt in range(max_retries):
             try:
