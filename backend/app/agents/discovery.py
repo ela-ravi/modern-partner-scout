@@ -632,9 +632,15 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
         """
         Check if a profile has any topical relevance to brand keywords.
 
-        Compares profile bio, business category, and full name against
-        the brand's keywords. Returns True if ANY keyword (or a significant
-        word within a multi-word keyword) appears in the profile's text.
+        Two-tier matching to avoid false positives from generic business
+        terms (e.g. "wholesale", "distributor") while keeping niche terms:
+
+        1. Any FULL keyword phrase found in profile text → immediate PASS
+           (e.g. "specialty coffee" or "perfume boutique" in bio)
+        2. Otherwise, count distinct individual word matches (≥4 chars).
+           Require 2+ distinct words to PASS. This rejects profiles that
+           only match a single generic word like "wholesale" but keeps
+           profiles matching "coffee" + "roaster".
 
         Returns True when no keywords are provided (no filtering).
         """
@@ -654,17 +660,20 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
         ).lower()
         searchable = f"{bio} {category} {full_name}"
 
+        # Tier 1: Full keyword phrase match (strong signal — one is enough)
         for kw in keywords:
             kw_lower = kw.lower().strip()
-            if not kw_lower:
-                continue
-            # Check full keyword phrase
-            if kw_lower in searchable:
+            if kw_lower and kw_lower in searchable:
                 return True
-            # Check individual words (min 4 chars to avoid noise)
-            for word in kw_lower.split():
-                if len(word) >= 4 and word in searchable:
-                    return True
+
+        # Tier 2: Individual word matching — require 2+ distinct words
+        matched_words: Set[str] = set()
+        for kw in keywords:
+            for word in kw.lower().split():
+                if len(word) >= 4 and word not in matched_words and word in searchable:
+                    matched_words.add(word)
+                    if len(matched_words) >= 2:
+                        return True
 
         return False
 
