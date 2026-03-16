@@ -338,8 +338,8 @@ export default function DiscoveryConfigPage() {
                     value={field.value}
                     onChange={field.onChange}
                     label="Keywords"
-                    placeholder="Type keyword and press Enter"
-                    helperText="Topics and themes related to your brand"
+                    placeholder="Type and press Enter, or paste multiple at once"
+                    helperText="Topics and themes related to your brand — paste comma/newline-separated list to bulk-add"
                     maxTags={20}
                   />
                 )}
@@ -353,9 +353,10 @@ export default function DiscoveryConfigPage() {
                     value={field.value}
                     onChange={field.onChange}
                     label="Hashtags"
-                    placeholder="Type hashtag (with #) and press Enter"
-                    helperText="Hashtags your ideal partners use"
+                    placeholder="Type and press Enter, or paste multiple at once"
+                    helperText="Hashtags your ideal partners use — # is added automatically when pasting"
                     maxTags={20}
+                    prefix="#"
                     validate={(tag) => tag.startsWith('#') || 'Hashtags must start with #'}
                   />
                 )}

@@ -1,4 +1,4 @@
-import { useState, useRef, useId, useCallback, type KeyboardEvent, type ChangeEvent } from 'react'
+import { useState, useRef, useId, useCallback, type KeyboardEvent, type ChangeEvent, type ClipboardEvent } from 'react'
 import { cn } from '@/lib/utils'
 import CloseIcon from '@mui/icons-material/Close'
 
@@ -13,6 +13,8 @@ export interface TagInputProps {
   maxTags?: number
   /** Validation function for tags */
   validate?: (tag: string) => boolean | string
+  /** Prefix to auto-prepend to pasted items (e.g. "#" for hashtags) */
+  prefix?: string
   /** Label for the input */
   label?: string
   /** Helper text */
@@ -31,6 +33,7 @@ export function TagInput({
   placeholder = 'Type and press Enter',
   maxTags,
   validate,
+  prefix,
   label,
   helperText,
   error,
@@ -109,13 +112,46 @@ export function TagInput({
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
-    // Handle comma-separated pasting
+    // Handle comma-separated typing
     if (newValue.includes(',')) {
       const tags = newValue.split(',')
       tags.forEach(tag => addTag(tag))
     } else {
       setInputValue(newValue)
       setValidationError(null)
+    }
+  }
+
+  const handlePaste = (e: ClipboardEvent<HTMLInputElement>) => {
+    const text = e.clipboardData.getData('text')
+    // Split on newlines, commas, or semicolons
+    const items = text.split(/[\n\r,;]+/).map(s => s.trim()).filter(Boolean)
+    if (items.length <= 1) return // single item — let default handle it
+
+    e.preventDefault()
+    const newTags = [...value]
+    let added = 0
+    for (const raw of items) {
+      if (maxTags && newTags.length >= maxTags) break
+      // Auto-prepend prefix (e.g. "#" for hashtags) if not already present
+      let tag = raw
+      if (prefix && !tag.startsWith(prefix)) {
+        tag = `${prefix}${tag}`
+      }
+      if (!newTags.includes(tag) && tag.trim()) {
+        // Skip items that fail validation during bulk paste
+        if (validate) {
+          const result = validate(tag)
+          if (result !== true) continue
+        }
+        newTags.push(tag)
+        added++
+      }
+    }
+    if (added > 0) {
+      onChange?.(newTags)
+      setInputValue('')
+      announceToScreenReader(`${added} tags added`)
     }
   }
 
@@ -182,6 +218,7 @@ export function TagInput({
           value={inputValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder={value.length === 0 ? placeholder : ''}
           disabled={disabled}
           aria-describedby={cn(
