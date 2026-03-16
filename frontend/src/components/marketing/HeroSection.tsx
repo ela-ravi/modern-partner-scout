@@ -39,12 +39,31 @@ export function HeroSection() {
               className="flex flex-wrap gap-4"
               style={{ animation: 'slide-up 0.8s cubic-bezier(0.16,1,0.3,1) forwards', animationDelay: '0.4s', opacity: 0 }}
             >
-              <Button variant="primary" size="lg" rightIcon={<ArrowForwardIcon className="w-5 h-5" />} asChild>
-                <Link to="/login">Get Started Free</Link>
-              </Button>
-              <Button variant="secondary" size="lg" leftIcon={<PlayArrowIcon className="w-5 h-5" />} asChild>
-                <Link to="/docs">Watch Demo</Link>
-              </Button>
+              <Link
+                to="/login"
+                className="group relative inline-flex items-center gap-2 px-8 py-4 rounded-2xl text-white font-semibold text-lg
+                  bg-gradient-to-r from-brand-primary to-brand-accent
+                  shadow-[0_8px_30px_rgba(0,122,255,0.35)]
+                  hover:shadow-[0_12px_40px_rgba(0,122,255,0.5)]
+                  hover:scale-[1.03] active:scale-[0.98]
+                  transition-all duration-200 ease-out"
+              >
+                Get Started Free
+                <ArrowForwardIcon className="w-5 h-5 transition-transform duration-200 group-hover:translate-x-1" />
+              </Link>
+              <Link
+                to="/docs"
+                className="group relative inline-flex items-center gap-2 px-8 py-4 rounded-2xl font-semibold text-lg
+                  text-apple-text bg-white
+                  border-2 border-apple-border
+                  shadow-[0_4px_20px_rgba(0,0,0,0.08)]
+                  hover:border-brand-primary/40 hover:shadow-[0_8px_30px_rgba(0,122,255,0.15)]
+                  hover:scale-[1.03] active:scale-[0.98]
+                  transition-all duration-200 ease-out"
+              >
+                <PlayArrowIcon className="w-6 h-6 text-brand-primary transition-transform duration-200 group-hover:scale-110" />
+                Watch Demo
+              </Link>
             </div>
           </div>
 
