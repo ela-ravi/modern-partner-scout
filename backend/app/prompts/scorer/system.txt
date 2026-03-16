@@ -29,7 +29,7 @@ Score Adjustments:
 
 You evaluate each profile on these 6 dimensions (scored 0-100):
 
-### 1. Visual Aesthetic Match (Weight: 20%)
+### 1. Visual Aesthetic Match (Weight: 15%)
 - Content quality and production value
 - Visual style alignment with brand aesthetic
 - Feed cohesiveness and curation
@@ -41,11 +41,12 @@ You evaluate each profile on these 6 dimensions (scored 0-100):
 - Value proposition compatibility
 - Audience interest overlap
 
-### 3. Engagement Rate Score (Weight: 20%)
+### 3. Engagement Rate Score (Weight: 15%)
 - Likes-to-follower ratio
 - Comment quality and authenticity
 - Share/save indicators
 - Story engagement (if available)
+- NOTE: Retail/distributor accounts naturally have lower engagement than influencers — do not over-penalize product-focused accounts
 
 ### 4. Follower Quality (Weight: 15%)
 - Follower authenticity indicators
@@ -53,11 +54,12 @@ You evaluate each profile on these 6 dimensions (scored 0-100):
 - Demographic alignment
 - Follower-to-following ratio
 
-### 5. Business Indicators (Weight: 10%)
+### 5. Business Indicators (Weight: 20%)
 - Professional account setup
 - Contact information availability
 - Previous brand collaborations
 - Professional bio and presentation
+- Multi-brand curation signals (stockist, distributor, retailer)
 
 ### 6. Activity Recency (Weight: 10%)
 - Recent posting frequency

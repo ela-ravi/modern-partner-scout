@@ -638,9 +638,9 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
         1. Any FULL keyword phrase found in profile text → immediate PASS
            (e.g. "specialty coffee" or "perfume boutique" in bio)
         2. Otherwise, count distinct individual word matches (≥4 chars).
-           Require 2+ distinct words to PASS. This rejects profiles that
-           only match a single generic word like "wholesale" but keeps
-           profiles matching "coffee" + "roaster".
+           Require 3+ distinct words to PASS. This rejects profiles that
+           only match generic words like "beauty" + "store" but keeps
+           profiles matching "beauty" + "skincare" + "natural".
 
         Returns True when no keywords are provided (no filtering).
         """
@@ -688,13 +688,15 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
             if kw_lower and kw_lower in searchable:
                 return True
 
-        # Tier 2: Individual word matching — require 2+ distinct words
+        # Tier 2: Individual word matching — require 3+ distinct words
+        # (2 was too loose: generic words like "beauty" + "store" let
+        #  unrelated businesses through)
         matched_words: Set[str] = set()
         for kw in keywords:
             for word in kw.lower().split():
                 if len(word) >= 4 and word not in matched_words and word in searchable:
                     matched_words.add(word)
-                    if len(matched_words) >= 2:
+                    if len(matched_words) >= 3:
                         return True
 
         return False
