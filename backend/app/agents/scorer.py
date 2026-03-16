@@ -1391,17 +1391,29 @@ class ScorerAgent(BaseAgent[ScorerRequest, ScorerResponse]):
 
         profile_text = f"{bio} {category} {full_name} {username}"
 
+        # Require 2+ distinct keyword/hashtag hits to prove industry relevance.
+        # A single generic word like "luxury" or "boutique" is not enough —
+        # it appears across many industries (mattress stores, hotels, fashion).
+        hits = 0
+
         # Check keywords (e.g., "perfume", "fragrance", "beauty")
+        seen: set = set()
         for keyword in keywords:
             kw = keyword.lower().strip()
-            if len(kw) >= 3 and kw in profile_text:
-                return True
+            if len(kw) >= 3 and kw not in seen and kw in profile_text:
+                seen.add(kw)
+                hits += 1
+                if hits >= 2:
+                    return True
 
         # Check hashtag roots (e.g., "#perfume" → "perfume")
         for tag in hashtags:
             tag_clean = tag.lower().strip().lstrip("#")
-            if len(tag_clean) >= 3 and tag_clean in profile_text:
-                return True
+            if len(tag_clean) >= 3 and tag_clean not in seen and tag_clean in profile_text:
+                seen.add(tag_clean)
+                hits += 1
+                if hits >= 2:
+                    return True
 
         return False
 
