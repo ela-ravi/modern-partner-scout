@@ -20,6 +20,11 @@ const ContactPage = lazy(() => import('@/pages/marketing/ContactPage'))
 const PrivacyPage = lazy(() => import('@/pages/marketing/PrivacyPage'))
 const TermsPage = lazy(() => import('@/pages/marketing/TermsPage'))
 const DocsPage = lazy(() => import('@/pages/marketing/DocsPage'))
+const AboutPage = lazy(() => import('@/pages/marketing/AboutPage'))
+const BlogPage = lazy(() => import('@/pages/marketing/BlogPage'))
+const CareersPage = lazy(() => import('@/pages/marketing/CareersPage'))
+const ChangelogPage = lazy(() => import('@/pages/marketing/ChangelogPage'))
+const CookiesPage = lazy(() => import('@/pages/marketing/CookiesPage'))
 
 // DEV ONLY: Mockup pages for UI design reference — remove before production deploy
 const MockGallery = lazy(() => import('@/mockups/MockGallery'))
@@ -77,6 +82,26 @@ export const router = createBrowserRouter([
       {
         path: 'docs',
         element: withSuspense(DocsPage),
+      },
+      {
+        path: 'about',
+        element: withSuspense(AboutPage),
+      },
+      {
+        path: 'blog',
+        element: withSuspense(BlogPage),
+      },
+      {
+        path: 'careers',
+        element: withSuspense(CareersPage),
+      },
+      {
+        path: 'changelog',
+        element: withSuspense(ChangelogPage),
+      },
+      {
+        path: 'cookies',
+        element: withSuspense(CookiesPage),
       },
     ],
   },

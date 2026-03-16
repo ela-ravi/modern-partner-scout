@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useScrollReveal } from '@/hooks/useScrollReveal'
+import { usePageMeta } from '@/hooks/usePageMeta'
 import { cn } from '@/lib/utils'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 
@@ -80,6 +81,13 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
 
 export default function DocsPage() {
   const containerRef = useScrollReveal()
+
+  usePageMeta({
+    title: 'Documentation - PartnerScout AI',
+    description: 'Learn how to use PartnerScout AI — getting started guides, core concepts, features, and API reference.',
+    keywords: 'documentation, API reference, getting started, PartnerScout AI guide',
+    canonical: '/docs',
+  })
 
   return (
     <div ref={containerRef} className="pt-24 pb-16">

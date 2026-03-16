@@ -1,4 +1,5 @@
 import { useScrollReveal } from '@/hooks/useScrollReveal'
+import { usePageMeta } from '@/hooks/usePageMeta'
 
 const sections = [
   {
@@ -117,6 +118,13 @@ Your continued use of PartnerScout after changes are posted constitutes acceptan
 
 export default function PrivacyPage() {
   const containerRef = useScrollReveal()
+
+  usePageMeta({
+    title: 'Privacy Policy - PartnerScout AI',
+    description: 'How PartnerScout AI collects, uses, and protects your personal data and Instagram profile information.',
+    keywords: 'privacy policy, data protection, PartnerScout AI privacy, GDPR',
+    canonical: '/privacy',
+  })
 
   return (
     <div ref={containerRef} className="pt-24 pb-16">

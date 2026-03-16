@@ -1,4 +1,5 @@
 import { useScrollReveal } from '@/hooks/useScrollReveal'
+import { usePageMeta } from '@/hooks/usePageMeta'
 
 const sections = [
   {
@@ -116,6 +117,13 @@ Continued use of the Service after changes take effect constitutes acceptance of
 
 export default function TermsPage() {
   const containerRef = useScrollReveal()
+
+  usePageMeta({
+    title: 'Terms of Service - PartnerScout AI',
+    description: 'Terms and conditions for using the PartnerScout AI platform.',
+    keywords: 'terms of service, terms and conditions, PartnerScout AI legal',
+    canonical: '/terms',
+  })
 
   return (
     <div ref={containerRef} className="pt-24 pb-16">

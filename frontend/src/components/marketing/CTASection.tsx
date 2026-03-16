@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import { Button } from '@/components/ui/Button'
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
 
 export function CTASection() {
@@ -23,23 +22,30 @@ export function CTASection() {
           </p>
 
           <div className="flex flex-wrap justify-center gap-4">
-            <Button
-              variant="secondary"
-              size="lg"
-              rightIcon={<ArrowForwardIcon className="w-5 h-5" />}
-              className="bg-white text-brand-primary hover:bg-white/90"
-              asChild
+            <Link
+              to="/login"
+              className="group relative inline-flex items-center gap-2 px-8 py-4 rounded-2xl font-semibold text-lg
+                text-brand-primary bg-white
+                shadow-[0_8px_30px_rgba(255,255,255,0.3)]
+                hover:shadow-[0_12px_40px_rgba(255,255,255,0.5)]
+                hover:scale-[1.03] active:scale-[0.98]
+                transition-all duration-200 ease-out"
             >
-              <Link to="/login">Get Started Free</Link>
-            </Button>
-            <Button
-              variant="ghost"
-              size="lg"
-              className="text-white border border-white/30 hover:bg-white/10"
-              asChild
+              Get Started Free
+              <ArrowForwardIcon className="w-5 h-5 transition-transform duration-200 group-hover:translate-x-1" />
+            </Link>
+            <Link
+              to="/contact"
+              className="group relative inline-flex items-center gap-2 px-8 py-4 rounded-2xl font-semibold text-lg
+                text-white
+                border-2 border-white/30
+                shadow-[0_4px_20px_rgba(255,255,255,0.08)]
+                hover:border-white/60 hover:shadow-[0_8px_30px_rgba(255,255,255,0.2)]
+                hover:scale-[1.03] active:scale-[0.98]
+                transition-all duration-200 ease-out"
             >
-              <Link to="/contact">Talk to Sales</Link>
-            </Button>
+              Talk to Sales
+            </Link>
           </div>
         </div>
       </div>

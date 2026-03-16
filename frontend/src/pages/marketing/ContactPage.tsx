@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useScrollReveal } from '@/hooks/useScrollReveal'
+import { usePageMeta } from '@/hooks/usePageMeta'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { Button } from '@/components/ui/Button'
@@ -34,6 +35,13 @@ export default function ContactPage() {
   const containerRef = useScrollReveal()
   const { success } = useToast()
   const [submitting, setSubmitting] = useState(false)
+
+  usePageMeta({
+    title: 'Contact Us - PartnerScout AI',
+    description: 'Get in touch with the PartnerScout AI team for questions, demos, or partnership inquiries.',
+    keywords: 'contact PartnerScout, support, demo request, partnership inquiry',
+    canonical: '/contact',
+  })
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
