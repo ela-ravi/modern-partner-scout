@@ -93,21 +93,78 @@ export default function DiscoveryConfigPage() {
     },
   ], [step])
 
-  // Handle adding reference profile
-  const handleAddProfile = () => {
-    const trimmed = profileInput.trim()
-    if (!trimmed) return
-
-    // Basic URL validation
+  // Normalize a profile input into a valid URL
+  const normalizeProfileUrl = (input: string): string | null => {
+    let url = input.trim()
+    if (!url) return null
+    // Bare username: "scentroomla" or "@scentroomla"
+    if (!url.includes('/') && !url.includes('.')) {
+      url = `https://instagram.com/${url.replace(/^@/, '')}`
+    }
+    // Missing protocol: "instagram.com/username" or "www.instagram.com/username"
+    else if (!url.startsWith('http')) {
+      url = `https://${url}`
+    }
     try {
-      new URL(trimmed)
-      const current = getValues('referenceProfiles')
-      if (current.length < 10 && !current.includes(trimmed)) {
-        setValue('referenceProfiles', [...current, trimmed], { shouldValidate: true })
-        setProfileInput('')
-      }
+      new URL(url)
+      return url
     } catch {
-      toast.error('Please enter a valid URL')
+      return null
+    }
+  }
+
+  // Handle adding a single reference profile
+  const handleAddProfile = () => {
+    const url = normalizeProfileUrl(profileInput)
+    if (!url) {
+      if (profileInput.trim()) toast.error('Please enter a valid URL or username')
+      return
+    }
+    const current = getValues('referenceProfiles')
+    if (current.length >= 10) {
+      toast.error('Maximum 10 profiles reached')
+      return
+    }
+    if (!current.includes(url)) {
+      setValue('referenceProfiles', [...current, url], { shouldValidate: true })
+    }
+    setProfileInput('')
+  }
+
+  // Handle pasting multiple URLs at once (newline or comma separated)
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const text = e.clipboardData.getData('text')
+    const lines = text.split(/[\n\r,]+/).map(s => s.trim()).filter(Boolean)
+    if (lines.length <= 1) return // Single item — let default paste handle it
+
+    e.preventDefault()
+    const current = getValues('referenceProfiles')
+    if (current.length >= 10) {
+      toast.error('Maximum 10 profiles reached')
+      return
+    }
+
+    const newUrls = [...current]
+    let added = 0
+    let invalid = 0
+
+    for (const line of lines) {
+      if (newUrls.length >= 10) break
+      const url = normalizeProfileUrl(line)
+      if (url && !newUrls.includes(url)) {
+        newUrls.push(url)
+        added++
+      } else if (!url) {
+        invalid++
+      }
+    }
+
+    if (added > 0) {
+      setValue('referenceProfiles', newUrls, { shouldValidate: true })
+      setProfileInput('')
+      toast.success(`Added ${added} profile${added > 1 ? 's' : ''}${invalid > 0 ? ` (${invalid} invalid skipped)` : ''}`)
+    } else {
+      toast.error('No valid URLs found in pasted text')
     }
   }
 
@@ -204,7 +261,7 @@ export default function DiscoveryConfigPage() {
           <Card>
             <h2 className="text-lg font-semibold text-apple-text mb-4">Reference Profiles</h2>
             <p className="text-sm text-apple-text-secondary mb-4">
-              Add 2-10 Instagram profiles that represent your ideal partners
+              Add 2-10 Instagram profiles that represent your ideal partners. Paste multiple URLs or usernames at once — they&apos;ll be added automatically.
             </p>
 
             <div className="space-y-4">
@@ -212,7 +269,8 @@ export default function DiscoveryConfigPage() {
                 <Input
                   value={profileInput}
                   onChange={(e) => setProfileInput(e.target.value)}
-                  placeholder="https://instagram.com/username"
+                  placeholder="Paste URLs or usernames (one per line)"
+                  onPaste={handlePaste}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault()
@@ -262,7 +320,7 @@ export default function DiscoveryConfigPage() {
               )}
 
               <p className="text-xs text-apple-text-tertiary">
-                {watchedValues.referenceProfiles.length}/10 profiles added
+                {watchedValues.referenceProfiles.length}/10 profiles added · Paste multiple URLs at once
               </p>
             </div>
           </Card>
