@@ -268,6 +268,10 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
             if len(_term) >= 4:
                 _raw_kw.append(_term)
         discovery_keywords = list(dict.fromkeys(_raw_kw))[:40]
+        logger.info(
+            f"[Orchestration] Job {job_id}: Discovery relevance keywords "
+            f"({len(discovery_keywords)}): {discovery_keywords[:15]}..."
+        )
 
         # Inject country-specific hashtags when target_country is set
         target_country = job_data.get("target_country")
