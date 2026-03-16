@@ -658,7 +658,29 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
         full_name = (
             profile.get("fullName") or profile.get("full_name") or ""
         ).lower()
-        searchable = f"{bio} {category} {full_name}"
+        username = (
+            profile.get("username") or profile.get("userName") or ""
+        ).lower()
+
+        # Collect text from recent post captions and hashtags
+        posts = (
+            profile.get("latestPosts")
+            or profile.get("recentPosts")
+            or profile.get("posts")
+            or []
+        )
+        post_text_parts: List[str] = []
+        for post in posts[:5]:
+            caption = post.get("caption") or post.get("text") or ""
+            if caption:
+                post_text_parts.append(caption.lower())
+            # Also check hashtags array if present
+            tags = post.get("hashtags") or []
+            if tags:
+                post_text_parts.append(" ".join(str(t).lower() for t in tags))
+        post_text = " ".join(post_text_parts)
+
+        searchable = f"{bio} {category} {full_name} {username} {post_text}"
 
         # Tier 1: Full keyword phrase match (strong signal — one is enough)
         for kw in keywords:
