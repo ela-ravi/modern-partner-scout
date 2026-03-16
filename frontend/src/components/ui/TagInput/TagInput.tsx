@@ -111,22 +111,15 @@ export function TagInput({
   }
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value
-    // Handle comma-separated typing
-    if (newValue.includes(',')) {
-      const tags = newValue.split(',')
-      tags.forEach(tag => addTag(tag))
-    } else {
-      setInputValue(newValue)
-      setValidationError(null)
-    }
+    setInputValue(e.target.value)
+    setValidationError(null)
   }
 
   const handlePaste = (e: ClipboardEvent<HTMLInputElement>) => {
     const text = e.clipboardData.getData('text')
     // Split on newlines, commas, or semicolons
     const items = text.split(/[\n\r,;]+/).map(s => s.trim()).filter(Boolean)
-    if (items.length <= 1) return // single item — let default handle it
+    if (items.length === 0) return
 
     e.preventDefault()
     const newTags = [...value]
@@ -151,7 +144,8 @@ export function TagInput({
     if (added > 0) {
       onChange?.(newTags)
       setInputValue('')
-      announceToScreenReader(`${added} tags added`)
+      setValidationError(null)
+      announceToScreenReader(`${added} tag${added > 1 ? 's' : ''} added`)
     }
   }
 
