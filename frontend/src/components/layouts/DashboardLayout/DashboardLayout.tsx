@@ -27,7 +27,7 @@ export function DashboardLayout() {
           <div className="flex h-16 items-center justify-between">
             {/* Logo */}
             <Link
-              to="/sessions"
+              to="/"
               className="flex items-center gap-2 text-apple-text font-semibold text-lg"
               aria-label="PartnerScout home"
             >
