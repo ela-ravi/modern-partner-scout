@@ -244,7 +244,7 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
                 f"({deduplicated_count} duplicates removed)"
             )
 
-            # Step 7: Filter by follower range + business account (SUB-3.3.3.1.3)
+            # Step 7: Filter by follower range + business account + relevance (SUB-3.3.3.1.3)
             filtered_profiles, filtered_out_count = self._filter_profiles(
                 profiles_data,
                 min_followers=input_data.follower_min,
@@ -252,6 +252,7 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
                 limit=input_data.limit,
                 require_business_account=input_data.require_business_account,
                 deprioritize_brands=input_data.deprioritize_brands,
+                relevance_keywords=input_data.keywords if input_data.keywords else None,
             )
 
             # Step 7b: Extract related usernames from fetched profiles
@@ -622,6 +623,52 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
         return "unknown"
 
     # =========================================================================
+    # Relevance Pre-Filter
+    # =========================================================================
+
+    def _check_relevance(
+        self, profile: Dict[str, Any], keywords: List[str]
+    ) -> bool:
+        """
+        Check if a profile has any topical relevance to brand keywords.
+
+        Compares profile bio, business category, and full name against
+        the brand's keywords. Returns True if ANY keyword (or a significant
+        word within a multi-word keyword) appears in the profile's text.
+
+        Returns True when no keywords are provided (no filtering).
+        """
+        if not keywords:
+            return True
+
+        bio = (
+            profile.get("biography") or profile.get("bio") or ""
+        ).lower()
+        category = (
+            profile.get("businessCategoryName")
+            or profile.get("category_name")
+            or ""
+        ).lower()
+        full_name = (
+            profile.get("fullName") or profile.get("full_name") or ""
+        ).lower()
+        searchable = f"{bio} {category} {full_name}"
+
+        for kw in keywords:
+            kw_lower = kw.lower().strip()
+            if not kw_lower:
+                continue
+            # Check full keyword phrase
+            if kw_lower in searchable:
+                return True
+            # Check individual words (min 4 chars to avoid noise)
+            for word in kw_lower.split():
+                if len(word) >= 4 and word in searchable:
+                    return True
+
+        return False
+
+    # =========================================================================
     # Follower Range Filtering (SUB-3.3.3.1.3)
     # =========================================================================
 
@@ -635,6 +682,7 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
         exclude_no_posts: bool = True,
         require_business_account: bool = False,
         deprioritize_brands: bool = False,
+        relevance_keywords: Optional[List[str]] = None,
     ) -> Tuple[List[Dict[str, Any]], int]:
         """
         Filter profiles by various criteria including follower range.
@@ -670,6 +718,7 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
             "no_posts": 0,
             "fake_suspected": 0,
             "not_business": 0,
+            "irrelevant": 0,
             "brand_deprioritized": 0,
         }
 
@@ -715,6 +764,13 @@ class DiscoveryAgent(BaseAgent[DiscoveryRequest, DiscoveryResponse]):
             # Check for fake profile indicators
             if self._is_likely_fake(profile):
                 filtered_out_reasons["fake_suspected"] += 1
+                continue
+
+            # Check topical relevance against brand keywords
+            if relevance_keywords and not self._check_relevance(profile, relevance_keywords):
+                uname = profile.get("username") or profile.get("userName") or "?"
+                logger.debug(f"Filtered out @{uname}: no relevance to brand keywords")
+                filtered_out_reasons["irrelevant"] += 1
                 continue
 
             # Profile passed all filters

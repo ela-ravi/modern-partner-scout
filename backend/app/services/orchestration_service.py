@@ -13,7 +13,7 @@ import asyncio
 import logging
 import threading
 import time
-from typing import Dict, Any, List, Set
+from typing import Dict, Any, List, Optional, Set
 
 from app.agents.brand_analyzer import get_brand_analyzer_agent
 from app.agents.discovery import get_discovery_agent
@@ -118,6 +118,7 @@ async def _try_keyword_user_search(
     follower_min: int,
     follower_max: int,
     excluded_usernames: Set[str],
+    discovery_keywords: Optional[List[str]] = None,
 ) -> "DiscoveryRequest | None":
     """
     Try keyword user search and return a DiscoveryRequest, or None on failure.
@@ -150,6 +151,7 @@ async def _try_keyword_user_search(
             return DiscoveryRequest(
                 job_id=job_id,
                 reference_usernames=search_usernames[:discover_count],
+                keywords=discovery_keywords or [],
                 limit=discover_count,
                 follower_min=follower_min,
                 follower_max=follower_max,
@@ -253,9 +255,19 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
         all_hashtags = list(dict.fromkeys(hashtags + job_hashtags))  # deduplicated, order preserved
         if not all_hashtags:
             all_hashtags = ["#sustainable", "#ecofriendly"]
-        discovery_keywords = list(dict.fromkeys(
-            (keywords[:5] if keywords else []) + (job_data.get("keywords", [])[:5])
-        ))
+        # Build comprehensive relevance keywords for discovery pre-filter.
+        # Combines brand-analyzer keywords, partner search keywords, job-level
+        # keywords, and core terms from hashtags so the discovery agent can
+        # reject obviously irrelevant profiles before scoring.
+        _raw_kw: List[str] = []
+        _raw_kw.extend(keywords or [])
+        _raw_kw.extend(partner_search_keywords or [])
+        _raw_kw.extend(job_data.get("keywords", []))
+        for _tag in all_hashtags:
+            _term = _tag.lstrip("#").strip()
+            if len(_term) >= 4:
+                _raw_kw.append(_term)
+        discovery_keywords = list(dict.fromkeys(_raw_kw))[:40]
 
         # Inject country-specific hashtags when target_country is set
         target_country = job_data.get("target_country")
@@ -422,6 +434,7 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                         discovery_request = DiscoveryRequest(
                             job_id=job_id,
                             reference_usernames=new_taggers[:discover_count],
+                            keywords=discovery_keywords,
                             limit=discover_count,
                             follower_min=follower_min,
                             follower_max=follower_max,
@@ -442,6 +455,7 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                     discovery_request = await _try_keyword_user_search(
                         job_id, partner_search_keywords, discover_count,
                         follower_min, follower_max, excluded_usernames,
+                        discovery_keywords=discovery_keywords,
                     )
                     # Mark keywords as consumed so Round 2 doesn't repeat
                     partner_search_keywords = []
@@ -452,6 +466,7 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                     discovery_request = DiscoveryRequest(
                         job_id=job_id,
                         reference_usernames=ref_batch,
+                        keywords=discovery_keywords,
                         limit=discover_count,
                         follower_min=follower_min,
                         follower_max=follower_max,
@@ -487,6 +502,7 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                 discovery_request = await _try_keyword_user_search(
                     job_id, partner_search_keywords, discover_count,
                     follower_min, follower_max, excluded_usernames,
+                    discovery_keywords=discovery_keywords,
                 )
 
                 # Fall back to related profiles if keyword search failed/empty
@@ -495,6 +511,7 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                     discovery_request = DiscoveryRequest(
                         job_id=job_id,
                         reference_usernames=ref_batch,
+                        keywords=discovery_keywords,
                         limit=discover_count,
                         follower_min=follower_min,
                         follower_max=follower_max,
@@ -530,6 +547,7 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                 discovery_request = DiscoveryRequest(
                     job_id=job_id,
                     reference_usernames=ref_batch,
+                    keywords=discovery_keywords,
                     limit=discover_count,
                     follower_min=follower_min,
                     follower_max=follower_max,
@@ -554,6 +572,7 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                     discovery_request = DiscoveryRequest(
                         job_id=job_id,
                         reference_usernames=batch,
+                        keywords=discovery_keywords,
                         limit=discover_count,
                         follower_min=follower_min,
                         follower_max=follower_max,
@@ -630,6 +649,7 @@ async def _run_pipeline(job_id: str, job_data: Dict[str, Any]) -> None:
                     rescue_request = DiscoveryRequest(
                         job_id=job_id,
                         reference_usernames=rescue_batch,
+                        keywords=discovery_keywords,
                         limit=discover_count,
                         follower_min=follower_min,
                         follower_max=follower_max,
