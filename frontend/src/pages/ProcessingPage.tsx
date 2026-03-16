@@ -122,7 +122,7 @@ export default function ProcessingPage() {
   const { data: job, isLoading: jobLoading } = useJob(jobId, {
     refetchInterval: 3000,
   })
-  const { data: analytics } = useJobAnalytics(jobId)
+  const { data: analytics } = useJobAnalytics(jobId, { refetchInterval: 3000 })
 
   const isRunning = !!job && !TERMINAL_STATUSES.includes(job.status)
 
