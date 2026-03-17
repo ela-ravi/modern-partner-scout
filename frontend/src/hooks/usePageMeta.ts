@@ -57,7 +57,7 @@ export function usePageMeta({ title, description, keywords, canonical }: PageMet
       setCanonical(canonical)
     }
 
-    // Cleanup — restore defaults on unmount
+    // Restore defaults on unmount
     return () => {
       document.title = DEFAULT_TITLE
       setMetaTag('name', 'description', DEFAULT_DESCRIPTION)

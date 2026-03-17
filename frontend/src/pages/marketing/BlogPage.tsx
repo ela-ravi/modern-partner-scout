@@ -25,7 +25,7 @@ const articles = [
   {
     title: 'Why Engagement Rate Alone Isn\'t Enough to Evaluate Partners',
     excerpt:
-      'High engagement doesn\'t always mean high quality. Retail accounts naturally have lower engagement than influencers — here\'s why multi-dimensional scoring matters.',
+      'High engagement doesn\'t always mean high quality. Retail accounts naturally have lower engagement than influencers, and that\'s exactly why multi-dimensional scoring matters.',
     category: 'Insights',
     date: 'Feb 10, 2026',
     readTime: '4 min read',

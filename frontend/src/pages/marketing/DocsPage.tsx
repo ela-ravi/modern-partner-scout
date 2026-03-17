@@ -84,7 +84,7 @@ export default function DocsPage() {
 
   usePageMeta({
     title: 'Documentation - PartnerScout AI',
-    description: 'Learn how to use PartnerScout AI — getting started guides, core concepts, features, and API reference.',
+    description: 'Learn how to use PartnerScout AI. Covers getting started guides, core concepts, features, and API reference.',
     keywords: 'documentation, API reference, getting started, PartnerScout AI guide',
     canonical: '/docs',
   })

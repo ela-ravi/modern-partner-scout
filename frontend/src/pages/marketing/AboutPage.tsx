@@ -12,7 +12,7 @@ const pipelineSteps = [
     icon: <PsychologyIcon className="w-7 h-7" />,
     title: 'Brand DNA Analysis',
     description:
-      'Our AI analyzes reference Instagram profiles to extract brand identity — hashtags, content themes, visual aesthetics, and audience signals.',
+      'Our AI analyzes reference Instagram profiles to extract brand identity: hashtags, content themes, visual aesthetics, and audience signals.',
   },
   {
     icon: <SearchIcon className="w-7 h-7" />,
@@ -37,7 +37,7 @@ const pipelineSteps = [
 const values = [
   {
     title: 'Transparency',
-    description: 'Every score comes with detailed reasoning. No black-box decisions — you see exactly why a partner scored the way they did.',
+    description: 'Every score comes with detailed reasoning. No black-box decisions. You see exactly why a partner scored the way they did.',
   },
   {
     title: 'Speed',
@@ -76,8 +76,8 @@ export default function AboutPage() {
             </h1>
             <p className="text-lg sm:text-xl text-apple-text-secondary leading-relaxed">
               PartnerScout AI helps D2C brands find their perfect Instagram collaborators.
-              Drop in a brand handle, and our AI pipeline does the rest — analyzing, discovering,
-              scoring, and connecting you with ideal partners in minutes.
+              Drop in a brand handle, and our AI pipeline does the rest. It analyzes, discovers,
+              scores, and connects you with ideal partners in minutes.
             </p>
           </div>
         </div>
@@ -91,7 +91,7 @@ export default function AboutPage() {
               Our 4-step AI pipeline
             </h2>
             <p className="text-apple-text-secondary text-lg max-w-2xl mx-auto">
-              From a single Instagram handle to a ranked list of qualified partners — fully automated.
+              From a single Instagram handle to a ranked list of qualified partners. Fully automated.
             </p>
           </div>
 

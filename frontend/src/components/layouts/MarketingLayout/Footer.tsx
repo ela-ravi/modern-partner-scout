@@ -1,4 +1,15 @@
-import { Link } from 'react-router-dom'
+import { useCallback } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+
+function scrollToHash(hash: string) {
+  const id = hash.replace('#', '')
+  const el = document.getElementById(id)
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth' })
+    return true
+  }
+  return false
+}
 
 const footerSections = [
   {
@@ -60,6 +71,26 @@ const socialLinks = [
 ]
 
 export function Footer() {
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  const handleHashClick = useCallback((e: React.MouseEvent, path: string) => {
+    const hashIndex = path.indexOf('#')
+    if (hashIndex === -1) return
+
+    const basePath = path.substring(0, hashIndex) || '/'
+    const hash = path.substring(hashIndex)
+
+    e.preventDefault()
+
+    if (location.pathname === basePath || (basePath === '/' && location.pathname === '/')) {
+      scrollToHash(hash)
+    } else {
+      navigate(basePath)
+      setTimeout(() => scrollToHash(hash), 150)
+    }
+  }, [location.pathname, navigate])
+
   return (
     <footer className="bg-[#1A0533] text-white/80">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -111,6 +142,7 @@ export function Footer() {
                   <li key={link.label}>
                     <Link
                       to={link.href}
+                      onClick={(e) => handleHashClick(e, link.href)}
                       className="text-sm text-white/50 hover:text-white transition-colors"
                     >
                       {link.label}

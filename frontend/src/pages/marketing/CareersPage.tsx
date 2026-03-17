@@ -26,24 +26,24 @@ const cultureValues = [
   {
     icon: <WorkIcon className="w-6 h-6" />,
     title: 'Learn constantly',
-    description: 'AI, scraping, scoring, UX — you\'ll work across the full stack and learn something new every week.',
+    description: 'AI, scraping, scoring, UX. You\'ll work across the full stack and pick up something new every week.',
   },
 ]
 
 const openings = [
   {
     title: 'Full-Stack Engineer',
-    type: 'Full-time · Remote',
+    type: 'Full-time, Remote',
     description: 'Build and improve our React + FastAPI platform. Work on AI agent pipelines, real-time processing, and the user-facing dashboard.',
   },
   {
     title: 'AI/ML Engineer',
-    type: 'Full-time · Remote',
+    type: 'Full-time, Remote',
     description: 'Design and fine-tune our multi-agent scoring system. Work with LangChain, embeddings, and multi-provider LLM integrations.',
   },
   {
     title: 'Growth Marketing Lead',
-    type: 'Full-time · Remote',
+    type: 'Full-time, Remote',
     description: 'Drive user acquisition for D2C brands. Own content strategy, partnerships, and product-led growth initiatives.',
   },
 ]
@@ -110,7 +110,7 @@ export default function CareersPage() {
               Open positions
             </h2>
             <p className="text-apple-text-secondary text-lg">
-              Don't see a perfect match? Reach out anyway — we're always looking for talented people.
+              Don't see a perfect match? Reach out anyway. We're always looking for talented people.
             </p>
           </div>
 

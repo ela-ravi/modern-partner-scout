@@ -261,7 +261,7 @@ export default function DiscoveryConfigPage() {
           <Card>
             <h2 className="text-lg font-semibold text-apple-text mb-4">Reference Profiles</h2>
             <p className="text-sm text-apple-text-secondary mb-4">
-              Add 2-10 Instagram profiles that represent your ideal partners. Paste multiple URLs or usernames at once — they&apos;ll be added automatically.
+              Add 2-10 Instagram profiles that represent your ideal partners. Paste multiple URLs or usernames at once and they&apos;ll be added automatically.
             </p>
 
             <div className="space-y-4">
@@ -339,7 +339,7 @@ export default function DiscoveryConfigPage() {
                     onChange={field.onChange}
                     label="Keywords"
                     placeholder="Type and press Enter, or paste multiple at once"
-                    helperText="Topics and themes related to your brand — paste comma/newline-separated list to bulk-add"
+                    helperText="Topics and themes related to your brand. Paste comma or newline-separated list to bulk-add"
                     maxTags={20}
                   />
                 )}
@@ -354,7 +354,7 @@ export default function DiscoveryConfigPage() {
                     onChange={field.onChange}
                     label="Hashtags"
                     placeholder="Type and press Enter, or paste multiple at once"
-                    helperText="Hashtags your ideal partners use — # is added automatically when pasting"
+                    helperText="Hashtags your ideal partners use. The # is added automatically when pasting"
                     maxTags={20}
                     prefix="#"
                     validate={(tag) => tag.startsWith('#') || 'Hashtags must start with #'}
@@ -410,7 +410,7 @@ export default function DiscoveryConfigPage() {
                     {...field}
                     label="Target Country / Region"
                     placeholder="e.g., India, USA, Germany"
-                    helperText="Optional — profiles from this region get priority in scoring"
+                    helperText="Optional. Profiles from this region get priority in scoring"
                   />
                 )}
               />

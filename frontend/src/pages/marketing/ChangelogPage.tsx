@@ -40,7 +40,7 @@ const releases = [
     version: 'v1.2',
     date: 'December 2025',
     changes: [
-      'Multi-reference profile support — analyze up to 5 brand handles',
+      'Multi-reference profile support: analyze up to 5 brand handles',
       'Custom keywords and hashtags input for fine-tuned discovery',
       'Contact email extraction from public profile data',
       'Session management with history and re-run capabilities',

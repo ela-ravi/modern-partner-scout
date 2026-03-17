@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/contexts/AuthContext'
@@ -13,11 +13,30 @@ const navLinks = [
   { path: '/contact', label: 'Contact' },
 ]
 
+function scrollToHash(hash: string) {
+  const id = hash.replace('#', '')
+  const el = document.getElementById(id)
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth' })
+    return true
+  }
+  return false
+}
+
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
   const { isAuthenticated } = useAuth()
+
+  // Handle hash scroll after navigation
+  useEffect(() => {
+    if (location.hash) {
+      // Small delay to let the page render first
+      setTimeout(() => scrollToHash(location.hash), 100)
+    }
+  }, [location])
 
   useEffect(() => {
     function onScroll() {
@@ -28,6 +47,25 @@ export function Navbar() {
   }, [])
 
   const closeMobile = useCallback(() => setMobileOpen(false), [])
+
+  const handleHashClick = useCallback((e: React.MouseEvent, path: string) => {
+    const hashIndex = path.indexOf('#')
+    if (hashIndex === -1) return // Not a hash link, let React Router handle it
+
+    const basePath = path.substring(0, hashIndex) || '/'
+    const hash = path.substring(hashIndex)
+
+    e.preventDefault()
+
+    if (location.pathname === basePath || (basePath === '/' && location.pathname === '/')) {
+      // Already on the right page, just scroll
+      scrollToHash(hash)
+    } else {
+      // Navigate first, then scroll
+      navigate(basePath)
+      setTimeout(() => scrollToHash(hash), 150)
+    }
+  }, [location.pathname, navigate])
 
   return (
     <header
@@ -72,6 +110,7 @@ export function Navbar() {
               <Link
                 key={link.path}
                 to={link.path}
+                onClick={(e) => handleHashClick(e, link.path)}
                 className={cn(
                   'px-4 py-2 rounded-xl text-sm font-medium transition-colors',
                   location.pathname === link.path
@@ -125,7 +164,7 @@ export function Navbar() {
                 <Link
                   key={link.path}
                   to={link.path}
-                  onClick={closeMobile}
+                  onClick={(e) => { closeMobile(); handleHashClick(e, link.path) }}
                   className={cn(
                     'px-4 py-3 rounded-xl text-sm font-medium transition-colors',
                     location.pathname === link.path
