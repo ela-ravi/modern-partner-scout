@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>PartnerScout AI - UI Components Library</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "apple-bg": "#fbfbfd",
+                        "apple-card": "#ffffff",
+                        "apple-gray": "#f5f5f7",
+                        "apple-border": "rgba(0, 0, 0, 0.06)",
+                        "apple-blue": "#0071e3",
+                        "apple-blue-hover": "#0077ed",
+                        "apple-green": "#34c759",
+                        "apple-orange": "#ff9500",
+                        "apple-red": "#ff3b30",
+                        "apple-purple": "#af52de",
+                        "apple-text": "#1d1d1f",
+                        "apple-text-secondary": "#86868b",
+                        "apple-text-tertiary": "#aeaeb2",
+                    },
+                    fontFamily: {
+                        "sf": ["Inter", "-apple-system", "BlinkMacSystemFont", "sans-serif"]
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.3s ease-out forwards',
+                        'slide-up': 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        'slide-down': 'slideDown 0.2s ease-out forwards',
+                        'toast-in': 'toastIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        'toast-out': 'toastOut 0.3s ease-in forwards',
+                        'shimmer': 'shimmer 1.5s infinite',
+                        'spin': 'spin 1s linear infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        slideDown: {
+                            '0%': { opacity: '0', transform: 'translateY(-10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        toastIn: {
+                            '0%': { opacity: '0', transform: 'translateX(100%)' },
+                            '100%': { opacity: '1', transform: 'translateX(0)' },
+                        },
+                        toastOut: {
+                            '0%': { opacity: '1', transform: 'translateX(0)' },
+                            '100%': { opacity: '0', transform: 'translateX(100%)' },
+                        },
+                        shimmer: {
+                            '0%': { backgroundPosition: '-200% 0' },
+                            '100%': { backgroundPosition: '200% 0' },
+                        },
+                        spin: {
+                            '0%': { transform: 'rotate(0deg)' },
+                            '100%': { transform: 'rotate(360deg)' },
+                        }
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+        
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        /* User Dropdown Menu */
+        .user-dropdown {
+            background: #ffffff;
+            border-radius: 14px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.1);
+            min-width: 220px;
+        }
+        
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            color: #1d1d1f;
+            font-size: 14px;
+            transition: background 0.15s ease;
+        }
+        
+        .dropdown-item:hover {
+            background: #f5f5f7;
+        }
+        
+        .dropdown-item.danger {
+            color: #ff3b30;
+        }
+        
+        .dropdown-divider {
+            height: 1px;
+            background: rgba(0, 0, 0, 0.06);
+            margin: 6px 0;
+        }
+        
+        /* Toast Notifications */
+        .toast {
+            background: #ffffff;
+            border-radius: 14px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.1);
+            padding: 14px 18px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            min-width: 320px;
+            max-width: 420px;
+        }
+        
+        .toast-success {
+            border-left: 4px solid #34c759;
+        }
+        
+        .toast-error {
+            border-left: 4px solid #ff3b30;
+        }
+        
+        .toast-warning {
+            border-left: 4px solid #ff9500;
+        }
+        
+        .toast-info {
+            border-left: 4px solid #0071e3;
+        }
+        
+        /* Skeleton Loaders */
+        .skeleton {
+            background: linear-gradient(90deg, #f5f5f7 25%, #ebebeb 50%, #f5f5f7 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 8px;
+        }
+        
+        .skeleton-circle {
+            border-radius: 50%;
+        }
+        
+        .skeleton-text {
+            height: 14px;
+            border-radius: 4px;
+        }
+        
+        .skeleton-text-sm {
+            height: 10px;
+            border-radius: 3px;
+        }
+        
+        /* Loading Spinner */
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid #f5f5f7;
+            border-top-color: #0071e3;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .spinner-lg {
+            width: 40px;
+            height: 40px;
+            border-width: 4px;
+        }
+        
+        /* Modal */
+        .modal-backdrop {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(8px);
+        }
+        
+        .modal-content {
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        
+        .apple-button {
+            background: #0071e3;
+            color: white;
+            border-radius: 980px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .apple-button:hover {
+            background: #0077ed;
+        }
+        
+        .apple-button-secondary {
+            background: #f5f5f7;
+            color: #1d1d1f;
+            border-radius: 980px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .apple-button-secondary:hover {
+            background: #ebebeb;
+        }
+    </style>
+</head>
+<body class="bg-apple-gray text-apple-text min-h-screen p-8">
+    <div class="max-w-5xl mx-auto space-y-16">
+        <header class="text-center mb-16">
+            <h1 class="text-4xl font-semibold tracking-tight mb-4">UI Components Library</h1>
+            <p class="text-apple-text-secondary text-lg">Reusable components for PartnerScout AI</p>
+        </header>
+
+        <!-- ============================================ -->
+        <!-- SECTION 1: User Dropdown Menu -->
+        <!-- ============================================ -->
+        <section>
+            <h2 class="text-2xl font-semibold mb-2">1. User Dropdown Menu</h2>
+            <p class="text-apple-text-secondary mb-6">Appears when clicking the user avatar in header. Includes logout functionality.</p>
+            
+            <div class="bg-white rounded-2xl p-8 border border-apple-border">
+                <div class="flex items-start gap-8">
+                    <!-- Header Preview -->
+                    <div class="flex items-center gap-4">
+                        <div class="relative">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center cursor-pointer ring-2 ring-apple-blue ring-offset-2">
+                                <span class="text-white text-sm font-semibold">R</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dropdown Menu -->
+                    <div class="user-dropdown animate-slide-down">
+                        <!-- User Info -->
+                        <div class="px-4 py-3 border-b border-apple-border">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                                    <span class="text-white text-sm font-semibold">R</span>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-sm">Ravi Kumar</p>
+                                    <p class="text-apple-text-secondary text-xs">ravi@company.com</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Menu Items -->
+                        <div class="py-2">
+                            <a href="#" class="dropdown-item">
+                                <span class="material-symbols-outlined text-lg text-apple-text-secondary">person</span>
+                                <span>Profile Settings</span>
+                            </a>
+                            <a href="#" class="dropdown-item">
+                                <span class="material-symbols-outlined text-lg text-apple-text-secondary">settings</span>
+                                <span>Preferences</span>
+                            </a>
+                            <a href="#" class="dropdown-item">
+                                <span class="material-symbols-outlined text-lg text-apple-text-secondary">help</span>
+                                <span>Help & Support</span>
+                            </a>
+                        </div>
+                        
+                        <div class="dropdown-divider"></div>
+                        
+                        <!-- Logout -->
+                        <div class="py-2">
+                            <a href="#" class="dropdown-item danger">
+                                <span class="material-symbols-outlined text-lg">logout</span>
+                                <span>Sign Out</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================ -->
+        <!-- SECTION 2: Toast Notifications -->
+        <!-- ============================================ -->
+        <section>
+            <h2 class="text-2xl font-semibold mb-2">2. Toast Notifications</h2>
+            <p class="text-apple-text-secondary mb-6">Temporary notifications for success, error, warning, and info messages.</p>
+            
+            <div class="bg-white rounded-2xl p-8 border border-apple-border space-y-4">
+                <!-- Success Toast -->
+                <div class="toast toast-success animate-toast-in">
+                    <span class="material-symbols-outlined text-apple-green text-xl flex-shrink-0" style="font-variation-settings: 'FILL' 1">check_circle</span>
+                    <div class="flex-1">
+                        <p class="font-semibold text-sm">Discovery completed!</p>
+                        <p class="text-apple-text-secondary text-sm">47 profiles discovered and scored successfully.</p>
+                    </div>
+                    <button class="text-apple-text-tertiary hover:text-apple-text-secondary transition-colors">
+                        <span class="material-symbols-outlined text-lg">close</span>
+                    </button>
+                </div>
+
+                <!-- Error Toast -->
+                <div class="toast toast-error animate-toast-in">
+                    <span class="material-symbols-outlined text-apple-red text-xl flex-shrink-0">error</span>
+                    <div class="flex-1">
+                        <p class="font-semibold text-sm">Discovery failed</p>
+                        <p class="text-apple-text-secondary text-sm">Unable to connect to Instagram API. Please try again.</p>
+                    </div>
+                    <button class="text-apple-text-tertiary hover:text-apple-text-secondary transition-colors">
+                        <span class="material-symbols-outlined text-lg">close</span>
+                    </button>
+                </div>
+
+                <!-- Warning Toast -->
+                <div class="toast toast-warning animate-toast-in">
+                    <span class="material-symbols-outlined text-apple-orange text-xl flex-shrink-0">warning</span>
+                    <div class="flex-1">
+                        <p class="font-semibold text-sm">Rate limit warning</p>
+                        <p class="text-apple-text-secondary text-sm">You have 2 discovery sessions remaining today.</p>
+                    </div>
+                    <button class="text-apple-text-tertiary hover:text-apple-text-secondary transition-colors">
+                        <span class="material-symbols-outlined text-lg">close</span>
+                    </button>
+                </div>
+
+                <!-- Info Toast -->
+                <div class="toast toast-info animate-toast-in">
+                    <span class="material-symbols-outlined text-apple-blue text-xl flex-shrink-0">info</span>
+                    <div class="flex-1">
+                        <p class="font-semibold text-sm">Email sent</p>
+                        <p class="text-apple-text-secondary text-sm">Outreach email sent to @cleaneatingamy.</p>
+                    </div>
+                    <button class="text-apple-text-tertiary hover:text-apple-text-secondary transition-colors">
+                        <span class="material-symbols-outlined text-lg">close</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Toast Container Position -->
+            <p class="text-apple-text-tertiary text-sm mt-4">
+                <strong>Placement:</strong> Fixed to top-right corner with 24px margin. Stack vertically with 12px gap.
+            </p>
+        </section>
+
+        <!-- ============================================ -->
+        <!-- SECTION 3: Loading States -->
+        <!-- ============================================ -->
+        <section>
+            <h2 class="text-2xl font-semibold mb-2">3. Loading States</h2>
+            <p class="text-apple-text-secondary mb-6">Spinners, overlays, and loading indicators for async operations.</p>
+            
+            <div class="bg-white rounded-2xl p-8 border border-apple-border">
+                <div class="grid md:grid-cols-3 gap-8">
+                    <!-- Spinner Sizes -->
+                    <div class="text-center">
+                        <p class="text-sm font-medium text-apple-text-secondary mb-4">Spinners</p>
+                        <div class="flex items-center justify-center gap-6">
+                            <div class="spinner" style="width: 16px; height: 16px; border-width: 2px;"></div>
+                            <div class="spinner"></div>
+                            <div class="spinner spinner-lg"></div>
+                        </div>
+                    </div>
+
+                    <!-- Button Loading -->
+                    <div class="text-center">
+                        <p class="text-sm font-medium text-apple-text-secondary mb-4">Button Loading</p>
+                        <button class="apple-button inline-flex items-center gap-2 px-6 py-3 text-sm opacity-80 cursor-not-allowed">
+                            <div class="spinner" style="width: 16px; height: 16px; border-width: 2px; border-color: rgba(255,255,255,0.3); border-top-color: white;"></div>
+                            <span>Processing...</span>
+                        </button>
+                    </div>
+
+                    <!-- Page Loading Overlay -->
+                    <div class="text-center">
+                        <p class="text-sm font-medium text-apple-text-secondary mb-4">Page Loading</p>
+                        <div class="relative bg-apple-gray rounded-xl p-8 h-32 flex flex-col items-center justify-center gap-3">
+                            <div class="spinner spinner-lg"></div>
+                            <p class="text-apple-text-secondary text-sm">Loading profiles...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================ -->
+        <!-- SECTION 4: Skeleton Loaders -->
+        <!-- ============================================ -->
+        <section>
+            <h2 class="text-2xl font-semibold mb-2">4. Skeleton Loaders</h2>
+            <p class="text-apple-text-secondary mb-6">Placeholder content while data is loading.</p>
+            
+            <div class="bg-white rounded-2xl p-8 border border-apple-border">
+                <div class="grid md:grid-cols-3 gap-6">
+                    <!-- Skeleton Profile Card -->
+                    <div class="bg-white rounded-2xl border border-apple-border overflow-hidden">
+                        <!-- Cover skeleton -->
+                        <div class="skeleton h-28"></div>
+                        <!-- Content -->
+                        <div class="p-5 pt-8">
+                            <div class="flex items-end gap-3 -mt-14 mb-4">
+                                <div class="skeleton skeleton-circle w-14 h-14 border-4 border-white"></div>
+                                <div class="flex-1 space-y-2 pb-2">
+                                    <div class="skeleton skeleton-text w-3/4"></div>
+                                    <div class="skeleton skeleton-text-sm w-1/2"></div>
+                                </div>
+                            </div>
+                            <div class="space-y-2 mb-4">
+                                <div class="skeleton skeleton-text w-full"></div>
+                                <div class="skeleton skeleton-text w-2/3"></div>
+                            </div>
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex gap-4">
+                                    <div class="skeleton w-12 h-8 rounded-lg"></div>
+                                    <div class="skeleton w-12 h-8 rounded-lg"></div>
+                                </div>
+                                <div class="skeleton skeleton-circle w-12 h-12"></div>
+                            </div>
+                            <div class="skeleton h-10 rounded-xl"></div>
+                        </div>
+                    </div>
+
+                    <!-- Skeleton Session Card -->
+                    <div class="bg-white rounded-2xl border border-apple-border p-6">
+                        <div class="flex items-start gap-4">
+                            <div class="skeleton skeleton-circle w-12 h-12 rounded-xl"></div>
+                            <div class="flex-1 space-y-3">
+                                <div class="skeleton skeleton-text w-3/4"></div>
+                                <div class="skeleton skeleton-text-sm w-1/2"></div>
+                                <div class="flex gap-4 mt-4">
+                                    <div class="skeleton w-16 h-4 rounded"></div>
+                                    <div class="skeleton w-16 h-4 rounded"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4 pt-4 border-t border-apple-border">
+                            <div class="skeleton h-2 rounded-full"></div>
+                        </div>
+                    </div>
+
+                    <!-- Skeleton Stats Card -->
+                    <div class="space-y-4">
+                        <div class="bg-white rounded-2xl border border-apple-border p-5">
+                            <div class="skeleton skeleton-text-sm w-1/2 mb-3"></div>
+                            <div class="skeleton h-8 w-16 rounded-lg"></div>
+                        </div>
+                        <div class="bg-white rounded-2xl border border-apple-border p-5">
+                            <div class="skeleton skeleton-text-sm w-1/2 mb-3"></div>
+                            <div class="skeleton h-8 w-20 rounded-lg"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================ -->
+        <!-- SECTION 5: Daily Limit Modal -->
+        <!-- ============================================ -->
+        <section>
+            <h2 class="text-2xl font-semibold mb-2">5. Daily Limit Exceeded Modal</h2>
+            <p class="text-apple-text-secondary mb-6">Shown when user reaches their daily discovery session limit.</p>
+            
+            <div class="relative bg-gray-800/10 rounded-2xl p-8 min-h-[400px] flex items-center justify-center">
+                <!-- Modal -->
+                <div class="modal-content w-full max-w-md p-8 text-center animate-slide-up">
+                    <!-- Icon -->
+                    <div class="w-16 h-16 rounded-full bg-apple-orange/10 flex items-center justify-center mx-auto mb-6">
+                        <span class="material-symbols-outlined text-apple-orange text-3xl">schedule</span>
+                    </div>
+                    
+                    <!-- Content -->
+                    <h3 class="text-2xl font-semibold mb-3">Daily Limit Reached</h3>
+                    <p class="text-apple-text-secondary mb-6 leading-relaxed">
+                        You've used all <strong class="text-apple-text">5 discovery sessions</strong> for today. 
+                        Your limit will reset at midnight UTC.
+                    </p>
+                    
+                    <!-- Countdown -->
+                    <div class="bg-apple-gray rounded-xl p-4 mb-8">
+                        <p class="text-sm text-apple-text-secondary mb-2">Resets in</p>
+                        <div class="flex items-center justify-center gap-2">
+                            <div class="bg-white rounded-lg px-3 py-2 shadow-sm">
+                                <span class="text-2xl font-semibold">04</span>
+                                <span class="text-xs text-apple-text-tertiary block">hours</span>
+                            </div>
+                            <span class="text-apple-text-tertiary text-xl">:</span>
+                            <div class="bg-white rounded-lg px-3 py-2 shadow-sm">
+                                <span class="text-2xl font-semibold">23</span>
+                                <span class="text-xs text-apple-text-tertiary block">mins</span>
+                            </div>
+                            <span class="text-apple-text-tertiary text-xl">:</span>
+                            <div class="bg-white rounded-lg px-3 py-2 shadow-sm">
+                                <span class="text-2xl font-semibold">47</span>
+                                <span class="text-xs text-apple-text-tertiary block">secs</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Actions -->
+                    <div class="flex flex-col gap-3">
+                        <button class="apple-button w-full py-3.5 text-sm">
+                            <span class="material-symbols-outlined text-lg align-middle mr-2">diamond</span>
+                            Upgrade to Pro
+                        </button>
+                        <button class="apple-button-secondary w-full py-3.5 text-sm">
+                            Close
+                        </button>
+                    </div>
+                    
+                    <!-- Upgrade Benefits -->
+                    <div class="mt-6 pt-6 border-t border-apple-border text-left">
+                        <p class="text-xs text-apple-text-secondary mb-3">Pro includes:</p>
+                        <ul class="space-y-2">
+                            <li class="flex items-center gap-2 text-sm text-apple-text-secondary">
+                                <span class="material-symbols-outlined text-apple-green text-base" style="font-variation-settings: 'FILL' 1">check_circle</span>
+                                Unlimited discovery sessions
+                            </li>
+                            <li class="flex items-center gap-2 text-sm text-apple-text-secondary">
+                                <span class="material-symbols-outlined text-apple-green text-base" style="font-variation-settings: 'FILL' 1">check_circle</span>
+                                Priority processing
+                            </li>
+                            <li class="flex items-center gap-2 text-sm text-apple-text-secondary">
+                                <span class="material-symbols-outlined text-apple-green text-base" style="font-variation-settings: 'FILL' 1">check_circle</span>
+                                Advanced analytics
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================ -->
+        <!-- SECTION 6: Input Validation States -->
+        <!-- ============================================ -->
+        <section>
+            <h2 class="text-2xl font-semibold mb-2">6. Input Validation States</h2>
+            <p class="text-apple-text-secondary mb-6">Form field states for validation feedback.</p>
+            
+            <div class="bg-white rounded-2xl p-8 border border-apple-border">
+                <div class="grid md:grid-cols-3 gap-8">
+                    <!-- Default State -->
+                    <div>
+                        <label class="block text-sm font-medium text-apple-text mb-2">Default</label>
+                        <input type="text" placeholder="Enter email..." 
+                            class="w-full px-4 py-3.5 bg-white border border-gray-200 rounded-xl focus:border-apple-blue focus:ring-3 focus:ring-apple-blue/10 outline-none transition-all"/>
+                    </div>
+
+                    <!-- Error State -->
+                    <div>
+                        <label class="block text-sm font-medium text-apple-text mb-2">Error</label>
+                        <input type="text" value="invalid-email" 
+                            class="w-full px-4 py-3.5 bg-white border-2 border-apple-red rounded-xl focus:ring-3 focus:ring-apple-red/10 outline-none"/>
+                        <p class="flex items-center gap-1.5 mt-2 text-apple-red text-sm">
+                            <span class="material-symbols-outlined text-base">error</span>
+                            Please enter a valid email address
+                        </p>
+                    </div>
+
+                    <!-- Success State -->
+                    <div>
+                        <label class="block text-sm font-medium text-apple-text mb-2">Success</label>
+                        <div class="relative">
+                            <input type="text" value="valid@email.com" 
+                                class="w-full px-4 py-3.5 pr-12 bg-white border-2 border-apple-green rounded-xl focus:ring-3 focus:ring-apple-green/10 outline-none"/>
+                            <span class="material-symbols-outlined text-apple-green absolute right-4 top-1/2 -translate-y-1/2" style="font-variation-settings: 'FILL' 1">check_circle</span>
+                        </div>
+                        <p class="flex items-center gap-1.5 mt-2 text-apple-green text-sm">
+                            <span class="material-symbols-outlined text-base" style="font-variation-settings: 'FILL' 1">check_circle</span>
+                            Email verified
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================ -->
+        <!-- SECTION 7: Email Source Indicator -->
+        <!-- ============================================ -->
+        <section>
+            <h2 class="text-2xl font-semibold mb-2">7. Email Source Indicator</h2>
+            <p class="text-apple-text-secondary mb-6">Shows where the email was extracted from (bio or website).</p>
+            
+            <div class="bg-white rounded-2xl p-8 border border-apple-border">
+                <div class="grid md:grid-cols-2 gap-6">
+                    <!-- From Bio -->
+                    <div class="bg-apple-gray rounded-xl p-5">
+                        <h4 class="font-medium text-apple-text-secondary text-xs uppercase tracking-wider mb-3">Contact</h4>
+                        <div class="flex items-center gap-3 p-3 bg-white rounded-xl">
+                            <span class="material-symbols-outlined text-apple-orange text-lg">mail</span>
+                            <div class="flex-1">
+                                <span class="text-sm">collabs@cleaneatingamy.com</span>
+                                <span class="ml-2 px-2 py-0.5 bg-apple-purple/10 text-apple-purple text-xs font-medium rounded-full">from bio</span>
+                            </div>
+                            <button class="text-apple-text-tertiary hover:text-apple-blue transition-colors">
+                                <span class="material-symbols-outlined text-lg">content_copy</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- From Website -->
+                    <div class="bg-apple-gray rounded-xl p-5">
+                        <h4 class="font-medium text-apple-text-secondary text-xs uppercase tracking-wider mb-3">Contact</h4>
+                        <div class="flex items-center gap-3 p-3 bg-white rounded-xl">
+                            <span class="material-symbols-outlined text-apple-orange text-lg">mail</span>
+                            <div class="flex-1">
+                                <span class="text-sm">hello@fitnesswithmike.com</span>
+                                <span class="ml-2 px-2 py-0.5 bg-apple-blue/10 text-apple-blue text-xs font-medium rounded-full">from website</span>
+                            </div>
+                            <button class="text-apple-text-tertiary hover:text-apple-blue transition-colors">
+                                <span class="material-symbols-outlined text-lg">content_copy</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================ -->
+        <!-- SECTION 8: Service Unavailable Fallback -->
+        <!-- ============================================ -->
+        <section>
+            <h2 class="text-2xl font-semibold mb-2">8. Service Unavailable Fallback</h2>
+            <p class="text-apple-text-secondary mb-6">Graceful degradation when backend services are unavailable.</p>
+            
+            <div class="bg-white rounded-2xl p-12 border border-apple-border text-center">
+                <div class="max-w-md mx-auto">
+                    <!-- Icon -->
+                    <div class="w-20 h-20 rounded-full bg-apple-gray flex items-center justify-center mx-auto mb-6">
+                        <span class="material-symbols-outlined text-apple-text-tertiary text-4xl">cloud_off</span>
+                    </div>
+                    
+                    <h3 class="text-xl font-semibold mb-3">Service Temporarily Unavailable</h3>
+                    <p class="text-apple-text-secondary mb-8 leading-relaxed">
+                        We're having trouble connecting to our servers. This is usually temporary. Please try again in a few moments.
+                    </p>
+                    
+                    <button class="apple-button inline-flex items-center gap-2 px-8 py-3.5 text-sm">
+                        <span class="material-symbols-outlined text-lg">refresh</span>
+                        Try Again
+                    </button>
+                    
+                    <p class="text-apple-text-tertiary text-sm mt-6">
+                        If the problem persists, 
+                        <a href="#" class="text-apple-blue hover:underline">contact support</a>.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="py-8 mt-8 border-t border-apple-border">
+            <p class="text-center text-apple-text-tertiary text-sm">
+                © 2026 PartnerScout AI — UI Components v1.0
+            </p>
+        </footer>
+    </div>
+</body>
+</html>
+

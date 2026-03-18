@@ -1,0 +1,49 @@
+Please analyze the following discovered Instagram profiles and identify the most promising candidates for brand partnership.
+
+## Brand Context
+
+**Brand Description:**
+{brand_description}
+
+**Target Hashtags:**
+{hashtags}
+
+**Target Keywords:**
+{keywords}
+
+## Discovery Parameters
+
+- Minimum Followers: {min_followers}
+- Maximum Followers: {max_followers}
+- Discovery Limit: {limit}
+
+## Discovered Profiles
+
+{profiles_data}
+
+## Analysis Instructions
+
+1. Review each discovered profile for:
+   - Relevance to the brand's industry and values
+   - Content quality and consistency
+   - Engagement authenticity indicators
+   - Professional presentation
+
+2. Filter out profiles that:
+   - Have suspicious engagement patterns (very high/low engagement rates)
+   - Appear to be inactive (no recent posts)
+   - Have content misaligned with brand values
+   - Show signs of fake followers
+
+3. Score remaining profiles on a scale of 0-100 based on:
+   - Content theme alignment (30%)
+   - Engagement quality (25%)
+   - Audience fit (25%)
+   - Professional indicators (20%)
+
+4. Provide your analysis in the specified JSON format with:
+   - Filtered and scored profile list
+   - Filter statistics
+   - Top recommendations for further scoring
+
+Please be selective and prioritize quality partnerships.

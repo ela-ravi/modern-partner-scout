@@ -1,0 +1,151 @@
+# PartnerScout AI - Scoring Configuration
+# Weights, thresholds, and dimension configurations for profile scoring
+
+# Scoring dimension weights (must sum to 1.0)
+# Prioritise content relevance & business readiness over engagement,
+# because retail/distributor accounts naturally have lower engagement
+# than influencers but are the ideal partnership targets.
+weights:
+  visual_aesthetic_match: 0.15
+  content_theme_alignment: 0.25
+  engagement_rate_score: 0.15
+  follower_quality: 0.15
+  business_indicators: 0.20
+  activity_recency: 0.10
+
+# Score thresholds
+thresholds:
+  # Minimum score for a profile to be recommended
+  min_recommendation_score: 50
+  
+  # High-quality match threshold
+  high_score: 80
+  
+  # Score ranges for categorization
+  excellent:
+    min: 90
+    max: 100
+    label: "Excellent Match"
+    color: "#22c55e"  # Green
+  
+  good:
+    min: 75
+    max: 89
+    label: "Good Match"
+    color: "#3b82f6"  # Blue
+  
+  moderate:
+    min: 50
+    max: 74
+    label: "Moderate Match"
+    color: "#f59e0b"  # Amber
+  
+  low:
+    min: 0
+    max: 49
+    label: "Low Match"
+    color: "#ef4444"  # Red
+
+# Scoring dimensions configuration
+dimensions:
+  visual_aesthetic_match:
+    name: "Visual Aesthetic Match"
+    description: "How well the profile's visual style matches your brand"
+    min_score: 0
+    max_score: 100
+    factors:
+      - "Color palette consistency"
+      - "Photography style"
+      - "Visual branding elements"
+      - "Feed cohesiveness"
+  
+  content_theme_alignment:
+    name: "Content Theme Alignment"
+    description: "Alignment of content topics and messaging with your brand"
+    min_score: 0
+    max_score: 100
+    factors:
+      - "Topic relevance"
+      - "Messaging alignment"
+      - "Niche compatibility"
+      - "Content quality"
+  
+  engagement_rate_score:
+    name: "Engagement Rate"
+    description: "Quality and authenticity of audience engagement"
+    min_score: 0
+    max_score: 100
+    benchmarks:
+      excellent: 6.0   # 6%+ engagement rate
+      good: 3.0        # 3-6% engagement rate
+      average: 1.5     # 1.5-3% engagement rate
+      below_average: 0.5  # 0.5-1.5% engagement rate
+      poor: 0.0        # Below 0.5%
+    factors:
+      - "Like-to-follower ratio"
+      - "Comment quality"
+      - "Share/save indicators"
+  
+  follower_quality:
+    name: "Follower Quality"
+    description: "Authenticity and relevance of the follower base"
+    min_score: 0
+    max_score: 100
+    factors:
+      - "Follower authenticity"
+      - "Geographic relevance"
+      - "Demographic alignment"
+      - "Follower engagement"
+    red_flags:
+      - "High percentage of fake followers"
+      - "Sudden follower spikes"
+      - "Low follower-to-following ratio"
+  
+  business_indicators:
+    name: "Business Readiness"
+    description: "Signs of professionalism and partnership readiness"
+    min_score: 0
+    max_score: 100
+    factors:
+      - "Business/creator account"
+      - "Contact information available"
+      - "Media kit presence"
+      - "Previous brand collaborations"
+      - "Professional bio"
+  
+  activity_recency:
+    name: "Activity Recency"
+    description: "How recently and consistently the account is active"
+    min_score: 0
+    max_score: 100
+    recency_rules:
+      last_post_within_7_days: 100
+      last_post_within_14_days: 85
+      last_post_within_30_days: 70
+      last_post_within_60_days: 40
+      last_post_within_90_days: 20
+      last_post_over_90_days: 0
+
+# Recommendation logic
+recommendations:
+  # Minimum requirements for recommendation
+  minimum_requirements:
+    min_score: 50
+    required_dimensions_above_40:
+      - engagement_rate_score
+      - content_theme_alignment
+  
+  # Priority ordering for equal scores
+  tiebreaker_priority:
+    - engagement_rate_score
+    - content_theme_alignment
+    - business_indicators
+    - visual_aesthetic_match
+    - follower_quality
+    - activity_recency
+  
+  # Output settings
+  output:
+    include_reasoning: true
+    include_dimension_breakdown: true
+    include_improvement_suggestions: false

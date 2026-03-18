@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>PartnerScout AI - Review & Launch</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "apple-bg": "#fbfbfd",
+                        "apple-card": "#ffffff",
+                        "apple-gray": "#f5f5f7",
+                        "apple-border": "rgba(0, 0, 0, 0.06)",
+                        "apple-blue": "#0071e3",
+                        "apple-blue-hover": "#0077ed",
+                        "apple-green": "#34c759",
+                        "apple-orange": "#ff9500",
+                        "apple-red": "#ff3b30",
+                        "apple-purple": "#af52de",
+                        "apple-text": "#1d1d1f",
+                        "apple-text-secondary": "#86868b",
+                        "apple-text-tertiary": "#aeaeb2",
+                    },
+                    fontFamily: {
+                        "sf": ["Inter", "-apple-system", "BlinkMacSystemFont", "sans-serif"]
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.6s ease-out forwards',
+                        'slide-up': 'slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+        
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .apple-card {
+            background: #ffffff;
+            border-radius: 18px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04), 0 0 1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .apple-button {
+            background: #0071e3;
+            color: white;
+            border-radius: 980px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .apple-button:hover {
+            background: #0077ed;
+            transform: scale(1.02);
+        }
+        
+        .apple-button:active {
+            transform: scale(0.98);
+        }
+        
+        .config-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+        }
+        
+        .config-row:last-child {
+            border-bottom: none;
+        }
+        
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            background: rgba(0, 113, 227, 0.08);
+            border-radius: 980px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #0071e3;
+        }
+        
+        .agent-chip {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            background: #f5f5f7;
+            border-radius: 12px;
+            transition: all 0.2s ease;
+        }
+        
+        .agent-chip:hover {
+            background: #ebebed;
+        }
+        
+        .animate-delay-100 { animation-delay: 0.1s; }
+        .animate-delay-200 { animation-delay: 0.2s; }
+        .animate-delay-300 { animation-delay: 0.3s; }
+        .animate-delay-400 { animation-delay: 0.4s; }
+    </style>
+</head>
+<body class="bg-apple-bg text-apple-text min-h-screen">
+    <div class="flex flex-col min-h-screen">
+        <!-- Header -->
+        <header class="sticky top-0 z-50 bg-apple-bg/80 backdrop-blur-xl border-b border-apple-border">
+            <div class="max-w-3xl mx-auto px-6">
+                <div class="flex items-center justify-between h-14">
+                    <!-- Logo -->
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-apple-blue to-blue-600 flex items-center justify-center">
+                            <svg class="w-4.5 h-4.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                        </div>
+                        <span class="font-semibold text-lg tracking-tight">PartnerScout</span>
+                    </div>
+
+                    <button class="p-2 rounded-full hover:bg-apple-gray transition-colors">
+                        <span class="material-symbols-outlined text-apple-text-secondary">close</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 max-w-3xl w-full mx-auto px-6 py-12">
+            <!-- Stepper -->
+            <div class="mb-16 opacity-0 animate-fade-in">
+                <div class="flex items-center justify-center gap-0 max-w-sm mx-auto">
+                    <!-- Step 1 - Complete -->
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-full bg-apple-green flex items-center justify-center text-white shadow-lg">
+                            <span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1">check</span>
+                        </div>
+                        <span class="font-medium text-apple-green hidden sm:block">Configure</span>
+                    </div>
+                    
+                    <!-- Connector -->
+                    <div class="flex-1 h-px mx-6 bg-apple-green max-w-[80px]"></div>
+                    
+                    <!-- Step 2 - Active -->
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-full bg-apple-blue flex items-center justify-center text-white font-semibold text-sm shadow-lg">
+                            2
+                        </div>
+                        <span class="font-medium text-apple-text hidden sm:block">Launch</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page Header -->
+            <div class="text-center mb-12 opacity-0 animate-slide-up animate-delay-100">
+                <h1 class="text-4xl font-semibold tracking-tight mb-4">Review & Launch</h1>
+                <p class="text-apple-text-secondary text-xl max-w-lg mx-auto">
+                    Confirm your settings before starting discovery
+                </p>
+            </div>
+
+            <!-- Review Card -->
+            <div class="apple-card overflow-hidden opacity-0 animate-slide-up animate-delay-200">
+                <!-- Header -->
+                <div class="bg-apple-gray/50 px-8 py-6 border-b border-apple-border">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center">
+                            <span class="material-symbols-outlined text-apple-blue text-2xl">campaign</span>
+                        </div>
+                        <div>
+                            <h2 class="font-semibold text-lg">Summer Wellness Campaign 2026</h2>
+                            <p class="text-apple-text-secondary text-sm">Ready to launch</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configuration Summary -->
+                <div class="px-8 py-6">
+                    <h3 class="font-medium text-apple-text-secondary text-xs uppercase tracking-wider mb-4">Configuration</h3>
+                    
+                    <div class="config-row">
+                        <span class="text-apple-text-secondary">Reference Profiles</span>
+                        <div class="flex gap-2">
+                            <span class="tag">@yourbrand</span>
+                            <span class="tag">@competitor1</span>
+                        </div>
+                    </div>
+
+                    <div class="config-row">
+                        <span class="text-apple-text-secondary">Brand Description</span>
+                        <span class="text-sm text-right max-w-[280px]">Wellness brand focused on organic supplements...</span>
+                    </div>
+                    
+                    <div class="config-row">
+                        <span class="text-apple-text-secondary">Target Keywords</span>
+                        <div class="flex flex-wrap gap-1.5 justify-end max-w-[280px]">
+                            <span class="tag">#wellness</span>
+                            <span class="tag">#healthylifestyle</span>
+                            <span class="tag">#mindfulness</span>
+                            <span class="tag">#plantbased</span>
+                        </div>
+                    </div>
+                    
+                    <div class="config-row">
+                        <span class="text-apple-text-secondary">Profiles to Discover</span>
+                        <span class="font-semibold">50 profiles</span>
+                    </div>
+                    
+                    <div class="config-row">
+                        <span class="text-apple-text-secondary">Minimum Score</span>
+                        <span class="font-semibold text-apple-green">70%</span>
+                    </div>
+                    
+                    <div class="config-row">
+                        <span class="text-apple-text-secondary">Follower Range</span>
+                        <span class="font-semibold">10K – 500K</span>
+                    </div>
+                </div>
+
+                <!-- AI Pipeline -->
+                <div class="px-8 py-6 bg-apple-gray/30 border-t border-apple-border">
+                    <h3 class="font-medium text-apple-text-secondary text-xs uppercase tracking-wider mb-4">AI Pipeline</h3>
+                    
+                    <div class="flex flex-wrap gap-3 items-center">
+                        <div class="agent-chip">
+                            <span class="material-symbols-outlined text-apple-purple text-lg">psychology</span>
+                            <span class="text-sm font-medium">Brand Analyzer</span>
+                        </div>
+                        <span class="text-apple-text-tertiary">→</span>
+                        <div class="agent-chip">
+                            <span class="material-symbols-outlined text-apple-blue text-lg">explore</span>
+                            <span class="text-sm font-medium">Discovery</span>
+                        </div>
+                        <span class="text-apple-text-tertiary">→</span>
+                        <div class="agent-chip">
+                            <span class="material-symbols-outlined text-apple-green text-lg">verified</span>
+                            <span class="text-sm font-medium">Scoring</span>
+                        </div>
+                        <span class="text-apple-text-tertiary">→</span>
+                        <div class="agent-chip">
+                            <span class="material-symbols-outlined text-apple-orange text-lg">mail</span>
+                            <span class="text-sm font-medium">Emails</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Time Estimate -->
+                <div class="px-8 py-5 border-t border-apple-border">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <span class="material-symbols-outlined text-apple-text-secondary">schedule</span>
+                            <span class="text-apple-text-secondary">Estimated time</span>
+                        </div>
+                        <span class="font-semibold">~3-5 minutes</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Info Note -->
+            <div class="mt-6 p-5 bg-apple-blue/5 rounded-2xl flex gap-4 opacity-0 animate-fade-in animate-delay-300">
+                <span class="material-symbols-outlined text-apple-blue flex-shrink-0">info</span>
+                <p class="text-sm text-apple-text-secondary leading-relaxed">
+                    <span class="font-medium text-apple-text">Real-time updates:</span> 
+                    Profiles will appear on your dashboard as they're discovered. You can start reviewing while discovery is running.
+                </p>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center justify-between mt-10 opacity-0 animate-fade-in animate-delay-400">
+                <button class="flex items-center gap-2 text-apple-text-secondary hover:text-apple-text transition-colors">
+                    <span class="material-symbols-outlined text-lg">arrow_back</span>
+                    <span class="text-sm font-medium">Back</span>
+                </button>
+                <button class="apple-button inline-flex items-center gap-3 px-10 py-4 text-base shadow-lg shadow-apple-blue/20">
+                    <span class="material-symbols-outlined text-xl">rocket_launch</span>
+                    Launch Discovery
+                </button>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="py-8 mt-auto border-t border-apple-border">
+            <div class="max-w-3xl mx-auto px-6">
+                <p class="text-center text-apple-text-tertiary text-sm">
+                    © 2026 PartnerScout AI
+                </p>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>

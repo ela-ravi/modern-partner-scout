@@ -1,0 +1,255 @@
+"""
+PartnerScout AI - Demo Seed Data
+
+Pre-seeded data for the Watch Demo feature.
+Creates a completed job with realistic sample profiles.
+"""
+
+DEMO_BRAND_DESCRIPTION = """
+EcoLife is a sustainable lifestyle brand focused on eco-friendly products 
+and mindful living. We promote minimalist aesthetics, organic materials, 
+and environmental consciousness through our curated collection of home 
+goods and personal care items. Our target audience is environmentally 
+conscious millennials and Gen-Z consumers who value quality over quantity.
+"""
+
+DEMO_BRAND_DNA = {
+    "hashtags": ["#sustainable", "#ecofriendly", "#minimalist", "#zerowaste", "#organic"],
+    "keywords": ["sustainable", "eco", "organic", "minimalist", "green living", "zero waste"],
+    "visual_themes": ["clean aesthetics", "nature", "neutral colors", "minimal design"],
+    "content_pillars": ["sustainability tips", "product showcases", "lifestyle inspiration", "DIY projects"],
+    "target_audience_description": "Environmentally conscious millennials and Gen-Z who value sustainable living"
+}
+
+DEMO_PROFILES = [
+    {
+        "username": "eco_lifestyle_jane",
+        "full_name": "Jane Green",
+        "bio": "🌿 Living sustainably | Sharing eco-tips daily | Mom of 2 | Collab: jane@ecolife.co",
+        "followers_count": 45000,
+        "following_count": 890,
+        "posts_count": 342,
+        "engagement_rate": 4.2,
+        "is_verified": False,
+        "is_business_account": True,
+        "external_url": "https://ecolifejane.com",
+        "score": 92,
+        "recommendation": "highly_recommended",
+        "contact_email": "jane@ecolife.co",
+        "dimension_scores": {
+            "visual_aesthetic_match": 95,
+            "content_theme_alignment": 90,
+            "engagement_rate_score": 88,
+            "follower_quality": 92,
+            "business_indicators": 90,
+            "activity_recency": 95,
+        }
+    },
+    {
+        "username": "minimal_home_studio",
+        "full_name": "Minimal Home Studio",
+        "bio": "✨ Curated minimalist spaces | Interior design inspo | NYC based | DM for collabs",
+        "followers_count": 128000,
+        "following_count": 450,
+        "posts_count": 567,
+        "engagement_rate": 3.8,
+        "is_verified": True,
+        "is_business_account": True,
+        "external_url": "https://minimalhome.co",
+        "score": 88,
+        "recommendation": "highly_recommended",
+        "contact_email": "hello@minimalhome.co",
+        "dimension_scores": {
+            "visual_aesthetic_match": 92,
+            "content_theme_alignment": 85,
+            "engagement_rate_score": 82,
+            "follower_quality": 90,
+            "business_indicators": 88,
+            "activity_recency": 90,
+        }
+    },
+    {
+        "username": "green_living_tips",
+        "full_name": "Sarah's Green Journey",
+        "bio": "🌱 Zero waste advocate | Mom of 2 | Tips for sustainable families | 🇨🇦",
+        "followers_count": 67000,
+        "following_count": 1200,
+        "posts_count": 890,
+        "engagement_rate": 5.1,
+        "is_verified": False,
+        "is_business_account": False,
+        "external_url": None,
+        "score": 85,
+        "recommendation": "recommended",
+        "contact_email": None,
+        "dimension_scores": {
+            "visual_aesthetic_match": 78,
+            "content_theme_alignment": 95,
+            "engagement_rate_score": 92,
+            "follower_quality": 80,
+            "business_indicators": 70,
+            "activity_recency": 88,
+        }
+    },
+    {
+        "username": "conscious_consumer_co",
+        "full_name": "Conscious Consumer",
+        "bio": "🌍 Ethical shopping made easy | Product reviews | Sustainable swaps | Shop: link.tree/conscious",
+        "followers_count": 89000,
+        "following_count": 650,
+        "posts_count": 423,
+        "engagement_rate": 4.5,
+        "is_verified": False,
+        "is_business_account": True,
+        "external_url": "https://consciousconsumer.co",
+        "score": 82,
+        "recommendation": "recommended",
+        "contact_email": "partner@consciousconsumer.co",
+        "dimension_scores": {
+            "visual_aesthetic_match": 85,
+            "content_theme_alignment": 88,
+            "engagement_rate_score": 85,
+            "follower_quality": 78,
+            "business_indicators": 82,
+            "activity_recency": 80,
+        }
+    },
+    {
+        "username": "plant_based_living",
+        "full_name": "Plant Based Living",
+        "bio": "🥗 Vegan lifestyle | Easy recipes | Health tips | Book author 📚",
+        "followers_count": 156000,
+        "following_count": 320,
+        "posts_count": 1200,
+        "engagement_rate": 3.2,
+        "is_verified": True,
+        "is_business_account": True,
+        "external_url": "https://plantbasedliving.com",
+        "score": 78,
+        "recommendation": "recommended",
+        "contact_email": "collab@plantbasedliving.com",
+        "dimension_scores": {
+            "visual_aesthetic_match": 72,
+            "content_theme_alignment": 75,
+            "engagement_rate_score": 70,
+            "follower_quality": 85,
+            "business_indicators": 88,
+            "activity_recency": 82,
+        }
+    },
+    {
+        "username": "slow_fashion_daily",
+        "full_name": "Slow Fashion Daily",
+        "bio": "👗 Sustainable fashion blogger | Thrift finds | Capsule wardrobe tips | Based in LA",
+        "followers_count": 34000,
+        "following_count": 780,
+        "posts_count": 256,
+        "engagement_rate": 6.2,
+        "is_verified": False,
+        "is_business_account": False,
+        "external_url": None,
+        "score": 75,
+        "recommendation": "recommended",
+        "contact_email": None,
+        "dimension_scores": {
+            "visual_aesthetic_match": 88,
+            "content_theme_alignment": 80,
+            "engagement_rate_score": 95,
+            "follower_quality": 70,
+            "business_indicators": 55,
+            "activity_recency": 78,
+        }
+    },
+    {
+        "username": "nature_lover_mike",
+        "full_name": "Mike Outdoors",
+        "bio": "🏕️ Outdoor adventures | Nature photography | Conservation advocate | 📍 Colorado",
+        "followers_count": 52000,
+        "following_count": 410,
+        "posts_count": 678,
+        "engagement_rate": 4.8,
+        "is_verified": False,
+        "is_business_account": False,
+        "external_url": "https://mikeoutdoors.com",
+        "score": 68,
+        "recommendation": "consider",
+        "contact_email": "mike@mikeoutdoors.com",
+        "dimension_scores": {
+            "visual_aesthetic_match": 85,
+            "content_theme_alignment": 60,
+            "engagement_rate_score": 88,
+            "follower_quality": 72,
+            "business_indicators": 50,
+            "activity_recency": 75,
+        }
+    },
+    {
+        "username": "zero_waste_home",
+        "full_name": "Zero Waste Home Tips",
+        "bio": "♻️ Reducing waste one swap at a time | DIY cleaning products | Family of 4",
+        "followers_count": 23000,
+        "following_count": 890,
+        "posts_count": 156,
+        "engagement_rate": 7.1,
+        "is_verified": False,
+        "is_business_account": False,
+        "external_url": None,
+        "score": 65,
+        "recommendation": "consider",
+        "contact_email": None,
+        "dimension_scores": {
+            "visual_aesthetic_match": 65,
+            "content_theme_alignment": 90,
+            "engagement_rate_score": 98,
+            "follower_quality": 60,
+            "business_indicators": 40,
+            "activity_recency": 70,
+        }
+    },
+    {
+        "username": "organic_garden_life",
+        "full_name": "Organic Garden Life",
+        "bio": "🌻 Home gardening tips | Organic produce | Seed saving | Zone 7b",
+        "followers_count": 18000,
+        "following_count": 1100,
+        "posts_count": 432,
+        "engagement_rate": 5.5,
+        "is_verified": False,
+        "is_business_account": False,
+        "external_url": None,
+        "score": 58,
+        "recommendation": "consider",
+        "contact_email": None,
+        "dimension_scores": {
+            "visual_aesthetic_match": 60,
+            "content_theme_alignment": 70,
+            "engagement_rate_score": 90,
+            "follower_quality": 55,
+            "business_indicators": 35,
+            "activity_recency": 65,
+        }
+    },
+    {
+        "username": "wellness_wanderer",
+        "full_name": "Wellness Wanderer",
+        "bio": "🧘 Yoga teacher | Travel blogger | Wellness tips | Currently in Bali 🌴",
+        "followers_count": 95000,
+        "following_count": 280,
+        "posts_count": 890,
+        "engagement_rate": 2.8,
+        "is_verified": False,
+        "is_business_account": True,
+        "external_url": "https://wellnesswanderer.com",
+        "score": 52,
+        "recommendation": "not_recommended",
+        "contact_email": "hello@wellnesswanderer.com",
+        "dimension_scores": {
+            "visual_aesthetic_match": 70,
+            "content_theme_alignment": 45,
+            "engagement_rate_score": 55,
+            "follower_quality": 60,
+            "business_indicators": 65,
+            "activity_recency": 50,
+        }
+    },
+]

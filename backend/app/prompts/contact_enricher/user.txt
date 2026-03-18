@@ -1,0 +1,29 @@
+Extract contact information from the following website content for this Instagram profile.
+
+## Profile Context
+
+**Username:** {username}
+**Full Name:** {full_name}
+**Website URL:** {website_url}
+
+## Website Content
+
+{page_content}
+
+## Instructions
+
+1. Find the most relevant business/contact EMAIL address
+2. Find any PHONE number (mobile, business, or landline)
+3. Find any physical ADDRESS (office, store, or business location)
+4. Rate your confidence for each piece of information
+
+Focus on information that belongs to the profile owner, not third parties or platform providers.
+
+IMPORTANT: Return ONLY a valid JSON object with these keys:
+- email (string or null)
+- phone (string or null)
+- address (string or null)
+- email_confidence ("high", "medium", "low", or null)
+- phone_confidence ("high", "medium", "low", or null)
+- address_confidence ("high", "medium", "low", or null)
+- sources (array of strings describing where info was found)
