@@ -1,8 +1,12 @@
 # =============================================================================
 # PartnerScout AI — CI/CD Pipeline
 #
+# Environments:
+#   main    branch → Production  (port 80)   at /opt/partner-scout
+#   develop branch → Staging     (port 8080) at /opt/partner-scout-staging
+#
 # Triggers:
-#   - Push to `main` branch
+#   - Push to `main` or `develop` branch
 #   - Manual dispatch (for re-deploying after GitHub Secrets changes)
 #
 # Jobs:
@@ -32,16 +36,19 @@
 #   N8N_WEBHOOK_URL        (n8n webhook endpoint)
 #
 #   --- Frontend Build Args ---
-#   VITE_API_URL           (backend URL the frontend calls, e.g. http://VPS_IP)
+#   VITE_API_URL           (production backend URL, e.g. http://VPS_IP)
+#   VITE_API_URL_STAGING   (staging backend URL, e.g. http://VPS_IP:8080)
+#                          — if not set, falls back to VITE_API_URL
 # =============================================================================
 
 name: Deploy to Hostinger VPS
 
 on:
-  # Trigger on every push to the main branch
+  # Trigger on pushes to main (production) or develop (staging)
   push:
     branches:
       - main
+      - develop
 
   # Allow manual trigger from the Actions tab
   # Useful when you only changed GitHub Secrets (no code push needed)
@@ -123,6 +130,10 @@ jobs:
   # ===========================================================================
   # Job 3: Deploy to Hostinger KVM2 VPS
   # Runs only after both test jobs succeed
+  #
+  # Branch detection:
+  #   main    → production  (port 80,   /opt/partner-scout)
+  #   develop → staging     (port 8080, /opt/partner-scout-staging)
   # ===========================================================================
   deploy:
     name: Deploy to VPS
@@ -131,6 +142,40 @@ jobs:
     needs: [test-backend, test-frontend]
 
     steps:
+      # -- Determine environment from branch ------------------------------------
+      # Sets DEPLOY_ENV, DEPLOY_DIR, DEPLOY_BRANCH, DEPLOY_PORT, and VITE_API_URL
+      # so the SSH script below can use them
+      - name: Set deploy variables
+        id: vars
+        run: |
+          # Extract branch name from the GitHub ref (e.g. refs/heads/main → main)
+          BRANCH="${GITHUB_REF#refs/heads/}"
+
+          if [ "$BRANCH" = "main" ]; then
+            echo "deploy_env=production"   >> "$GITHUB_OUTPUT"
+            echo "deploy_dir=/opt/partner-scout"          >> "$GITHUB_OUTPUT"
+            echo "deploy_branch=main"      >> "$GITHUB_OUTPUT"
+            echo "deploy_port=80"          >> "$GITHUB_OUTPUT"
+            # Production uses VITE_API_URL
+            echo "vite_api_url=${{ secrets.VITE_API_URL }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy_env=staging"      >> "$GITHUB_OUTPUT"
+            echo "deploy_dir=/opt/partner-scout-staging"  >> "$GITHUB_OUTPUT"
+            echo "deploy_branch=develop"   >> "$GITHUB_OUTPUT"
+            echo "deploy_port=8080"        >> "$GITHUB_OUTPUT"
+            # Staging uses VITE_API_URL_STAGING; falls back to VITE_API_URL if not set
+            STAGING_URL="${{ secrets.VITE_API_URL_STAGING }}"
+            echo "vite_api_url=${STAGING_URL:-${{ secrets.VITE_API_URL }}}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # -- Log which environment we're deploying to -----------------------------
+      - name: Log deployment info
+        run: |
+          echo "🚀 Deploying to: ${{ steps.vars.outputs.deploy_env }}"
+          echo "📂 Directory:    ${{ steps.vars.outputs.deploy_dir }}"
+          echo "🌿 Branch:       ${{ steps.vars.outputs.deploy_branch }}"
+          echo "🔌 Port:         ${{ steps.vars.outputs.deploy_port }}"
+
       # -- SSH into VPS and deploy -----------------------------------------------
       # Uses appleboy/ssh-action to execute commands on the remote server
       # All env vars are written from GitHub Secrets — no manual SSH needed
@@ -144,24 +189,48 @@ jobs:
           # Increase timeout for docker builds (can take a few minutes)
           command_timeout: 10m
           script: |
-            # -- Navigate to the project directory --------------------------------
-            cd /opt/partner-scout
+            # ── Variables set by the branch-detection step above ───────────
+            DEPLOY_ENV="${{ steps.vars.outputs.deploy_env }}"
+            DEPLOY_DIR="${{ steps.vars.outputs.deploy_dir }}"
+            DEPLOY_BRANCH="${{ steps.vars.outputs.deploy_branch }}"
+            DEPLOY_PORT="${{ steps.vars.outputs.deploy_port }}"
+            VITE_API_URL="${{ steps.vars.outputs.vite_api_url }}"
 
-            # -- Write backend/.env from GitHub Secrets ---------------------------
+            echo "=== Deploying $DEPLOY_ENV from $DEPLOY_BRANCH ==="
+
+            # -- Clone repo if this is the first deploy for this env ----------
+            if [ ! -d "$DEPLOY_DIR" ]; then
+              echo "First deploy — cloning repo to $DEPLOY_DIR..."
+              git clone --branch "$DEPLOY_BRANCH" https://github.com/${{ github.repository }}.git "$DEPLOY_DIR"
+            fi
+
+            # -- Navigate to the project directory --------------------------------
+            cd "$DEPLOY_DIR"
+
+            # -- Write backend .env from GitHub Secrets ---------------------------
             # This file is regenerated on every deploy so env var changes
             # made in GitHub Secrets take effect immediately.
             #
             # All env var names here must match what backend/app/core/config.py
             # reads via pydantic-settings (see each *Settings class and its env_prefix).
-            cat > backend/.env << 'ENVEOF'
+            #
+            # For staging, the file is backend/.env.staging (loaded by
+            # docker-compose.staging.yml); for production it's backend/.env.
+            if [ "$DEPLOY_ENV" = "staging" ]; then
+              ENV_FILE="backend/.env.staging"
+            else
+              ENV_FILE="backend/.env"
+            fi
+
+            cat > "$ENV_FILE" << ENVEOF
             # ── App Settings ──────────────────────────────────────────────
-            ENVIRONMENT=production
+            ENVIRONMENT=$DEPLOY_ENV
             DEBUG=false
             LOG_LEVEL=INFO
 
             # ── CORS ─────────────────────────────────────────────────────
             # Comma-separated origins allowed to call the API
-            CORS_ORIGINS=${{ secrets.VITE_API_URL }},http://localhost:5173
+            CORS_ORIGINS=$VITE_API_URL,http://localhost:5173
 
             # ── Supabase (required) ──────────────────────────────────────
             # Read by SupabaseSettings (env_prefix=SUPABASE_)
@@ -199,24 +268,35 @@ jobs:
             N8N_WEBHOOK_URL=${{ secrets.N8N_WEBHOOK_URL }}
             ENVEOF
 
-            # -- Pull the latest code from main -----------------------------------
-            git pull origin main
+            # -- Pull the latest code from the target branch ----------------------
+            git fetch origin "$DEPLOY_BRANCH"
+            git checkout "$DEPLOY_BRANCH"
+            git pull origin "$DEPLOY_BRANCH"
 
-            # -- Build and restart containers -------------------------------------
-            # --build-arg passes VITE_* vars for the frontend build
+            # -- Set VITE_* vars for the frontend Docker build --------------------
             # These get baked into the static JS bundle by Vite
-            export VITE_API_URL="${{ secrets.VITE_API_URL }}"
+            export VITE_API_URL="$VITE_API_URL"
             export VITE_SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
             export VITE_SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
 
-            # Build images and recreate only changed containers
-            docker compose build \
+            # -- Build and restart containers -------------------------------------
+            if [ "$DEPLOY_ENV" = "staging" ]; then
+              # Staging: use the override file + a separate project name
+              # This gives containers a "-staging" suffix and maps to port 8080
+              COMPOSE_CMD="docker compose -f docker-compose.yml -f docker-compose.staging.yml -p partnerscout-staging"
+            else
+              # Production: use the base compose file only (port 80)
+              COMPOSE_CMD="docker compose -p partnerscout"
+            fi
+
+            # Build images with VITE_* build args
+            $COMPOSE_CMD build \
               --build-arg VITE_API_URL="$VITE_API_URL" \
               --build-arg VITE_SUPABASE_URL="$VITE_SUPABASE_URL" \
               --build-arg VITE_SUPABASE_ANON_KEY="$VITE_SUPABASE_ANON_KEY"
 
             # Start/restart containers in detached mode
-            docker compose up -d
+            $COMPOSE_CMD up -d
 
             # -- Clean up old Docker images to save disk space ---------------------
             docker image prune -f
@@ -224,4 +304,6 @@ jobs:
             # -- Health check — verify the backend is responding -------------------
             echo "Waiting for backend to start..."
             sleep 10
-            curl -f http://localhost/api/health || echo "WARNING: Health check failed"
+            curl -f "http://localhost:${DEPLOY_PORT}/api/health" || echo "WARNING: Health check failed"
+
+            echo "=== $DEPLOY_ENV deploy complete (port $DEPLOY_PORT) ==="

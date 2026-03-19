@@ -1,0 +1,39 @@
+# =============================================================================
+# PartnerScout AI — Docker Compose Staging Override
+#
+# This file overrides docker-compose.yml for the STAGING environment.
+# It runs alongside production on the same VPS but on a different port.
+#
+# Usage (the deploy workflow handles this automatically):
+#   docker compose -f docker-compose.yml -f docker-compose.staging.yml \
+#     -p partnerscout-staging up --build -d
+#
+# Differences from production:
+#   - Nginx listens on port 8080 instead of 80
+#   - Container names have "-staging" suffix to avoid collisions
+#   - Backend env is set to "staging" instead of "production"
+#   - Uses its own .env file at backend/.env.staging
+# =============================================================================
+
+services:
+
+  backend:
+    # Override container name to avoid collision with production
+    container_name: partnerscout-backend-staging
+    # Use a separate .env file for staging
+    env_file:
+      - ./backend/.env.staging
+    environment:
+      - ENVIRONMENT=staging
+
+  frontend:
+    # Override container name to avoid collision with production
+    container_name: partnerscout-frontend-staging
+
+  nginx:
+    # Override container name to avoid collision with production
+    container_name: partnerscout-nginx-staging
+    # Map to port 8080 on the host instead of 80
+    # Access staging at http://VPS_IP:8080
+    ports:
+      - "8080:80"
