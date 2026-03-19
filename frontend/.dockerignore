@@ -1,0 +1,36 @@
+# =============================================================================
+# Frontend .dockerignore
+# Excludes files that should NOT be copied into the Docker build stage
+# This speeds up builds and avoids leaking secrets
+# =============================================================================
+
+# Node modules — installed fresh via `npm ci` in the Dockerfile
+node_modules/
+
+# Build output — rebuilt inside the container
+dist/
+
+# Environment files — VITE_* vars are passed as build args instead
+.env
+.env.*
+
+# Test files — not needed for the production build
+e2e/
+test-results/
+coverage/
+vitest.config.ts
+
+# IDE files
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Docker files (prevent recursive copy)
+Dockerfile
+.dockerignore
+
+# Documentation
+*.md

@@ -1,0 +1,227 @@
+# =============================================================================
+# PartnerScout AI — CI/CD Pipeline
+#
+# Triggers:
+#   - Push to `main` branch
+#   - Manual dispatch (for re-deploying after GitHub Secrets changes)
+#
+# Jobs:
+#   1. test-backend   — Run pytest
+#   2. test-frontend  — Run vitest
+#   3. deploy         — SSH into VPS, write .env, rebuild & restart containers
+#
+# Required GitHub Secrets (set in repo Settings → Secrets → Actions):
+#
+#   --- SSH Connection ---
+#   VPS_HOST, VPS_USER, VPS_SSH_KEY, VPS_PORT
+#
+#   --- Supabase (required) ---
+#   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_JWT_SECRET
+#
+#   --- LLM Providers (at least one API key required) ---
+#   LLM_PROVIDER          (openai | gemini | ollama | openrouter | huggingface)
+#   EMBEDDING_PROVIDER     (openai | gemini | huggingface)
+#   OPENAI_API_KEY         (required if LLM_PROVIDER=openai)
+#   GOOGLE_API_KEY         (required if LLM_PROVIDER=gemini)
+#   OPENROUTER_API_KEY     (required if LLM_PROVIDER=openrouter)
+#   HUGGINGFACE_API_KEY    (required if LLM_PROVIDER=huggingface)
+#
+#   --- External Services ---
+#   APIFY_API_KEY          (Instagram scraping)
+#   N8N_SERVICE_KEY        (n8n webhook auth)
+#   N8N_WEBHOOK_URL        (n8n webhook endpoint)
+#
+#   --- Frontend Build Args ---
+#   VITE_API_URL           (backend URL the frontend calls, e.g. http://VPS_IP)
+# =============================================================================
+
+name: Deploy to Hostinger VPS
+
+on:
+  # Trigger on every push to the main branch
+  push:
+    branches:
+      - main
+
+  # Allow manual trigger from the Actions tab
+  # Useful when you only changed GitHub Secrets (no code push needed)
+  workflow_dispatch:
+
+jobs:
+  # ===========================================================================
+  # Job 1: Run backend tests (pytest)
+  # ===========================================================================
+  test-backend:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      # -- Check out the repo ---------------------------------------------------
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # -- Set up Python 3.13 ---------------------------------------------------
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          # Cache pip packages between runs to speed up installs
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      # -- Install backend dependencies -----------------------------------------
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # -- Run pytest -----------------------------------------------------------
+      - name: Run tests
+        working-directory: backend
+        # Set minimal env vars so the app can import without crashing
+        env:
+          ENVIRONMENT: test
+          SUPABASE_URL: "https://placeholder.supabase.co"
+          SUPABASE_ANON_KEY: "placeholder"
+          SUPABASE_SERVICE_ROLE_KEY: "placeholder"
+          SUPABASE_JWT_SECRET: "placeholder"
+        run: |
+          pytest --tb=short -q
+
+  # ===========================================================================
+  # Job 2: Run frontend tests (vitest)
+  # ===========================================================================
+  test-frontend:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      # -- Check out the repo ---------------------------------------------------
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # -- Set up Node 20 -------------------------------------------------------
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          # Cache npm packages between runs
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      # -- Install frontend dependencies ----------------------------------------
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # -- Run vitest ------------------------------------------------------------
+      - name: Run tests
+        working-directory: frontend
+        run: npm test -- --run
+
+  # ===========================================================================
+  # Job 3: Deploy to Hostinger KVM2 VPS
+  # Runs only after both test jobs succeed
+  # ===========================================================================
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    # Only deploy if both test jobs pass
+    needs: [test-backend, test-frontend]
+
+    steps:
+      # -- SSH into VPS and deploy -----------------------------------------------
+      # Uses appleboy/ssh-action to execute commands on the remote server
+      # All env vars are written from GitHub Secrets — no manual SSH needed
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          # Increase timeout for docker builds (can take a few minutes)
+          command_timeout: 10m
+          script: |
+            # -- Navigate to the project directory --------------------------------
+            cd /opt/partner-scout
+
+            # -- Write backend/.env from GitHub Secrets ---------------------------
+            # This file is regenerated on every deploy so env var changes
+            # made in GitHub Secrets take effect immediately.
+            #
+            # All env var names here must match what backend/app/core/config.py
+            # reads via pydantic-settings (see each *Settings class and its env_prefix).
+            cat > backend/.env << 'ENVEOF'
+            # ── App Settings ──────────────────────────────────────────────
+            ENVIRONMENT=production
+            DEBUG=false
+            LOG_LEVEL=INFO
+
+            # ── CORS ─────────────────────────────────────────────────────
+            # Comma-separated origins allowed to call the API
+            CORS_ORIGINS=${{ secrets.VITE_API_URL }},http://localhost:5173
+
+            # ── Supabase (required) ──────────────────────────────────────
+            # Read by SupabaseSettings (env_prefix=SUPABASE_)
+            SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+            SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+            SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+            SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }}
+
+            # ── LLM / Embedding Provider Selection ───────────────────────
+            # Which provider the agents use (openai | gemini | ollama | openrouter | huggingface)
+            LLM_PROVIDER=${{ secrets.LLM_PROVIDER }}
+            # Which provider generates embeddings (openai | gemini | huggingface)
+            EMBEDDING_PROVIDER=${{ secrets.EMBEDDING_PROVIDER }}
+
+            # ── OpenAI (env_prefix=OPENAI_) ──────────────────────────────
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+
+            # ── Google Gemini ────────────────────────────────────────────
+            # GEMINI_API_KEY is read by GeminiSettings (env_prefix=GEMINI_)
+            # GOOGLE_API_KEY is read by langchain-google-genai directly
+            GEMINI_API_KEY=${{ secrets.GOOGLE_API_KEY }}
+            GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
+
+            # ── OpenRouter (env_prefix=OPENROUTER_) ──────────────────────
+            OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
+
+            # ── HuggingFace (env_prefix=HUGGINGFACE_) ────────────────────
+            HUGGINGFACE_API_KEY=${{ secrets.HUGGINGFACE_API_KEY }}
+
+            # ── Apify – Instagram scraping (env_prefix=APIFY_) ───────────
+            APIFY_API_KEY=${{ secrets.APIFY_API_KEY }}
+
+            # ── n8n – Workflow orchestration (env_prefix=N8N_) ───────────
+            N8N_SERVICE_KEY=${{ secrets.N8N_SERVICE_KEY }}
+            N8N_WEBHOOK_URL=${{ secrets.N8N_WEBHOOK_URL }}
+            ENVEOF
+
+            # -- Pull the latest code from main -----------------------------------
+            git pull origin main
+
+            # -- Build and restart containers -------------------------------------
+            # --build-arg passes VITE_* vars for the frontend build
+            # These get baked into the static JS bundle by Vite
+            export VITE_API_URL="${{ secrets.VITE_API_URL }}"
+            export VITE_SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
+            export VITE_SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+
+            # Build images and recreate only changed containers
+            docker compose build \
+              --build-arg VITE_API_URL="$VITE_API_URL" \
+              --build-arg VITE_SUPABASE_URL="$VITE_SUPABASE_URL" \
+              --build-arg VITE_SUPABASE_ANON_KEY="$VITE_SUPABASE_ANON_KEY"
+
+            # Start/restart containers in detached mode
+            docker compose up -d
+
+            # -- Clean up old Docker images to save disk space ---------------------
+            docker image prune -f
+
+            # -- Health check — verify the backend is responding -------------------
+            echo "Waiting for backend to start..."
+            sleep 10
+            curl -f http://localhost/api/health || echo "WARNING: Health check failed"
