@@ -2,7 +2,7 @@
 """
 PartnerScout AI - Real Orchestration Runner (Python Fallback)
 
-Replaces N8N workflow by calling backend API endpoints directly.
+Calls backend API endpoints directly to run the discovery pipeline.
 Runs the full 3-phase pipeline: Brand Analysis -> Discovery -> Scoring.
 
 Usage:
@@ -28,7 +28,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="repla
 # =============================================================================
 
 BASE_URL = "http://localhost:8001/api"
-SERVICE_KEY = "ks-partnerscout-n8n-2026-secure"
+SERVICE_KEY = "ks-partnerscout-n8n-2026-secure"  # matches SUPABASE_SERVICE_ROLE_KEY in .env
 JWT_SECRET = "0adc5126-ba10-4b62-ba00-dbb55b6bd01e"
 TEST_USER_ID = "13db01c0-19f8-4538-a807-16f5a24b1828"
 

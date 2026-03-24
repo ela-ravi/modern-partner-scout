@@ -25,7 +25,6 @@ from app.core.exceptions import (
     JobAlreadyCompletedError,
     JobNotFoundError,
     JobNotStartableError,
-    N8NError,
 )
 from app.guards.auth import UserContext
 
@@ -602,22 +601,6 @@ class TestStartJob:
         data = response.json()
         assert data["detail"]["error"]["code"] == "JOB_NOT_STARTABLE"
     
-    def test_start_job_n8n_error(
-        self, client, mock_job_service, sample_job_id, valid_token
-    ):
-        """Test handling N8N webhook error."""
-        mock_job_service.trigger_discovery.side_effect = N8NError(
-            message="Webhook failed"
-        )
-        
-        response = client.post(
-            f"/api/jobs/{sample_job_id}/start",
-            headers={"Authorization": f"Bearer {valid_token}"}
-        )
-        
-        assert response.status_code == 502
-        data = response.json()
-        assert data["detail"]["error"]["code"] == "N8N_ERROR"
 
 
 # =============================================================================

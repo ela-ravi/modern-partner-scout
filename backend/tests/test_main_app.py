@@ -95,7 +95,7 @@ def expired_token(jwt_secret, valid_user_id):
 @pytest.fixture
 def service_key():
     """Get service key for testing."""
-    return settings.n8n.service_key
+    return settings.supabase.service_role_key
 
 
 # =============================================================================

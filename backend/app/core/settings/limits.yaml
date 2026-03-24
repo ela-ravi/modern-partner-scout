@@ -133,11 +133,6 @@ circuit_breaker:
     recovery_timeout_seconds: 120
     half_open_requests: 2
   
-  # N8N circuit breaker
-  n8n:
-    failure_threshold: 3
-    recovery_timeout_seconds: 60
-    half_open_requests: 2
 
 # Caching configuration
 caching:

@@ -31,7 +31,7 @@
 flowchart TB
     subgraph clients [Clients]
         FE[React Frontend]
-        N8N[n8n Orchestrator]
+        ORCH[Orchestration Pipeline]
     end
     
     subgraph backend [FastAPI Backend]
@@ -57,7 +57,7 @@ flowchart TB
     end
     
     FE --> Guards
-    N8N --> Guards
+    ORCH --> Guards
     Guards --> Routes
     Routes --> Services
     Services --> AgentLayer
@@ -121,7 +121,7 @@ flowchart TB
 
 | Responsibility | Description |
 |----------------|-------------|
-| **API Gateway** | Exposes RESTful endpoints for the React frontend and n8n orchestrator |
+| **API Gateway** | Exposes RESTful endpoints for the React frontend and orchestration pipeline |
 | **Request Guards** | Validate authentication, authorization, and input before processing |
 | **Business Logic** | All domain logic isolated in service layer |
 | **AI Agent Execution** | Runs Brand Analyzer, Discovery, and Scorer agents using LangChain |
@@ -163,7 +163,7 @@ This architecture is designed for future growth:
 | **New LLM Providers** | Add provider in `llm_service.py` factory, configure via `LLM_PROVIDER` env var |
 | **New Data Sources** | Add scraper in `services/` (e.g., `tiktok_service.py`), agents consume via dependency injection |
 | **Multi-Tenant SaaS** | Service layer already enforces user isolation via `user_id` filtering |
-| **Background Jobs** | Replace n8n with Celery by adding `tasks/` folder, agents remain unchanged |
+| **Background Jobs** | Replace orchestrator with Celery by adding `tasks/` folder, agents remain unchanged |
 | **Caching Layer** | Add Redis service in `services/cache_service.py`, inject into agents |
 | **Billing/Metering** | Add `services/billing_service.py`, wrap agent calls with usage tracking |
 | **Webhooks** | Add `services/webhook_service.py` for outbound notifications |
@@ -320,7 +320,7 @@ Guards are FastAPI dependencies that run **before** route handlers. They validat
 |-------|------|---------|-----------|
 | `AuthGuard` | guards/auth.py | Authenticate request | JWT token or Service Key exists and is valid |
 | `UserGuard` | guards/auth.py | Extract user context | JWT contains valid user_id, user exists |
-| `ServiceKeyGuard` | guards/auth.py | Validate n8n requests | X-Service-Key header matches config |
+| `ServiceKeyGuard` | guards/auth.py | Validate orchestrator requests | X-Service-Key header matches config |
 | `JobOwnerGuard` | guards/ownership.py | Verify job ownership | User owns the requested job_id |
 | `ProfileOwnerGuard` | guards/ownership.py | Verify profile ownership | Profile belongs to user's job |
 | `JobExistsGuard` | guards/validation.py | Validate job exists | job_id exists in database |
@@ -420,13 +420,13 @@ require_user = UserGuard()
 ```python
 # guards/auth.py
 class ServiceKeyGuard:
-    """Validates X-Service-Key header for n8n/orchestrator requests."""
+    """Validates X-Service-Key header for orchestrator requests."""
     
     async def __call__(
         self,
         x_service_key: str = Header(..., alias="X-Service-Key")
     ):
-        if x_service_key != settings.N8N_SERVICE_KEY:
+        if x_service_key != settings.SERVICE_KEY:
             raise HTTPException(
                 status_code=HttpStatus.UNAUTHORIZED,
                 detail={
@@ -665,7 +665,7 @@ router = APIRouter(prefix="/api/agent", tags=["agents"])
 @router.post("/analyze-brand")
 async def analyze_brand(
     request: AnalyzeBrandRequest,
-    _: bool = Depends(require_service_key),  # Guard: n8n only
+    _: bool = Depends(require_service_key),  # Guard: orchestrator only
     agent_service: AgentService = Depends()
 ):
     """Extract brand DNA from reference profiles."""
@@ -675,7 +675,7 @@ async def analyze_brand(
 @router.post("/discover")
 async def discover_profiles(
     request: DiscoverRequest,
-    _: bool = Depends(require_service_key),  # Guard: n8n only
+    _: bool = Depends(require_service_key),  # Guard: orchestrator only
     agent_service: AgentService = Depends()
 ):
     """Discover similar Instagram profiles."""
@@ -690,7 +690,7 @@ async def discover_profiles(
 @router.post("/score")
 async def score_profile(
     request: ScoreRequest,
-    _: bool = Depends(require_service_key),  # Guard: n8n only
+    _: bool = Depends(require_service_key),  # Guard: orchestrator only
     agent_service: AgentService = Depends()
 ):
     """Score a candidate profile against brand DNA."""
@@ -769,10 +769,10 @@ class Settings(BaseSettings):
     APIFY_API_KEY: str = ""
     
     # ==========================================================================
-    # n8n Integration
+    # Orchestration
     # ==========================================================================
-    N8N_SERVICE_KEY: str
-    N8N_WEBHOOK_URL: str
+    SERVICE_KEY: str
+    WEBHOOK_URL: str
     
     class Config:
         env_file = ".env"
@@ -1309,7 +1309,7 @@ class JobService:
     
     async def trigger_discovery(self, job: Job) -> dict:
         """
-        Trigger n8n workflow for the job.
+        Trigger orchestration pipeline for the job.
         
         Business Rules:
         - Can only start jobs in PENDING status
@@ -1320,12 +1320,12 @@ class JobService:
                 message=f"Job is already in '{job.status}' status"
             )
         
-        # Call n8n webhook
+        # Call orchestration webhook
         from app.core.config import settings
-        
+
         async with httpx.AsyncClient() as client:
             await client.post(
-                settings.N8N_WEBHOOK_URL,
+                settings.WEBHOOK_URL,
                 json={
                     "job_id": str(job.id),
                     "user_id": str(job.user_id)
@@ -1377,7 +1377,7 @@ class JobService:
         # Clear previous profiles (optional - or keep them)
         # await self.profile_repo.delete_by_job(job.id)
         
-        # Trigger n8n workflow
+        # Trigger orchestration pipeline
         job.status = JobStatus.PENDING
         return await self.trigger_discovery(job)
     
@@ -2388,56 +2388,56 @@ sequenceDiagram
     participant FE as Frontend
     participant WS as Supabase Realtime
     participant API as FastAPI
-    participant N8N as n8n
+    participant PIPE as Pipeline
     participant Agents as AI Agents
     participant DB as Supabase DB
-    
+
     Note over FE,DB: Setup Phase
     FE->>WS: Subscribe to changes for job_id
     WS-->>FE: Subscription confirmed
-    
+
     Note over FE,DB: Phase 0: Job Creation
     FE->>API: POST /api/jobs
     API->>DB: INSERT discovery_jobs
     API-->>FE: job_id
-    
+
     Note over FE,DB: Phase 1: Start Discovery
     FE->>API: POST /api/jobs/id/start
-    API->>N8N: Webhook trigger
+    API->>PIPE: Webhook trigger
     API-->>FE: 202 Accepted
-    
-    Note over N8N,DB: Phase 2: Validation
-    N8N->>N8N: Validate job_id
-    
-    Note over N8N,DB: Phase 3: Brand Analysis
-    N8N->>API: PATCH status analyzing
+
+    Note over PIPE,DB: Phase 2: Validation
+    PIPE->>PIPE: Validate job_id
+
+    Note over PIPE,DB: Phase 3: Brand Analysis
+    PIPE->>API: PATCH status analyzing
     API->>DB: UPDATE status
     DB->>WS: job UPDATE
     WS-->>FE: Status Analyzing
-    N8N->>API: POST analyze-brand
+    PIPE->>API: POST analyze-brand
     API->>Agents: BrandAnalyzer
     Agents->>DB: INSERT brand_dna
-    
-    Note over N8N,DB: Phase 4: Discovery
-    N8N->>API: PATCH status discovering
+
+    Note over PIPE,DB: Phase 4: Discovery
+    PIPE->>API: PATCH status discovering
     DB->>WS: job UPDATE
     WS-->>FE: Status Discovering
-    N8N->>API: POST discover
+    PIPE->>API: POST discover
     API->>Agents: DiscoveryAgent
     Agents->>DB: INSERT profiles batch
     DB->>WS: profile INSERTs
     WS-->>FE: Cards appear
-    
-    Note over N8N,DB: Phase 5: Scoring
-    N8N->>API: PATCH status scoring
+
+    Note over PIPE,DB: Phase 5: Scoring
+    PIPE->>API: PATCH status scoring
     DB->>WS: job UPDATE
     WS-->>FE: Status Scoring
-    
+
     loop Each Profile
-        N8N->>API: PATCH profile processing
+        PIPE->>API: PATCH profile processing
         DB->>WS: profile UPDATE
         WS-->>FE: Card to PROCESSING
-        N8N->>API: POST score
+        PIPE->>API: POST score
         API->>Agents: ScorerAgent
         Agents->>DB: INSERT score
         DB->>WS: score INSERT
@@ -2449,13 +2449,13 @@ sequenceDiagram
         DB->>WS: profile UPDATE
         WS-->>FE: Card to DONE
     end
-    
-    Note over N8N,DB: Phase 6: Post-Processing
-    N8N->>N8N: Filter score >= 50
-    N8N->>N8N: Deduplicate
-    
-    Note over N8N,DB: Phase 7: Completion
-    N8N->>API: PATCH status completed
+
+    Note over PIPE,DB: Phase 6: Post-Processing
+    PIPE->>PIPE: Filter score >= 50
+    PIPE->>PIPE: Deduplicate
+
+    Note over PIPE,DB: Phase 7: Completion
+    PIPE->>API: PATCH status completed
     DB->>WS: job UPDATE
     WS-->>FE: Status Completed
 ```
@@ -2464,15 +2464,15 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant N8N as n8n
+    participant PIPE as Pipeline
     participant API as FastAPI
     participant DB as Supabase
     participant WS as Realtime
     participant FE as Frontend
-    
-    N8N->>N8N: Error caught
-    N8N->>API: PATCH status failed
-    Note right of N8N: {status: failed, error_message: ...}
+
+    PIPE->>PIPE: Error caught
+    PIPE->>API: PATCH status failed
+    Note right of PIPE: {status: failed, error_message: ...}
     API->>DB: UPDATE job
     DB->>WS: job UPDATE
     WS-->>FE: Status Failed + error message
@@ -2803,10 +2803,10 @@ OLLAMA_MODEL=llama3
 APIFY_API_KEY=apify_api_...
 
 # =============================================================================
-# n8n Integration
+# Orchestration
 # =============================================================================
-N8N_SERVICE_KEY=your-secret-service-key-123
-N8N_WEBHOOK_URL=http://localhost:5678/webhook/start-discovery
+SERVICE_KEY=your-secret-service-key-123
+WEBHOOK_URL=http://localhost:8000/webhook/start-discovery
 ```
 
 ---
@@ -2818,7 +2818,7 @@ N8N_WEBHOOK_URL=http://localhost:5678/webhook/start-discovery
 | `docs/Partner_Scout_AI_PRD.md` | Product requirements and user stories |
 | `docs/Supabase_Database_Guide.md` | Database schema, migrations, and queries |
 | `docs/Agents_Documentation.md` | AI agent implementation details |
-| `docs/Orchestration.md` | n8n workflow and Python fallback |
+| `docs/Agents_Documentation.md` (Section 6) | Orchestration pipeline details |
 
 ---
 

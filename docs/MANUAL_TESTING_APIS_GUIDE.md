@@ -61,7 +61,7 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 SUPABASE_JWT_SECRET=your-jwt-secret
-N8N_SERVICE_KEY=test-service-key-12345
+SERVICE_KEY=test-service-key-12345
 ```
 
 ---
@@ -73,7 +73,7 @@ PartnerScout uses two authentication methods:
 | Auth Type | Header | Used For |
 |-----------|--------|----------|
 | **BearerAuth** | `Authorization: Bearer <JWT>` | User-facing endpoints (`/api/jobs`, etc.) |
-| **ServiceKeyAuth** | `X-Service-Key: <key>` | Agent endpoints (`/api/agent/*`) called by N8N/orchestrator |
+| **ServiceKeyAuth** | `X-Service-Key: <key>` | Agent endpoints (`/api/agent/*`) called by the orchestration pipeline |
 
 ### 2.1 Generate a Test JWT Token
 
@@ -272,7 +272,7 @@ curl -X GET "http://localhost:8000/api/jobs/$JOB_ID" \
 
 **Endpoint:** `POST /api/jobs/{job_id}/start`
 
-> **Note**: This endpoint triggers the N8N webhook. If N8N is not running, you'll get an `N8N_ERROR`.
+> **Note**: This endpoint triggers the orchestration pipeline. If the pipeline is not running, you'll get an error.
 
 **Swagger Steps:**
 1. Navigate to `POST /api/jobs/{job_id}/start` section
@@ -289,11 +289,11 @@ curl -X GET "http://localhost:8000/api/jobs/$JOB_ID" \
 }
 ```
 
-**Expected Error (N8N not running):**
+**Expected Error (orchestrator not running):**
 ```json
 {
   "error": {
-    "code": "N8N_ERROR",
+    "code": "ORCHESTRATION_ERROR",
     "message": "Failed to trigger discovery workflow: [Errno 61] Connection refused"
   }
 }
@@ -530,7 +530,7 @@ curl -X GET "http://localhost:8000/api/jobs/$JOB_ID/analytics" \
 
 ## 4. Agent API Testing
 
-Agent endpoints are called by the workflow orchestrator (N8N or Python script) and require **ServiceKeyAuth**.
+Agent endpoints are called by the internal orchestration pipeline (Python script) and require **ServiceKeyAuth**.
 
 ### 4.1 Authentication for Agent Endpoints
 
@@ -577,7 +577,7 @@ In Swagger UI, authorize using **ServiceKeyAuth** (not BearerAuth).
 **Cause**: Wrong `X-Service-Key` for agent endpoints.
 
 **Solutions:**
-1. Check `N8N_SERVICE_KEY` in your `.env` file
+1. Check `SERVICE_KEY` in your `.env` file
 2. Restart the server after changing `.env`
 3. Use the same key in your request header
 
@@ -603,14 +603,14 @@ In Swagger UI, authorize using **ServiceKeyAuth** (not BearerAuth).
 
 **Solution**: Provide 2-10 valid Instagram URLs in `reference_profiles` array.
 
-### 5.5 N8N_ERROR - Connection Refused
+### 5.5 ORCHESTRATION_ERROR - Connection Refused
 
-**Cause**: N8N is not running when calling `/api/jobs/{job_id}/start`.
+**Cause**: The orchestration pipeline is not running when calling `/api/jobs/{job_id}/start`.
 
 **Solutions:**
-1. Start N8N if you want workflow orchestration
-2. Or use the Python fallback orchestrator (see [Orchestration.md](./Orchestration.md))
-3. For testing without N8N, job creation and listing still work
+1. Start the orchestration pipeline for workflow execution
+2. Or use the Python fallback orchestrator script (`backend/scripts/run_orchestration.py`)
+3. For testing without the orchestrator, job creation and listing still work
 
 ### 5.6 JOB_NOT_FOUND
 

@@ -84,7 +84,6 @@ class ErrorCodes:
     # External Service Errors
     SUPABASE_ERROR = "SUPABASE_ERROR"
     APIFY_ERROR = "APIFY_ERROR"
-    N8N_ERROR = "N8N_ERROR"
     EXTERNAL_SERVICE_ERROR = "EXTERNAL_SERVICE_ERROR"
     
     # Rate Limiting

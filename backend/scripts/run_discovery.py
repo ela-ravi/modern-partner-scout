@@ -43,7 +43,7 @@ from app.core.config import settings
 # =============================================================================
 
 API_BASE_URL = f"http://localhost:{settings.api_port}"
-SERVICE_KEY = settings.n8n.service_key
+SERVICE_KEY = settings.supabase.service_role_key
 REQUEST_TIMEOUT = 300  # seconds (agents can take time, discovery can be 3-5 min)
 
 

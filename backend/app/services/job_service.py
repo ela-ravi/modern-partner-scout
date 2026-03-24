@@ -10,7 +10,6 @@ STORY-2.3.1: Implement Job Service
 import logging
 from typing import Any, Dict, List, Optional
 from uuid import UUID
-import httpx
 
 from app.core.config import settings
 from app.core.constants import (
@@ -26,7 +25,6 @@ from app.core.exceptions import (
     JobNotFoundError,
     JobNotStartableError,
     JobAlreadyCompletedError,
-    N8NError,
 )
 from app.repositories import JobRepository, ProfileRepository
 
@@ -41,7 +39,7 @@ class JobService:
     Handles business logic including:
     - Daily limit enforcement
     - Job lifecycle management
-    - N8N workflow triggering
+    - Discovery pipeline triggering
     - Analytics computation
     """
     
@@ -479,24 +477,23 @@ class JobService:
     
     def trigger_discovery(self, job_id: str, user_id: str) -> Dict[str, Any]:
         """
-        Trigger the discovery workflow via N8N webhook.
-        
+        Trigger the discovery pipeline.
+
         Args:
             job_id: Job UUID to start discovery for
             user_id: ID of the user triggering the workflow
-            
+
         Returns:
-            Response from N8N webhook
-            
+            Acceptance response
+
         Raises:
             JobNotFoundError: If job is not found
             JobNotStartableError: If job cannot be started
-            N8NError: If webhook call fails
         """
         # Get and validate job
         job = self.job_repo.get_by_id(job_id)
         current_status = JobStatus(job["status"])
-        
+
         # Check if job can be started
         if current_status not in JobStatus.startable_statuses():
             raise JobNotStartableError(
@@ -505,67 +502,17 @@ class JobService:
                 message=f"Job cannot be started from status '{current_status.value}'. "
                        f"Job must be in 'pending' status."
             )
-        
-        # Prepare webhook payload
-        webhook_url = settings.n8n.webhook_url
-        service_key = settings.n8n.service_key
-        
-        payload = {
+
+        from app.services.orchestration_service import start_pipeline_background
+        start_pipeline_background(job_id, job)
+
+        logger.info(f"Triggered discovery pipeline for job {job_id}")
+
+        return {
+            "status": "accepted",
             "job_id": job_id,
-            "user_id": user_id,
-            "brand_description": job["brand_description"],
-            "reference_profiles": job["reference_profiles"],
-            "follower_range_min": job["follower_range_min"],
-            "follower_range_max": job["follower_range_max"],
-            "discovery_limit": job["discovery_limit"],
+            "message": "Discovery pipeline initiated",
         }
-        
-        headers = {
-            "Content-Type": "application/json",
-            "X-Service-Key": service_key,
-        }
-        
-        try:
-            # Call N8N webhook
-            with httpx.Client(timeout=settings.request_timeout_seconds) as client:
-                response = client.post(
-                    webhook_url,
-                    json=payload,
-                    headers=headers,
-                )
-
-                if response.status_code >= 400:
-                    raise N8NError(
-                        message=f"N8N webhook returned error: {response.status_code}",
-                        details={
-                            "status_code": response.status_code,
-                            "response": response.text[:500],
-                        }
-                    )
-
-                logger.info(f"Triggered discovery workflow for job {job_id}")
-
-                return {
-                    "status": "accepted",
-                    "job_id": job_id,
-                    "message": "Discovery workflow initiated",
-                    "webhook_response": response.json() if response.text else None,
-                }
-
-        except (N8NError, httpx.RequestError) as e:
-            # N8N unavailable — fall back to internal orchestration
-            logger.warning(
-                f"N8N webhook failed for job {job_id}, falling back to internal orchestration: {e}"
-            )
-
-            from app.services.orchestration_service import start_pipeline_background
-            start_pipeline_background(job_id, job)
-
-            return {
-                "status": "accepted",
-                "job_id": job_id,
-                "message": "Discovery workflow initiated (internal fallback)",
-            }
     
     def cancel_job(self, job_id: str, user_id: str) -> Dict[str, Any]:
         """

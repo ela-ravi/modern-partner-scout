@@ -208,9 +208,8 @@ supabase/.branches/
 supabase/.temp/
 
 # ============================================
-# n8n
+# Orchestration
 # ============================================
-.n8n/
 
 # ============================================
 # Miscellaneous
@@ -865,10 +864,9 @@ EMBEDDING_PROVIDER=openai
 APIFY_API_KEY=apify_api_...
 
 # =============================================================================
-# N8N Orchestration
+# Orchestration
 # =============================================================================
-N8N_SERVICE_KEY=your-service-key
-N8N_WEBHOOK_URL=http://localhost:5678/webhook/partner-discovery
+SERVICE_KEY=your-service-key
 ```
 
 **Step 2.21** — Create `backend/.env` (actual values — NEVER committed):
@@ -1252,7 +1250,7 @@ circuit_breaker:
     failure_threshold: 3
     recovery_timeout_seconds: 120
     half_open_requests: 2
-  n8n:
+  orchestrator:
     failure_threshold: 3
     recovery_timeout_seconds: 60
     half_open_requests: 2
@@ -1451,7 +1449,7 @@ Read docs/api-spec.md and the YAML configs in backend/app/core/settings/.
 Create the backend core:
 1. backend/app/__init__.py
 2. backend/app/core/__init__.py
-3. backend/app/core/config.py — pydantic-settings loading from .env (all providers, Supabase, Apify, N8N)
+3. backend/app/core/config.py — pydantic-settings loading from .env (all providers, Supabase, Apify, orchestration)
 4. backend/app/core/constants.py — HTTP status codes, error codes
 5. backend/app/core/exceptions.py — PartnerScoutError, AgentError, custom exception hierarchy
 6. backend/app/core/settings/__init__.py — YAML config loader for agents/scoring/limits

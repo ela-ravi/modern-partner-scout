@@ -77,7 +77,7 @@ PartnerScout AI automates partner discovery by:
 * Contact extraction (email)
 * Real-time dashboard
 * Manual email trigger
-* n8n-based orchestration
+* Internal orchestration pipeline
 * User authentication (Supabase Auth)
 * Multi-user session management
 
@@ -268,7 +268,7 @@ Profiles scoring below 50 on follower quality are flagged as potentially fake.
 
 ---
 
-### 5.5 Orchestration (n8n)
+### 5.5 Orchestration (Internal Pipeline)
 
 * Webhook-triggered workflow
 * Sequential and parallel agent execution
@@ -308,8 +308,8 @@ Profiles scoring below 50 on follower quality are flagged as potentially fake.
 
 When multiple users submit jobs simultaneously:
 
-1. Each user's job enters the n8n queue
-2. n8n processes jobs in FIFO order (or parallel if resources allow)
+1. Each user's job enters the orchestration queue
+2. The pipeline processes jobs in FIFO order (or parallel if resources allow)
 3. Users see real-time status updates for their own jobs only
 4. No user can impact another user's job performance (fair scheduling)
 
@@ -324,7 +324,7 @@ Frontend (React + TypeScript)
     ↓
 Webhook Trigger
     ↓
-n8n Orchestration
+Internal Orchestration Pipeline
     ↓
 Agent APIs (FastAPI)
     ↓
@@ -333,7 +333,7 @@ Database (Supabase / SQLite)
 
 ---
 
-### 7.2 Orchestration Flow (n8n)
+### 7.2 Orchestration Flow
 
 ```
 Webhook Trigger
@@ -370,15 +370,15 @@ Authorization: Bearer <supabase_jwt_token>
 | Endpoint Pattern | Auth Required | User Scope |
 |------------------|---------------|------------|
 | `/api/jobs/*` | ✅ Yes (User JWT) | User's own jobs only |
-| `/api/agent/*` | ✅ Yes (Service Key) | Called by n8n with service key |
+| `/api/agent/*` | ✅ Yes (Service Key) | Called by orchestrator with service key |
 | `/api/health` | ❌ No | Public |
 
-**Service Key Authentication (for n8n):**
+**Service Key Authentication (for orchestrator):**
 
-Agent endpoints are called by n8n, not directly by users. They use a service key:
+Agent endpoints are called by the internal orchestration pipeline, not directly by users. They use a service key:
 
 ```
-X-Service-Key: <N8N_SERVICE_KEY>
+X-Service-Key: <SERVICE_KEY>
 ```
 
 The service key is validated server-side and grants access to process any job. The `job_id` in the request determines which user's data is being processed.
@@ -572,7 +572,7 @@ POST /api/agent/score
 
 ### Orchestration
 
-* n8n
+* Internal pipeline (Python-based)
 
 ### Database
 
@@ -798,7 +798,7 @@ Stores extracted contact information.
 
 ### Member 3 – Orchestration
 
-* n8n workflow
+* Orchestration pipeline
 * Error handling
 * Demo pipeline
 
@@ -838,11 +838,11 @@ Stores extracted contact information.
 
 ## 15. Final Recommendation
 
-**Use n8n-based orchestration for the hackathon MVP** due to:
+**Use the internal orchestration pipeline for the hackathon MVP** due to:
 
 * Faster development
-* Visual debugging
 * Deterministic execution
 * Strong demo storytelling
+* Simplified deployment (no external dependencies)
 
 ---

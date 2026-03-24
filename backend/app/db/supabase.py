@@ -178,7 +178,7 @@ def get_admin_db() -> SupabaseClient:
     
     This client bypasses RLS and should only be used for:
     - Background jobs and cron tasks
-    - Service-to-service communication (N8N webhooks)
+    - Service-to-service communication
     - Admin operations
     
     Usage:

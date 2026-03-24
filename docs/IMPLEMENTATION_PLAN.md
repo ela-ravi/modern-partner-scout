@@ -115,11 +115,11 @@ def cancel_job(self, job_id: str, user_id: str) -> Dict[str, Any]:
 
 The `JobStatus.CANCELLED` already exists in `constants.py` and valid transitions from `PENDING`, `ANALYZING`, `DISCOVERING`, `SCORING` → `CANCELLED` are already defined.
 
-#### Step 5: (Optional) N8N Webhook Callback
+#### Step 5: (Optional) Orchestrator Callback
 
-If job was running in N8N, we may need to:
-- Call N8N cancel webhook (if available)
-- Or let N8N poll for job status and abort
+If the job was running in the orchestration pipeline, we may need to:
+- Signal the orchestrator to cancel (if supported)
+- Or let the orchestrator poll for job status and abort
 
 **Files to modify:**
 1. `backend/app/api/routes/jobs.py` - Add route
@@ -483,7 +483,7 @@ async def create_job(
     return job
 ```
 
-#### Step 7: Update N8N Webhook Payload
+#### Step 7: Update Orchestrator Webhook Payload
 
 In `trigger_discovery()` method, include new fields:
 

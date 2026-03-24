@@ -240,9 +240,9 @@ POST /api/agent/score
 }
 ```
 
-**Option B: Simplified Request (used by N8N and Python orchestrators)**
+**Option B: Simplified Request (used by the orchestration pipeline)**
 
-The orchestrators use a simplified request with just IDs. The backend fetches `brand_dna` from the database and `profile_data` from the `discovered_profiles` table (stored at discovery time). Only `recent_posts` is fetched from Apify at runtime for engagement analysis. See `docs/Orchestration.md` Section 3.3 (Node 12) for details.
+The orchestrator uses a simplified request with just IDs. The backend fetches `brand_dna` from the database and `profile_data` from the `discovered_profiles` table (stored at discovery time). Only `recent_posts` is fetched from Apify at runtime for engagement analysis.
 
 ```json
 {
@@ -463,13 +463,13 @@ flowchart TB
 
 ## 6. Agent Orchestration
 
-### 6.1 Primary: n8n Workflow
+### 6.1 Internal Orchestration Pipeline
 
-n8n is the primary orchestrator that coordinates agent execution:
+The internal orchestration pipeline coordinates agent execution:
 
 ```mermaid
 flowchart LR
-    subgraph orchestration [n8n Workflow]
+    subgraph orchestration [Orchestration Pipeline]
         A[Webhook Trigger] --> B[Brand Analyzer]
         B --> C[Profile Discovery]
         C --> D[Split Profiles]
@@ -489,17 +489,16 @@ flowchart LR
 6. **Filter** - Keeps only profiles with score >= 50
 7. **Database Insert** - Updates final results and job status
 
-#### n8n Responsibilities
+#### Pipeline Responsibilities
 
 - Sequential and parallel agent execution
 - Retry logic on API failures
 - Error handling and job status updates
 - Webhook notifications to frontend
-- Visual workflow debugging
 
-### 6.2 Plan B: Python Fallback Orchestrator
+### 6.2 Python Orchestrator Script
 
-If n8n is unavailable during a demo, a Python script replaces the orchestration:
+The Python orchestrator script handles the discovery workflow:
 
 ```python
 # backend/scripts/run_discovery.py
@@ -508,7 +507,7 @@ from app.agents import brand_analyzer, discovery_agent, scorer_agent
 from app.db import update_job_status, save_result
 
 async def run_discovery(job_id: str):
-    """Fallback orchestrator when n8n is unavailable."""
+    """Run the discovery orchestration pipeline."""
     try:
         # Update status: analyzing
         await update_job_status(job_id, "analyzing")
@@ -545,22 +544,21 @@ if __name__ == "__main__":
     asyncio.run(run_discovery(job_id))
 ```
 
-#### When to Use Plan B
+#### When to Use the Python Orchestrator
 
-- n8n server is down or unreachable
-- Demo environment without n8n installed
 - Local development and testing
 - CI/CD pipeline integration tests
+- Demo environments
 
 ---
 
-## 7. How n8n and LangChain Work Together
+## 7. How the Orchestration Pipeline and LangChain Work Together
 
-n8n and LangChain are **not alternatives** - they operate at **different layers**:
+The orchestration pipeline and LangChain are **not alternatives** - they operate at **different layers**:
 
 ```mermaid
 flowchart TB
-    subgraph n8n [n8n Orchestration Layer]
+    subgraph pipeline [Orchestration Layer]
         W[Webhook] --> A[Call Agent 1]
         A --> B[Call Agent 2]
         B --> C[Call Agent 3]
@@ -591,7 +589,7 @@ flowchart TB
 
 | Layer | Technology | What It Does |
 |-------|------------|--------------|
-| **Orchestration** | n8n | Decides WHEN and in what ORDER to call agents. Handles retries, parallelization, filtering, webhooks. |
+| **Orchestration** | Internal Pipeline | Decides WHEN and in what ORDER to call agents. Handles retries, parallelization, filtering, webhooks. |
 | **API** | FastAPI | Exposes HTTP endpoints. Validates requests. Returns responses. |
 | **AI Logic** | LangChain | Handles HOW each agent thinks. Builds prompts, calls LLMs, parses outputs, generates embeddings. |
 | **LLM Providers** | OpenAI/Gemini/Ollama | The actual AI models that generate responses. |
@@ -600,12 +598,12 @@ flowchart TB
 
 ```mermaid
 sequenceDiagram
-    participant N as n8n
+    participant P as Pipeline
     participant F as FastAPI
     participant L as LangChain
     participant O as OpenAI
 
-    N->>F: POST /api/agent/analyze-brand
+    P->>F: POST /api/agent/analyze-brand
     F->>L: Call brand_analyzer pipeline
     L->>L: Build prompt template
     L->>O: Send prompt to GPT-4o
@@ -613,20 +611,20 @@ sequenceDiagram
     L->>L: Parse output to BrandDNA
     L->>L: Generate embedding vector
     L-->>F: Return structured result
-    F-->>N: JSON response
-    N->>N: Decide next step
+    F-->>P: JSON response
+    P->>P: Decide next step
 ```
 
 ### Division of Concerns
 
-| n8n Handles | LangChain Handles |
-|-------------|-------------------|
+| Orchestration Pipeline Handles | LangChain Handles |
+|-------------------------------|-------------------|
 | Retry if API call fails | Prompt engineering |
 | Run 50 scorer calls in parallel | LLM provider abstraction |
 | Filter profiles with score < 50 | Embedding generation |
 | Trigger webhooks to frontend | Chain-of-thought reasoning |
 | Update job status in database | Structured output parsing |
-| Visual workflow debugging | Memory/context management |
+| Coordinate agent execution order | Memory/context management |
 
 ---
 
@@ -1334,8 +1332,8 @@ class Settings(BaseSettings):
     # Apify
     APIFY_API_KEY: str = ""
     
-    # Service key for n8n
-    N8N_SERVICE_KEY: str = ""
+    # Service key for orchestration pipeline
+    SERVICE_KEY: str = ""
     
     class Config:
         env_file = ".env"
@@ -1396,8 +1394,8 @@ OLLAMA_MODEL=llama3
 # Apify for Instagram scraping
 APIFY_API_KEY=apify_api_...
 
-# Service key for n8n agent calls
-N8N_SERVICE_KEY=your-secret-key
+# Service key for agent calls
+SERVICE_KEY=your-secret-key
 ```
 
 ### 8.8 Agent Configuration
@@ -1663,7 +1661,7 @@ pyyaml>=6.0
 
 ## 9. FastAPI Integration
 
-Each agent is exposed via FastAPI endpoints that n8n (or the Python fallback) calls.
+Each agent is exposed via FastAPI endpoints that the orchestration pipeline calls.
 
 ### 9.1 Router Setup
 
@@ -1813,7 +1811,7 @@ class ScoreResponse(BaseModel):
 
 ### 9.3 Service Key Authentication
 
-Agent endpoints are called by n8n, not users. They require a service key:
+Agent endpoints are called by the orchestration pipeline, not users. They require a service key:
 
 ```python
 # backend/app/core/auth.py
@@ -1823,8 +1821,8 @@ from app.core.config import settings
 async def verify_service_key(
     x_service_key: str = Header(..., alias="X-Service-Key")
 ):
-    """Verify n8n service key for agent endpoints."""
-    if x_service_key != settings.N8N_SERVICE_KEY:
+    """Verify service key for agent endpoints."""
+    if x_service_key != settings.SERVICE_KEY:
         raise HTTPException(
             status_code=401,
             detail={
@@ -1843,7 +1841,7 @@ from app.api import agent, jobs
 
 app = FastAPI(title="PartnerScout API")
 
-# Agent endpoints (called by n8n)
+# Agent endpoints (called by orchestration pipeline)
 app.include_router(agent.router)
 
 # Job endpoints (called by frontend)
@@ -1866,8 +1864,7 @@ async def health_check():
 | `backend/app/api/agent.py` | FastAPI | HTTP route handlers for agents |
 | `backend/app/models/agent.py` | Pydantic | Request/response models |
 | `backend/app/core/auth.py` | FastAPI | Service key authentication |
-| `n8n/discovery_workflow.json` | n8n | Exported workflow definition |
-| `backend/scripts/run_discovery.py` | Python | Fallback orchestrator (Plan B) |
+| `backend/scripts/run_discovery.py` | Python | Orchestration pipeline script |
 
 ---
 
@@ -1892,7 +1889,7 @@ All agents return consistent error responses:
 | `LLM_ERROR` | AI model error | Retry with fallback provider |
 | `RATE_LIMITED` | API limits reached | Wait and retry |
 | `INVALID_INPUT` | Bad request data | Fix request payload |
-| `UNAUTHORIZED` | Invalid service key | Check N8N_SERVICE_KEY |
+| `UNAUTHORIZED` | Invalid service key | Check SERVICE_KEY |
 
 ---
 

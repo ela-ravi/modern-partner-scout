@@ -380,7 +380,7 @@ async def run_mock_orchestration():
     print("=" * 70)
 
     print(f"\n  In production, this pipeline:")
-    print(f"    1. N8N webhook triggers at POST /webhook/start-discovery")
+    print(f"    1. Frontend triggers discovery via POST /api/jobs/{{job_id}}/start")
     print(f"    2. Brand Analyzer calls POST /api/agent/analyze-brand")
     print(f"    3. Discovery Agent calls POST /api/agent/discover")
     print(f"    4. Scorer Agent calls POST /api/agent/score (per profile)")

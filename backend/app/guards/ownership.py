@@ -33,7 +33,7 @@ class OwnershipGuard(ABC):
     Abstract base class for resource ownership guards.
     
     Ensures that users can only access resources they own.
-    Services (N8N) bypass ownership checks.
+    Services bypass ownership checks.
     """
     
     def __init__(self, db: Optional[SupabaseClient] = None):

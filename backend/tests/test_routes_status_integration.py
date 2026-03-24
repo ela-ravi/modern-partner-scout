@@ -53,7 +53,7 @@ def jwt_secret():
 @pytest.fixture
 def service_key():
     """Get service key for authentication."""
-    return settings.n8n.service_key
+    return settings.supabase.service_role_key
 
 
 @pytest.fixture

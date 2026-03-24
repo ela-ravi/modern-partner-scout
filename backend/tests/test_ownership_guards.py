@@ -80,7 +80,7 @@ def other_user_context(other_user_id):
 def service_context():
     """Create a test service context."""
     return ServiceContext(
-        service_name="n8n",
+        service_name="internal",
         is_admin=True,
     )
 
@@ -495,7 +495,7 @@ class TestOwnershipGuardsFastAPI:
         app = FastAPI()
         
         # Override the dependency at FastAPI level
-        service_context = ServiceContext(service_name="n8n", is_admin=True)
+        service_context = ServiceContext(service_name="internal", is_admin=True)
         
         async def mock_get_user_or_service():
             return (service_context, "service")

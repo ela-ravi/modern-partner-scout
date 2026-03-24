@@ -211,11 +211,11 @@ class JobProgressStatus(BaseModel):
 
 
 # =============================================================================
-# Workflow Status Models (for N8N/orchestrator)
+# Workflow Status Models (for orchestration pipeline)
 # =============================================================================
 
 class WorkflowStatusUpdate(BaseModel):
-    """Status update from workflow orchestrator."""
+    """Status update from the orchestration pipeline."""
     
     job_id: UUID
     workflow_id: Optional[str] = None
@@ -252,7 +252,7 @@ class HealthStatus(BaseModel):
     database: str = "unknown"
     llm_service: str = "unknown"
     apify_service: str = "unknown"
-    n8n_service: str = "unknown"
+    orchestration_service: str = "unknown"
     
     # Metrics
     active_jobs: int = 0

@@ -106,7 +106,7 @@ def custom_openapi():
             "type": "apiKey",
             "in": "header",
             "name": "X-Service-Key",
-            "description": "Service key for N8N/internal service authentication.",
+            "description": "Service key for internal service authentication.",
         },
     }
     

@@ -480,7 +480,7 @@ class ExternalServiceError(PartnerScoutError):
     """
     Base class for external service errors.
     
-    Use for errors from third-party services (Supabase, Apify, N8N, etc.).
+    Use for errors from third-party services (Supabase, Apify, etc.).
     """
     
     def __init__(
@@ -534,27 +534,6 @@ class ApifyError(ExternalServiceError):
             message=message,
             service_name="apify",
             code=ErrorCodes.APIFY_ERROR,
-            details=error_details,
-        )
-
-
-class N8NError(ExternalServiceError):
-    """Raised when an N8N operation fails."""
-    
-    def __init__(
-        self,
-        message: str = "Workflow orchestration failed",
-        workflow_id: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
-    ):
-        error_details = details or {}
-        if workflow_id:
-            error_details["workflow_id"] = workflow_id
-        
-        super().__init__(
-            message=message,
-            service_name="n8n",
-            code=ErrorCodes.N8N_ERROR,
             details=error_details,
         )
 

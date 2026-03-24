@@ -29,7 +29,7 @@ def jwt_secret():
 @pytest.fixture
 def service_key():
     """Get service key for testing."""
-    return settings.n8n.service_key
+    return settings.supabase.service_role_key
 
 
 @pytest.fixture
@@ -139,9 +139,9 @@ class TestServiceContext:
         """Test creating a ServiceContext."""
         from app.guards.auth import ServiceContext
         
-        service = ServiceContext(service_name="n8n", is_admin=True)
+        service = ServiceContext(service_name="internal", is_admin=True)
         
-        assert service.service_name == "n8n"
+        assert service.service_name == "internal"
         assert service.is_admin is True
     
     def test_service_context_repr(self):
@@ -254,7 +254,7 @@ class TestServiceKeyGuard:
         guard = ServiceKeyGuard(service_key=service_key)
         context = guard.validate_key(service_key)
         
-        assert context.service_name == "n8n"
+        assert context.service_name == "internal"
         assert context.is_admin is True
     
     def test_validate_invalid_key(self, service_key):
@@ -327,7 +327,7 @@ class TestCombinedAuthGuard:
         context, auth_type = guard.authenticate(request)
         
         assert auth_type == "service"
-        assert context.service_name == "n8n"
+        assert context.service_name == "internal"
     
     def test_authenticate_with_user_token(self, valid_token, jwt_secret, service_key):
         """Test authentication with user JWT."""
@@ -452,7 +452,7 @@ class TestFastAPIIntegration:
         
         assert response.status_code == 200
         data = response.json()
-        assert data["service"] == "n8n"
+        assert data["service"] == "internal"
     
     def test_service_protected_with_invalid_key(self, client):
         """Test service-protected route with invalid key returns 401."""

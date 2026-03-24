@@ -80,9 +80,9 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...your-service-ro
 SUPABASE_JWT_SECRET=your-jwt-secret-from-dashboard
 
 # =============================================================================
-# N8N Orchestration (for workflow triggering)
+# Orchestration (for workflow triggering)
 # =============================================================================
-N8N_SERVICE_KEY=test-service-key-12345
+SERVICE_KEY=test-service-key-12345
 
 # =============================================================================
 # LLM Provider (choose one)

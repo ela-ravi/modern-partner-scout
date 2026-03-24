@@ -20,7 +20,7 @@ PartnerScout AI is an automated Instagram partner discovery platform for D2C bra
 - **Auth**: Supabase Auth
 
 ### Orchestration
-- **Workflow Engine**: n8n
+- **Pipeline**: Internal Python orchestration service
 - **Scraping**: Apify (Instagram)
 
 ## Project Structure
@@ -44,7 +44,6 @@ partner-scout/
 │   │   ├── services/         # Business logic
 │   │   └── db/               # Database utilities
 │   └── ...
-├── n8n/                      # n8n workflow exports
 ├── docs/                     # Documentation
 └── scripts/                  # Utility scripts
 ```

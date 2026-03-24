@@ -30,7 +30,6 @@ from app.core.exceptions import (
     JobAlreadyCompletedError,
     JobNotFoundError,
     JobNotStartableError,
-    N8NError,
     PartnerScoutError,
 )
 from app.guards.auth import UserContext, get_current_user
@@ -399,14 +398,13 @@ async def update_job(
     response_model=JobStartResponse,
     status_code=HttpStatus.ACCEPTED,
     summary="Start discovery workflow",
-    description="Trigger the discovery workflow via N8N for a pending job.",
+    description="Trigger the discovery pipeline for a pending job.",
     responses={
         202: {"description": "Discovery workflow initiated"},
         401: {"description": "Authentication required"},
         403: {"description": "Access denied - not the owner"},
         404: {"description": "Job not found"},
         409: {"description": "Job cannot be started (wrong status)"},
-        502: {"description": "N8N workflow trigger failed"},
     }
 )
 async def start_job(
@@ -417,12 +415,13 @@ async def start_job(
 ) -> JobStartResponse:
     """
     Start the discovery workflow for a job.
-    
-    Triggers the N8N workflow to begin the discovery process:
+
+    Triggers the internal pipeline to begin the discovery process:
     1. Brand analysis (extract hashtags, keywords, embedding)
     2. Profile discovery (search for similar profiles)
     3. Profile scoring (evaluate and rank profiles)
-    
+    4. Contact enrichment (extract emails and contacts)
+
     The job must be in 'pending' status to start.
     """
     try:
@@ -448,12 +447,6 @@ async def start_job(
             status_code=e.status_code,
             detail=e.to_dict()
         )
-    except N8NError as e:
-        raise HTTPException(
-            status_code=e.status_code,
-            detail=e.to_dict()
-        )
-
 
 @router.post(
     "/jobs/{job_id}/cancel",

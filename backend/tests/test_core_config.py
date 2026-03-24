@@ -23,8 +23,7 @@ class TestEnvironmentConfig:
         assert hasattr(settings, 'gemini')
         assert hasattr(settings, 'ollama')
         assert hasattr(settings, 'apify')
-        assert hasattr(settings, 'n8n')
-    
+
     def test_supabase_settings_exist(self):
         """Test that Supabase settings are accessible."""
         from app.core.config import settings
@@ -58,13 +57,6 @@ class TestEnvironmentConfig:
         assert hasattr(settings.apify, 'api_key')
         assert hasattr(settings.apify, 'instagram_scraper_id')
         assert hasattr(settings.apify, 'hashtag_scraper_id')
-    
-    def test_n8n_settings(self):
-        """Test that N8N settings are accessible."""
-        from app.core.config import settings
-        
-        assert hasattr(settings.n8n, 'service_key')
-        assert hasattr(settings.n8n, 'webhook_url')
     
     def test_cors_origins_list(self):
         """Test that CORS origins are parsed correctly."""

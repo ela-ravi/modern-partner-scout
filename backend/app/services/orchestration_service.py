@@ -6,7 +6,7 @@ Runs the 4-phase pipeline:
   Phase 2+3: Iterative Discovery & Scoring (loop until N quality profiles found)
   Phase 4: Contact Enrichment (website scraping + LLM)
 
-Called by job_service.trigger_discovery() when N8N is unavailable.
+Called by job_service.trigger_discovery() to run the pipeline.
 """
 
 import asyncio
@@ -898,7 +898,7 @@ def start_pipeline_background(job_id: str, job_data: Dict[str, Any]) -> None:
     """
     Start the orchestration pipeline in a background thread.
 
-    This is called by job_service.trigger_discovery() when N8N is unavailable.
+    This is called by job_service.trigger_discovery() to run the pipeline.
     The pipeline runs asynchronously in a separate thread so the API response
     returns immediately.
     """

@@ -128,23 +128,6 @@ class ApifySettings(BaseSettings):
     )
 
 
-class N8NSettings(BaseSettings):
-    """N8N workflow orchestration settings."""
-    
-    model_config = SettingsConfigDict(
-        env_prefix="N8N_",
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
-    
-    service_key: str = Field(default="", description="Service key for N8N authentication")
-    webhook_url: str = Field(
-        default="http://localhost:5678/webhook/partner-discovery",
-        description="N8N webhook URL for triggering workflows"
-    )
-
-
 class Settings(BaseSettings):
     """
     Main application settings.
@@ -205,7 +188,6 @@ class Settings(BaseSettings):
     openrouter: OpenRouterSettings = Field(default_factory=OpenRouterSettings)
     huggingface: HuggingFaceSettings = Field(default_factory=HuggingFaceSettings)
     apify: ApifySettings = Field(default_factory=ApifySettings)
-    n8n: N8NSettings = Field(default_factory=N8NSettings)
     
     @field_validator("llm_provider")
     @classmethod

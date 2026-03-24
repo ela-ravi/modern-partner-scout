@@ -10,7 +10,7 @@ Complete development plan structured for Agile project management tools (Jira, A
 2. [EPIC-1: Project Foundation & Infrastructure Setup](#epic-1-project-foundation--infrastructure-setup)
 3. [EPIC-2: Backend Core Services & API Layer](#epic-2-backend-core-services--api-layer)
 4. [EPIC-3: AI Agents & LLM Integration](#epic-3-ai-agents--llm-integration)
-5. [EPIC-4: Workflow Orchestration (N8N & Python)](#epic-4-workflow-orchestration-n8n--python)
+5. [EPIC-4: Workflow Orchestration (Python Pipeline)](#epic-4-workflow-orchestration-python-pipeline)
 6. [EPIC-5: Frontend Application Development](#epic-5-frontend-application-development)
 7. [EPIC-6: Comprehensive Testing & Quality Assurance](#epic-6-comprehensive-testing--quality-assurance)
 8. [EPIC-7: Deployment & Production Readiness](#epic-7-deployment--production-readiness)
@@ -38,7 +38,7 @@ Complete development plan structured for Agile project management tools (Jira, A
 | **EPIC-1** | Project Foundation & Infrastructure Setup | 2 | 8 |
 | **EPIC-2** | Backend Core Services & API Layer | 4 | 13 |
 | **EPIC-3** | AI Agents & LLM Integration | 3 | 8 |
-| **EPIC-4** | Workflow Orchestration (N8N & Python) | 2 | 4 |
+| **EPIC-4** | Workflow Orchestration (Python Pipeline) | 2 | 4 |
 | **EPIC-5** | Frontend Application Development | 7 | 12 |
 | **EPIC-6** | Comprehensive Testing & QA | 3 | 6 |
 | **EPIC-7** | Deployment & Production Readiness | 3 | 3 |
@@ -81,14 +81,13 @@ Complete development plan structured for Agile project management tools (Jira, A
 | SUB-1.1.1.2.4 | Configure Tailwind CSS |
 | SUB-1.1.1.2.5 | Create `.env.example` template |
 
-#### TASK-1.1.1.3: Create Supabase & N8N Structure
+#### TASK-1.1.1.3: Create Supabase & Orchestration Structure
 
 | Subtask | Description |
 |---------|-------------|
 | SUB-1.1.1.3.1 | Create `supabase/migrations/` directory |
 | SUB-1.1.1.3.2 | Create `supabase/seed.sql` file |
-| SUB-1.1.1.3.3 | Create `n8n/workflows/` directory |
-| SUB-1.1.1.3.4 | Create `n8n/README.md` with setup instructions |
+| SUB-1.1.1.3.3 | Create `backend/scripts/` directory for orchestration scripts |
 
 **Validation:** Run `tree` or `ls -R` to verify all directories exist.
 
@@ -114,7 +113,7 @@ Complete development plan structured for Agile project management tools (Jira, A
 | SUB-1.1.2.2.2 | Configure Supabase credentials |
 | SUB-1.1.2.2.3 | Configure LLM provider keys (OpenAI/Gemini) |
 | SUB-1.1.2.2.4 | Configure Apify API key |
-| SUB-1.1.2.2.5 | Configure N8N service key |
+| SUB-1.1.2.2.5 | Configure orchestration service key |
 
 #### TASK-1.1.2.3: Create Minimal FastAPI App
 
@@ -309,7 +308,7 @@ SELECT COUNT(*) FROM discovery_jobs; -- Expected: >= 1
 | SUB-2.1.1.1.2 | Define Supabase settings |
 | SUB-2.1.1.1.3 | Define LLM provider settings |
 | SUB-2.1.1.1.4 | Define Apify settings |
-| SUB-2.1.1.1.5 | Define N8N settings |
+| SUB-2.1.1.1.5 | Define orchestration settings |
 
 #### TASK-2.1.1.2: Create Constants & Enums
 
@@ -481,7 +480,7 @@ def test_create_job_request_validation():
 | SUB-2.2.1.1.1 | Create `app/guards/auth.py` |
 | SUB-2.2.1.1.2 | Implement `AuthGuard` base class |
 | SUB-2.2.1.1.3 | Implement `UserGuard` with JWT validation |
-| SUB-2.2.1.1.4 | Implement `ServiceKeyGuard` for N8N |
+| SUB-2.2.1.1.4 | Implement `ServiceKeyGuard` for orchestration pipeline |
 
 **Validation - curl (Unauthorized):**
 
@@ -567,7 +566,7 @@ curl -X PATCH http://localhost:8000/api/jobs/$JOB_ID/status \
 | SUB-2.3.1.1.2 | Implement `create_job()` with daily limit check |
 | SUB-2.3.1.1.3 | Implement `list_user_jobs()` |
 | SUB-2.3.1.1.4 | Implement `get_job_with_profiles()` |
-| SUB-2.3.1.1.5 | Implement `trigger_discovery()` to call N8N webhook |
+| SUB-2.3.1.1.5 | Implement `trigger_discovery()` to call orchestration pipeline |
 | SUB-2.3.1.1.6 | Implement `update_status()` |
 | SUB-2.3.1.1.7 | Implement `delete_job()`, `retry_job()` |
 | SUB-2.3.1.1.8 | Implement `get_analytics()` |
@@ -717,7 +716,7 @@ curl -X GET http://localhost:8000/api/jobs/$JOB_ID/analytics \
 
 ### STORY-2.4.2: Implement Status Update Endpoints
 
-**As an** orchestrator (N8N/Python), **I want** status update endpoints **so that** I can track workflow progress.
+**As an** orchestration pipeline, **I want** status update endpoints **so that** I can track workflow progress.
 
 #### TASK-2.4.2.1: Create Status Routes
 
@@ -1070,130 +1069,62 @@ async def test_email_composer():
 
 ---
 
-# EPIC-4: Workflow Orchestration (N8N & Python)
+# EPIC-4: Workflow Orchestration (Python Pipeline)
 
-**Description:** Implement workflow orchestration using N8N (primary) and Python fallback.
+**Description:** Implement workflow orchestration using the internal Python orchestration pipeline.
 
-**Acceptance Criteria:** Complete discovery workflow runs end-to-end via N8N or Python.
+**Acceptance Criteria:** Complete discovery workflow runs end-to-end via the Python orchestration pipeline.
 
 ---
 
-## FEAT-4.1: N8N Workflow Implementation
+## FEAT-4.1: Orchestration Pipeline Implementation
 
-### STORY-4.1.1: Setup N8N Environment
+### STORY-4.1.1: Setup Orchestration Environment
 
-**As a** DevOps engineer, **I want** N8N running **so that** I can build visual workflows.
+**As a** developer, **I want** the orchestration pipeline configured **so that** the full discovery workflow runs automatically.
 
-#### TASK-4.1.1.1: Install and Configure N8N
+#### TASK-4.1.1.1: Configure Orchestration Pipeline
 
 | Subtask | Description |
 |---------|-------------|
-| SUB-4.1.1.1.1 | Install N8N (Docker or npm) |
+| SUB-4.1.1.1.1 | Create `backend/scripts/run_orchestration.py` |
 | SUB-4.1.1.1.2 | Configure `FASTAPI_BASE_URL` environment variable |
-| SUB-4.1.1.1.3 | Configure `N8N_SERVICE_KEY` environment variable |
+| SUB-4.1.1.1.3 | Configure `SERVICE_KEY` environment variable |
 
-**Validation:** Access N8N at http://localhost:5678.
-
----
-
-### STORY-4.1.2: Build Discovery Workflow (21 Nodes)
-
-**As a** developer, **I want** the discovery workflow **so that** the full pipeline runs automatically.
-
-#### TASK-4.1.2.1: Create Trigger Nodes (1-2)
-
-| Subtask | Description |
-|---------|-------------|
-| SUB-4.1.2.1.1 | Create Webhook Trigger node |
-| SUB-4.1.2.1.2 | Create Manual Trigger node for testing |
-
-#### TASK-4.1.2.2: Create Validation Nodes (3-4)
-
-| Subtask | Description |
-|---------|-------------|
-| SUB-4.1.2.2.1 | Create Validate Input IF node |
-| SUB-4.1.2.2.2 | Create Return 400 Error node |
-
-#### TASK-4.1.2.3: Create Brand Analysis Nodes (5-6)
-
-| Subtask | Description |
-|---------|-------------|
-| SUB-4.1.2.3.1 | Create Set Job Analyzing HTTP node |
-| SUB-4.1.2.3.2 | Create Brand Analyzer Agent HTTP node |
-
-#### TASK-4.1.2.4: Create Discovery Nodes (7-8)
-
-| Subtask | Description |
-|---------|-------------|
-| SUB-4.1.2.4.1 | Create Set Job Discovering HTTP node |
-| SUB-4.1.2.4.2 | Create Discovery Agent HTTP node |
-
-#### TASK-4.1.2.5: Create Scoring Loop Nodes (9-14)
-
-| Subtask | Description |
-|---------|-------------|
-| SUB-4.1.2.5.1 | Create Set Job Scoring HTTP node |
-| SUB-4.1.2.5.2 | Create Split Profiles SplitInBatches node |
-| SUB-4.1.2.5.3 | Create Set Profile Processing HTTP node |
-| SUB-4.1.2.5.4 | Create Scorer Agent HTTP node |
-| SUB-4.1.2.5.5 | Create Set Profile Done HTTP node |
-| SUB-4.1.2.5.6 | Create Wait node for rate limiting |
-
-#### TASK-4.1.2.6: Create Completion Nodes (15-18)
-
-| Subtask | Description |
-|---------|-------------|
-| SUB-4.1.2.6.1 | Create Merge Results node |
-| SUB-4.1.2.6.2 | Create Filter High Scores (>=50) node |
-| SUB-4.1.2.6.3 | Create Set Job Completed HTTP node |
-| SUB-4.1.2.6.4 | Create Respond Success node |
-
-#### TASK-4.1.2.7: Create Error Handling Nodes (19-21)
-
-| Subtask | Description |
-|---------|-------------|
-| SUB-4.1.2.7.1 | Create Error Trigger node |
-| SUB-4.1.2.7.2 | Create Format Error Set node |
-| SUB-4.1.2.7.3 | Create Set Job Failed HTTP node |
-
-#### TASK-4.1.2.8: Connect All Nodes
-
-| Subtask | Description |
-|---------|-------------|
-| SUB-4.1.2.8.1 | Connect trigger to validation flow |
-| SUB-4.1.2.8.2 | Connect brand analysis flow |
-| SUB-4.1.2.8.3 | Connect discovery flow |
-| SUB-4.1.2.8.4 | Connect scoring loop |
-| SUB-4.1.2.8.5 | Connect completion flow |
-| SUB-4.1.2.8.6 | Connect error handling flow |
-
-**Validation - N8N Manual Test:**
-
-1. Open workflow in N8N
-2. Click "Execute Workflow"
-3. Verify all nodes execute successfully
-4. Check database for inserted profiles and scores
+**Validation:** Run the orchestration script and verify it connects to FastAPI.
 
 ---
 
-### STORY-4.1.3: Export and Document Workflow
+### STORY-4.1.2: Build Discovery Pipeline Steps
 
-**As a** developer, **I want** the workflow exported **so that** it can be version controlled.
+**As a** developer, **I want** the discovery pipeline **so that** the full workflow runs automatically.
 
-#### TASK-4.1.3.1: Export Workflow
+#### TASK-4.1.2.1: Implement Pipeline Steps
 
 | Subtask | Description |
 |---------|-------------|
-| SUB-4.1.3.1.1 | Export to `n8n/workflows/partner-discovery.json` |
-| SUB-4.1.3.1.2 | Update `n8n/README.md` with import instructions |
+| SUB-4.1.2.1.1 | Implement webhook trigger handler |
+| SUB-4.1.2.1.2 | Implement input validation step |
+| SUB-4.1.2.1.3 | Implement brand analysis step (calls `/api/agent/analyze-brand`) |
+| SUB-4.1.2.1.4 | Implement discovery step (calls `/api/agent/discover`) |
+| SUB-4.1.2.1.5 | Implement scoring loop with parallel execution |
+| SUB-4.1.2.1.6 | Implement score filtering (>= 50) |
+| SUB-4.1.2.1.7 | Implement completion and status update step |
+| SUB-4.1.2.1.8 | Implement error handling and job failure reporting |
+
+**Validation:**
+
+1. Run the pipeline script with a test job ID
+2. Verify all steps execute successfully
+3. Check database for inserted profiles and scores
 
 ---
 
-## FEAT-4.2: Python Fallback Orchestrator
+## FEAT-4.2: Python Orchestrator Script
 
-### STORY-4.2.1: Implement Python Fallback Script
+### STORY-4.2.1: Implement Python Orchestrator Script
 
-**As a** developer, **I want** a Python fallback **so that** discovery works without N8N.
+**As a** developer, **I want** a Python orchestrator **so that** discovery runs end-to-end.
 
 #### TASK-4.2.1.1: Create Fallback Script
 
@@ -1228,9 +1159,8 @@ python -m scripts.run_discovery 11111111-1111-1111-1111-111111111111
 | Test Type | Description | Tool |
 |-----------|-------------|------|
 | Unit Test | Each workflow step calls correct API | pytest |
-| Integration Test | Full workflow completes | N8N manual test |
-| Smoke Test | Python fallback completes | CLI |
-| Comparison Test | N8N and Python produce same results | pytest |
+| Integration Test | Full pipeline completes end-to-end | pytest |
+| Smoke Test | Python orchestrator completes | CLI |
 | Error Recovery Test | Failed jobs can be retried | pytest |
 | Performance Test | 50 profiles in < 10 minutes | pytest |
 
@@ -1752,7 +1682,7 @@ python -m scripts.run_discovery 11111111-1111-1111-1111-111111111111
 |---------|-------------|
 | SUB-7.1.1.1.1 | Set production environment variables |
 | SUB-7.1.1.1.2 | Configure production Supabase project |
-| SUB-7.1.1.1.3 | Configure production N8N instance |
+| SUB-7.1.1.1.3 | Configure production orchestration pipeline |
 
 #### TASK-7.1.1.2: Configure Frontend Production
 
@@ -1914,7 +1844,7 @@ python -m scripts.run_discovery $JOB_ID
 | Guards | Yes | Yes | - | Yes | - |
 | API Routes | Yes | Yes | Yes | Yes | Yes |
 | AI Agents | Yes | Yes | - | - | Yes |
-| N8N Workflow | - | Yes | Yes | - | Yes |
+| Orchestration Pipeline | - | Yes | Yes | - | Yes |
 | Frontend Components | Yes | - | - | - | - |
 | Frontend Pages | - | - | Yes | - | Yes |
 | Full System | - | - | Yes | Yes | Yes |

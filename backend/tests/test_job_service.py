@@ -2,8 +2,8 @@
 Tests for STORY-2.3.1: Implement Job Service
 
 These tests validate that the JobService implements all required
-business logic correctly, including daily limit enforcement,
-status transitions, and N8N webhook integration.
+business logic correctly, including daily limit enforcement
+and status transitions.
 """
 
 import pytest
@@ -20,7 +20,6 @@ from app.core.exceptions import (
     JobNotFoundError,
     JobNotStartableError,
     JobAlreadyCompletedError,
-    N8NError,
 )
 
 
@@ -477,7 +476,7 @@ class TestTriggerDiscovery:
     def test_trigger_discovery_webhook_error(
         self, mock_httpx_client, job_service, mock_job_repo, sample_job
     ):
-        """Test error when N8N webhook fails."""
+        """Test error when webhook fails."""
         job_id = sample_job["id"]
         sample_job["status"] = JobStatus.PENDING.value
         mock_job_repo.get_by_id.return_value = sample_job
@@ -494,7 +493,7 @@ class TestTriggerDiscovery:
         
         result = job_service.trigger_discovery(job_id=job_id, user_id="user-123")
 
-        # N8N failure now falls back to internal orchestration instead of raising
+        # Failure now falls back to internal orchestration instead of raising
         assert result is not None
 
     @patch("app.services.job_service.httpx.Client")
@@ -511,7 +510,7 @@ class TestTriggerDiscovery:
         mock_client_instance.__enter__.return_value = mock_client_instance
         mock_httpx_client.return_value = mock_client_instance
 
-        # N8N failure now falls back to internal orchestration instead of raising
+        # Failure now falls back to internal orchestration instead of raising
         result = job_service.trigger_discovery(job_id=job_id, user_id="user-123")
         assert result is not None
 

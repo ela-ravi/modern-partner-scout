@@ -3,7 +3,7 @@ PartnerScout AI - Authentication Guards
 
 Implements authentication guards for securing API endpoints.
 - UserGuard: JWT-based authentication for user requests
-- ServiceKeyGuard: Service key authentication for N8N/internal services
+- ServiceKeyGuard: Service key authentication for internal services
 """
 
 from abc import ABC, abstractmethod
@@ -85,13 +85,13 @@ class UserContext:
 class ServiceContext:
     """
     Represents a service authentication context.
-    
-    Used for N8N and internal service calls.
+
+    Used for internal service calls.
     """
-    
+
     def __init__(
         self,
-        service_name: str = "n8n",
+        service_name: str = "internal",
         is_admin: bool = True,
     ):
         self.service_name = service_name
@@ -348,14 +348,14 @@ class UserGuard(AuthGuard):
 
 
 # =============================================================================
-# Service Key Guard (N8N/Internal Services)
+# Service Key Guard (Internal Services)
 # =============================================================================
 
 class ServiceKeyGuard(AuthGuard):
     """
     Guard for service-to-service authentication using API keys.
-    
-    Used for N8N workflows and internal service calls.
+
+    Used for internal service calls.
     """
     
     HEADER_NAME = "X-Service-Key"
@@ -367,7 +367,7 @@ class ServiceKeyGuard(AuthGuard):
         Args:
             service_key: Expected service key (defaults to settings)
         """
-        self.service_key = service_key or settings.n8n.service_key
+        self.service_key = service_key or settings.supabase.service_role_key
     
     def get_auth_header(self, request: Request) -> Optional[str]:
         """Extract service key from X-Service-Key header."""
@@ -414,11 +414,11 @@ class ServiceKeyGuard(AuthGuard):
         if not self._secure_compare(key, self.service_key):
             raise InvalidServiceKeyError(
                 message="Invalid service key",
-                details={"hint": "Check your N8N_SERVICE_KEY configuration"}
+                details={"hint": "Check your service key configuration"}
             )
-        
+
         return ServiceContext(
-            service_name="n8n",
+            service_name="internal",
             is_admin=True,
         )
     

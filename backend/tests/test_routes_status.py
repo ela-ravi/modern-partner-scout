@@ -49,13 +49,13 @@ def client(app):
 @pytest.fixture
 def service_key():
     """Get service key for authentication."""
-    return settings.n8n.service_key
+    return settings.supabase.service_role_key
 
 
 @pytest.fixture
 def mock_service_context():
     """Create a mock service context."""
-    return ServiceContext(service_name="n8n", is_admin=True)
+    return ServiceContext(service_name="internal", is_admin=True)
 
 
 @pytest.fixture
@@ -120,7 +120,7 @@ class TestUpdateJobStatus:
         # Override dependencies
         app.dependency_overrides[get_job_repository] = lambda: mock_job_repo
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
         
         response = client.patch(
@@ -154,7 +154,7 @@ class TestUpdateJobStatus:
         
         app.dependency_overrides[get_job_repository] = lambda: mock_job_repo
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
         
         response = client.patch(
@@ -187,7 +187,7 @@ class TestUpdateJobStatus:
         
         app.dependency_overrides[get_job_repository] = lambda: mock_job_repo
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
         
         response = client.patch(
@@ -212,7 +212,7 @@ class TestUpdateJobStatus:
         
         app.dependency_overrides[get_job_repository] = lambda: mock_job_repo
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
         
         response = client.patch(
@@ -236,7 +236,7 @@ class TestUpdateJobStatus:
         
         app.dependency_overrides[get_job_repository] = lambda: mock_job_repo
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
         
         response = client.patch(
@@ -256,7 +256,7 @@ class TestUpdateJobStatus:
     ):
         """Test invalid status value returns 422."""
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
         
         response = client.patch(
@@ -295,7 +295,7 @@ class TestUpdateJobStatus:
         
         app.dependency_overrides[get_job_repository] = lambda: mock_job_repo
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
         
         response = client.patch(
@@ -333,7 +333,7 @@ class TestUpdateProfileStatus:
         
         app.dependency_overrides[get_profile_repository] = lambda: mock_profile_repo
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
         
         response = client.patch(
@@ -366,7 +366,7 @@ class TestUpdateProfileStatus:
         
         app.dependency_overrides[get_profile_repository] = lambda: mock_profile_repo
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
         
         response = client.patch(
@@ -398,7 +398,7 @@ class TestUpdateProfileStatus:
 
         app.dependency_overrides[get_profile_repository] = lambda: mock_profile_repo
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
 
         response = client.patch(
@@ -422,7 +422,7 @@ class TestUpdateProfileStatus:
         
         app.dependency_overrides[get_profile_repository] = lambda: mock_profile_repo
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
         
         response = client.patch(
@@ -446,7 +446,7 @@ class TestUpdateProfileStatus:
         
         app.dependency_overrides[get_profile_repository] = lambda: mock_profile_repo
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
         
         response = client.patch(
@@ -477,7 +477,7 @@ class TestUpdateProfileStatus:
         
         app.dependency_overrides[get_profile_repository] = lambda: mock_profile_repo
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
         
         response = client.patch(
@@ -536,7 +536,7 @@ class TestBatchUpdateProfileStatuses:
         app.dependency_overrides[get_job_repository] = lambda: mock_job_repo
         app.dependency_overrides[get_profile_repository] = lambda: mock_profile_repo
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
         
         response = client.patch(
@@ -594,7 +594,7 @@ class TestBatchUpdateProfileStatuses:
         app.dependency_overrides[get_job_repository] = lambda: mock_job_repo
         app.dependency_overrides[get_profile_repository] = lambda: mock_profile_repo
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
         
         response = client.patch(
@@ -621,7 +621,7 @@ class TestBatchUpdateProfileStatuses:
         
         app.dependency_overrides[get_job_repository] = lambda: mock_job_repo
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
         
         response = client.patch(
@@ -656,7 +656,7 @@ class TestBatchUpdateProfileStatuses:
         app.dependency_overrides[get_job_repository] = lambda: mock_job_repo
         app.dependency_overrides[get_profile_repository] = lambda: mock_profile_repo
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
         
         response = client.patch(
@@ -694,7 +694,7 @@ class TestBatchUpdateProfileStatuses:
         app.dependency_overrides[get_job_repository] = lambda: mock_job_repo
         app.dependency_overrides[get_profile_repository] = lambda: mock_profile_repo
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
         
         response = client.patch(
@@ -716,7 +716,7 @@ class TestBatchUpdateProfileStatuses:
     ):
         """Test batch update with empty profile list."""
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
         
         response = client.patch(
@@ -794,7 +794,7 @@ class TestStatusRoutesEdgeCases:
         
         app.dependency_overrides[get_job_repository] = lambda: mock_job_repo
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
         
         response = client.patch(
@@ -818,7 +818,7 @@ class TestStatusRoutesEdgeCases:
         
         app.dependency_overrides[get_profile_repository] = lambda: mock_profile_repo
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
         
         response = client.patch(
@@ -838,7 +838,7 @@ class TestStatusRoutesEdgeCases:
         mock_job["status"] = JobStatus.ANALYZING.value
         
         app.dependency_overrides[get_service_context] = lambda: ServiceContext(
-            service_name="n8n", is_admin=True
+            service_name="internal", is_admin=True
         )
         
         # Request without error_message should fail validation

@@ -2,7 +2,7 @@
 PartnerScout AI - Agent API Routes (STORY-3.3.6)
 
 API routes for AI agent operations including brand analysis, discovery, and scoring.
-These endpoints are called by the workflow orchestrator (N8N or Python script).
+These endpoints are called by the internal orchestration pipeline.
 
 Subtasks completed:
 - SUB-3.3.6.1.1: Create app/api/routes/agents.py
@@ -59,7 +59,7 @@ logger = logging.getLogger(__name__)
     3. Generates embedding vector for semantic similarity
     4. Stores brand DNA in the database
     
-    **Authentication:** Requires X-Service-Key header (for N8N/orchestrator).
+    **Authentication:** Requires X-Service-Key header.
     
     **Returns:** Brand DNA with hashtags, keywords, themes, and embedding vector.
     """,
@@ -177,7 +177,7 @@ async def analyze_brand(
     5. Deduplicates profiles by username
     6. Stores discovered profiles in the database
     
-    **Authentication:** Requires X-Service-Key header (for N8N/orchestrator).
+    **Authentication:** Requires X-Service-Key header.
     
     **Returns:** List of discovered profiles with metadata.
     """,
@@ -309,7 +309,7 @@ async def discover_profiles(
     - Business Indicators (15%): Partnership readiness
     - Activity Recency (10%): Recent activity
     
-    **Authentication:** Requires X-Service-Key header (for N8N/orchestrator).
+    **Authentication:** Requires X-Service-Key header.
     
     **Returns:** Complete scoring results with dimension breakdown and recommendation.
     """,

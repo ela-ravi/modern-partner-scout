@@ -49,7 +49,7 @@ const features = [
   {
     title: 'API & Webhooks',
     description:
-      'RESTful API, real-time webhooks, and n8n workflow integration for custom automation pipelines.',
+      'RESTful API, real-time webhooks, and workflow automation for custom discovery pipelines.',
     icon: <IntegrationInstructionsIcon className="w-6 h-6" />,
     span: 'sm:col-span-2',
     gradient: 'from-purple-50 to-brand-primary/5',

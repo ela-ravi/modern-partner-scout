@@ -3,7 +3,7 @@ PartnerScout AI - Status Update Routes
 
 STORY-2.4.2: Implement Status Update Endpoints
 
-Provides endpoints for orchestrators (N8N/Python) to update job and profile statuses
+Provides endpoints for the orchestration pipeline to update job and profile statuses
 during the discovery workflow.
 
 Endpoints:
@@ -85,7 +85,7 @@ def get_profile_repository() -> ProfileRepository:
     description="""
     Update the status of a discovery job.
     
-    This endpoint is used by the orchestrator (N8N/Python) to update job status
+    This endpoint is used by the orchestration pipeline to update job status
     during the discovery workflow.
     
     **Valid Transitions:**
